@@ -35,6 +35,19 @@
 .site-list-item.active {
   background: #eef5ff;
 }
+.site-list-title-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.favorite-toggle-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 15px;
+  padding: 0 2px;
+  line-height: 1;
+}
 .site-list-title {
   font-weight: bold;
 }
