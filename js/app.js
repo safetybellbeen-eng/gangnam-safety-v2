@@ -4,6 +4,7 @@ import { state } from './state.js';
 import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin } from './auth.js';
 import { initMap, renderMarkers, clearMarkers } from './map.js';
 import { loadActiveSites } from './sites.js';
+import { renderSiteList, selectSite, closeDetail } from './ui.js';
 
 const VIEWS = [
   'view-login', 'view-signup', 'view-signup-done',
@@ -42,10 +43,14 @@ function routeByProfile() {
         isAdmin() ? '관리자 계정입니다.' : '';
       showView('view-approved');
       // approved 상태에서만 지도를 초기화한다. pending/rejected/disabled는 여기 도달하지 않는다.
-      // 지도 초기화가 끝난 뒤에만 사업장을 조회해 마커를 그린다. 조회 실패해도 지도는 유지된다.
+      // 지도 초기화가 끝난 뒤에만 사업장을 조회해 마커/목록을 그린다. 조회 실패해도 지도는 유지된다.
       initMap('map-container')
         .then(() => loadActiveSites())
-        .then(sites => renderMarkers(sites))
+        .then(sites => {
+          state.sites = sites;
+          renderMarkers(sites, selectSite);
+          renderSiteList('site-list');
+        })
         .catch(err => {
           console.error('지도/사업장 초기화 실패:', err);
         });
@@ -67,7 +72,9 @@ function routeByProfile() {
 async function handleLogout() {
   await signOut();
   clearMarkers(); // 지도가 폐기되기 전에 마커를 먼저 정리
+  closeDetail();
   state.map = null; // 재로그인 시 지도가 정상적으로 다시 초기화되도록 초기화
+  state.sites = [];
   showView('view-login');
 }
 

@@ -4,15 +4,13 @@ import { sb } from './api.js';
 
 const SITE_COLUMNS = 'id, company_name, site_name, address, lat, lng, dong, amount, status, is_active';
 
-// is_active=true이고 lat/lng가 모두 있는 사업장만 조회한다.
-// 실패 시 예외를 던지지 않고 빈 배열을 반환해 앱 전체가 죽지 않도록 한다 (호출부 app.js에서 재확인).
+// is_active=true인 사업장을 전부 조회한다. 좌표 유무로 조회 자체를 제한하지 않는다 —
+// 좌표 없는 사업장도 목록에는 표시되어야 하며, 마커 생성 여부만 map.js의 좌표 검증이 담당한다.
 export async function loadActiveSites() {
   const { data, error } = await sb
     .from('gnmap_v2_sites')
     .select(SITE_COLUMNS)
-    .eq('is_active', true)
-    .not('lat', 'is', null)
-    .not('lng', 'is', null);
+    .eq('is_active', true);
 
   if (error) {
     console.error('사업장 조회 실패:', error);

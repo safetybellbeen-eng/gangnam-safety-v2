@@ -50,8 +50,9 @@ export async function initMap(containerId) {
 }
 
 // 사업장 배열로 마커를 그린다. 기존 마커는 전부 정리한 뒤 새로 생성한다 (중복 방지, 재호출 가능).
-// marker 클릭 상세정보/클러스터링은 이번 STEP 범위가 아니다.
-export function renderMarkers(sites) {
+// 각 마커 생성 시 클릭 리스너를 1회만 등록한다 — clearMarkers가 기존 마커를 먼저 지우므로
+// 재호출해도 리스너가 누적되지 않는다. onMarkerClick은 ui.js의 selectSite를 주입받는다.
+export function renderMarkers(sites, onMarkerClick) {
   clearMarkers();
 
   if (!state.map || !sites || sites.length === 0) return;
@@ -70,11 +71,31 @@ export function renderMarkers(sites) {
       position: new kakao.maps.LatLng(lat, lng),
       map: state.map
     });
+
+    if (typeof onMarkerClick === 'function') {
+      kakao.maps.event.addListener(marker, 'click', () => onMarkerClick(site.id));
+    }
+
     state.markers.push(marker);
+    state.siteMarkers.set(site.id, marker);
   });
 }
 
 export function clearMarkers() {
   state.markers.forEach(marker => marker.setMap(null));
   state.markers = [];
+  state.siteMarkers.clear();
+}
+
+// 선택된 사업장 좌표로 지도를 이동한다. 좌표가 유효하지 않으면 조용히 무시한다(앱이 죽지 않아야 함).
+export function panToSite(site) {
+  if (!state.map || !site) return;
+  const lat = Number(site.lat);
+  const lng = Number(site.lng);
+  const isValid =
+    Number.isFinite(lat) && Number.isFinite(lng) &&
+    lat >= -90 && lat <= 90 &&
+    lng >= -180 && lng <= 180;
+  if (!isValid) return;
+  state.map.panTo(new kakao.maps.LatLng(lat, lng));
 }
