@@ -1,8 +1,9 @@
-// ui.js — STEP 5B. 사업장 목록/상세 렌더링 및 선택 상태 연동.
+// ui.js — STEP 6A. 사업장 목록/상세/검색/정렬 렌더링 및 선택 상태 연동.
 // XSS 방지: DB 값(site_name/company_name/address 등)은 innerHTML 문자열 조립에 쓰지 않고
 // 전부 textContent 또는 createElement 기반 DOM 생성으로만 넣는다.
 import { state } from './state.js';
-import { panToSite } from './map.js';
+import { panToSite, renderMarkers } from './map.js';
+import { getFilteredSortedSites } from './sites.js';
 
 function displayValue(v) {
   return (v === null || v === undefined || v === '') ? '-' : v;
@@ -22,44 +23,54 @@ export function selectSite(siteId) {
 }
 
 // 목록 전체를 다시 그린다. 매번 새 DOM을 생성하므로 이전 렌더의 이벤트가 남아 누적되지 않는다.
+// 검색/정렬이 적용된 파생 배열(getFilteredSortedSites)만 받아서 렌더한다 — state.sites 원본은 건드리지 않는다.
 export function renderSiteList(containerId) {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
 
-  if (!state.sites || state.sites.length === 0) {
+  const visibleSites = getFilteredSortedSites();
+
+  if (!visibleSites || visibleSites.length === 0) {
     const empty = document.createElement('p');
     empty.textContent = '표시할 사업장이 없습니다.';
     container.appendChild(empty);
-    return;
+  } else {
+    visibleSites.forEach(site => {
+      const item = document.createElement('div');
+      item.className = 'site-list-item';
+      item.dataset.siteId = site.id;
+
+      const title = document.createElement('div');
+      title.className = 'site-list-title';
+      title.textContent = site.site_name || site.company_name || '-';
+
+      const company = document.createElement('div');
+      company.className = 'site-list-company';
+      company.textContent = displayValue(site.company_name);
+
+      const address = document.createElement('div');
+      address.className = 'site-list-address';
+      address.textContent = displayValue(site.address);
+
+      item.appendChild(title);
+      item.appendChild(company);
+      item.appendChild(address);
+
+      item.addEventListener('click', () => selectSite(site.id));
+
+      container.appendChild(item);
+    });
+
+    updateListActiveState();
   }
 
-  state.sites.forEach(site => {
-    const item = document.createElement('div');
-    item.className = 'site-list-item';
-    item.dataset.siteId = site.id;
+  // 검색/정렬 결과에 맞춰 marker도 다시 그린다.
+  renderMarkers(visibleSites, selectSite);
 
-    const title = document.createElement('div');
-    title.className = 'site-list-title';
-    title.textContent = site.site_name || site.company_name || '-';
-
-    const company = document.createElement('div');
-    company.className = 'site-list-company';
-    company.textContent = displayValue(site.company_name);
-
-    const address = document.createElement('div');
-    address.className = 'site-list-address';
-    address.textContent = displayValue(site.address);
-
-    item.appendChild(title);
-    item.appendChild(company);
-    item.appendChild(address);
-
-    item.addEventListener('click', () => selectSite(site.id));
-
-    container.appendChild(item);
-  });
-
-  updateListActiveState();
+  // 선택된 사업장이 현재 결과에서 사라졌으면 상세를 닫는다.
+  if (state.selectedSiteId !== null && !visibleSites.some(s => s.id === state.selectedSiteId)) {
+    closeDetail();
+  }
 }
 
 function updateListActiveState() {
@@ -118,4 +129,30 @@ export function closeDetail() {
   panel.innerHTML = '';
   state.selectedSiteId = null;
   updateListActiveState();
+}
+
+let searchDebounceTimer = null;
+let searchSortEventsbound = false;
+
+// 검색 input/정렬 select 이벤트를 1회만 바인딩한다 (중복 등록 방지 플래그).
+// 검색은 150ms debounce, 정렬은 즉시 반영. 둘 다 state 값만 갱신하고 렌더는 renderSiteList가 담당한다.
+export function bindSearchAndSort(containerId) {
+  if (searchSortEventsbound) return;
+  searchSortEventsbound = true;
+
+  const searchInput = document.getElementById('site-search-input');
+  const sortSelect = document.getElementById('site-sort-select');
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+      state.searchQuery = searchInput.value.trim();
+      renderSiteList(containerId);
+    }, 200);
+  });
+
+  sortSelect.addEventListener('change', () => {
+    state.sortMode = sortSelect.value;
+    renderSiteList(containerId);
+  });
 }

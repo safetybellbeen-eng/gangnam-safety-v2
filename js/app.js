@@ -2,9 +2,9 @@
 // 지도/사업장 등 실제 기능은 이후 STEP에서 추가한다 (CLAUDE.md 12절: 대규모 UI 금지).
 import { state } from './state.js';
 import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin } from './auth.js';
-import { initMap, renderMarkers, clearMarkers } from './map.js';
+import { initMap, clearMarkers } from './map.js';
 import { loadActiveSites } from './sites.js';
-import { renderSiteList, selectSite, closeDetail } from './ui.js';
+import { renderSiteList, selectSite, closeDetail, bindSearchAndSort } from './ui.js';
 
 const VIEWS = [
   'view-login', 'view-signup', 'view-signup-done',
@@ -48,8 +48,8 @@ function routeByProfile() {
         .then(() => loadActiveSites())
         .then(sites => {
           state.sites = sites;
-          renderMarkers(sites, selectSite);
-          renderSiteList('site-list');
+          bindSearchAndSort('site-list');
+          renderSiteList('site-list'); // 내부에서 marker도 함께 렌더한다 (getFilteredSortedSites 기준)
         })
         .catch(err => {
           console.error('지도/사업장 초기화 실패:', err);
@@ -75,6 +75,12 @@ async function handleLogout() {
   closeDetail();
   state.map = null; // 재로그인 시 지도가 정상적으로 다시 초기화되도록 초기화
   state.sites = [];
+  state.searchQuery = '';
+  state.sortMode = 'default';
+  const searchInput = document.getElementById('site-search-input');
+  const sortSelect = document.getElementById('site-sort-select');
+  if (searchInput) searchInput.value = '';
+  if (sortSelect) sortSelect.value = 'default';
   showView('view-login');
 }
 
