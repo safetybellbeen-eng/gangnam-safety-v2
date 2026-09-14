@@ -4,7 +4,7 @@ import { state } from './state.js';
 import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin } from './auth.js';
 import { initMap, clearMarkers } from './map.js';
 import { loadActiveSites } from './sites.js';
-import { renderSiteList, selectSite, closeDetail, bindSearchAndSort } from './ui.js';
+import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions } from './ui.js';
 
 const VIEWS = [
   'view-login', 'view-signup', 'view-signup-done',
@@ -48,6 +48,7 @@ function routeByProfile() {
         .then(() => loadActiveSites())
         .then(sites => {
           state.sites = sites;
+          renderDongOptions(); // state.sites 기준으로 동 select 옵션을 채운 뒤 이벤트 바인딩
           bindSearchAndSort('site-list');
           renderSiteList('site-list'); // 내부에서 marker도 함께 렌더한다 (getFilteredSortedSites 기준)
         })
@@ -77,10 +78,16 @@ async function handleLogout() {
   state.sites = [];
   state.searchQuery = '';
   state.sortMode = 'default';
+  state.selectedDong = 'all';
+  state.amountFilter = 'all';
   const searchInput = document.getElementById('site-search-input');
   const sortSelect = document.getElementById('site-sort-select');
+  const dongSelect = document.getElementById('site-dong-select');
+  const amountSelect = document.getElementById('site-amount-select');
   if (searchInput) searchInput.value = '';
   if (sortSelect) sortSelect.value = 'default';
+  if (dongSelect) dongSelect.innerHTML = '';
+  if (amountSelect) amountSelect.value = 'all';
   showView('view-login');
 }
 

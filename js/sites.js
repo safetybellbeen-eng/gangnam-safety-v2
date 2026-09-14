@@ -26,6 +26,33 @@ function matchesQuery(site, query) {
   return fields.some(f => (f || '').toString().toLowerCase().includes(q));
 }
 
+function matchesDong(site, selectedDong) {
+  if (!selectedDong || selectedDong === 'all') return true;
+  return site.dong === selectedDong;
+}
+
+// 금액 구간 경계(원 단위). 1억=100000000.
+const AMOUNT_RANGES = {
+  'under-100m': { min: -Infinity, max: 100000000 },       // 1억 미만
+  '100m-1b': { min: 100000000, max: 1000000000 },          // 1억 이상 ~ 10억 미만
+  '1b-5b': { min: 1000000000, max: 5000000000 },            // 10억 이상 ~ 50억 미만
+  '5b-12b': { min: 5000000000, max: 12000000000 },           // 50억 이상 ~ 120억 미만
+  'over-12b': { min: 12000000000, max: Infinity }             // 120억 이상
+};
+
+// amount가 숫자로 변환 불가능하거나 비어있으면 '전체'가 아닌 구간 선택 시 결과에서 제외한다.
+function matchesAmount(site, amountFilter) {
+  if (!amountFilter || amountFilter === 'all') return true;
+  const raw = site.amount;
+  if (raw === null || raw === undefined) return false;
+  if (typeof raw === 'string' && raw.trim() === '') return false;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return false;
+  const range = AMOUNT_RANGES[amountFilter];
+  if (!range) return true;
+  return n >= range.min && n < range.max;
+}
+
 function toSafeAmount(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
@@ -46,13 +73,26 @@ function compareBySort(a, b, sortMode) {
   }
 }
 
-// state.sites를 원본 그대로 두고, 복사본에서 검색 필터 → 정렬을 적용해 반환한다.
+// state.sites에 실제 존재하는 dong 값만 중복 제거 + 정렬해서 반환한다. select 옵션 채우기용.
+export function getDongOptions() {
+  const dongs = state.sites
+    .map(s => (typeof s.dong === 'string' ? s.dong.trim() : s.dong))
+    .filter(d => d !== null && d !== undefined && d !== '');
+  const unique = [...new Set(dongs)];
+  return unique.sort((a, b) => a.localeCompare(b, 'ko'));
+}
+
+// state.sites를 원본 그대로 두고, 복사본에서 검색 → 행정동 필터 → 금액 필터 → 정렬을 순서대로 적용해 반환한다.
 // UI/marker는 이 파생 배열만 받아서 렌더한다.
 export function getFilteredSortedSites() {
   const query = (state.searchQuery || '').trim();
-  const filtered = state.sites.filter(site => matchesQuery(site, query));
 
-  if (state.sortMode === 'default') return filtered;
+  let result = state.sites
+    .filter(site => matchesQuery(site, query))
+    .filter(site => matchesDong(site, state.selectedDong))
+    .filter(site => matchesAmount(site, state.amountFilter));
 
-  return [...filtered].sort((a, b) => compareBySort(a, b, state.sortMode));
+  if (state.sortMode === 'default') return result;
+
+  return [...result].sort((a, b) => compareBySort(a, b, state.sortMode));
 }
