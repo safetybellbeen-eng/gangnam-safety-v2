@@ -67,6 +67,17 @@
     <div id="site-list-panel">
       <div id="site-search-bar">
         <input type="text" id="site-search-input" placeholder="사업장명, 업체명, 주소, 동으로 검색">
+        <select id="site-dong-select">
+          <option value="all">전체</option>
+        </select>
+        <select id="site-amount-select">
+          <option value="all">전체</option>
+          <option value="under-100m">1억 미만</option>
+          <option value="100m-1b">1억 이상 ~ 10억 미만</option>
+          <option value="1b-5b">10억 이상 ~ 50억 미만</option>
+          <option value="5b-12b">50억 이상 ~ 120억 미만</option>
+          <option value="over-12b">120억 이상</option>
+        </select>
         <select id="site-sort-select">
           <option value="default">기본순서</option>
           <option value="name-asc">사업장명 가나다순</option>
