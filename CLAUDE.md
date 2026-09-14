@@ -6,9 +6,21 @@
 ## Supabase 프로젝트 공유 (중요)
 Supabase 무료 티어는 조직당 활성 프로젝트 2개로 제한되며 이미 2개를 사용 중이므로,
 V2는 새 Supabase 프로젝트를 만들지 않고 **기존 V1 프로젝트(motorrad-pulse)를 공유**한다.
-V1 테이블(schema/RLS/RPC)은 절대 수정하지 않는다.
-V2의 모든 테이블/인덱스/제약/함수는 `gnmap_v2_` 접두사로 V1과 이름이 겹치지 않게 분리한다.
-V1과 V2는 같은 프로젝트 안에서 완전히 독립된 네임스페이스로 취급한다.
+V1 테이블(schema/RLS/RPC)은 절대 읽지도, 수정하지도, 삭제하지도, 정책을 변경하지도 않는다.
+V2는 같은 프로젝트 안에서 `gnmap_v2_*` namespace로 완전히 분리하여 운영한다.
+
+**V2 실제 테이블명 (STEP 2에서 생성 완료, 확정):**
+- gnmap_v2_profiles
+- gnmap_v2_sites
+- gnmap_v2_favorites
+- gnmap_v2_site_notes
+- gnmap_v2_upload_history
+- gnmap_v2_supervisions
+
+앞으로의 모든 V2 작업(SQL/RLS/RPC/코드)은:
+- 위 `gnmap_v2_*` 테이블만 대상으로 한다.
+- 기존 V1의 `gnmap_*`(접두사 없는) 테이블은 읽기/쓰기/수정/삭제/정책변경 일체 금지.
+- 테이블명을 임의로 `gnmap_*`(V1 이름)로 되돌리거나 새로 짓지 않는다. 위 6개 확정 이름을 그대로 사용한다.
 
 ## LOW TOKEN MODE (항상 적용)
 - 요청 파일만 읽는다. 전체 repo 재탐색 금지.
