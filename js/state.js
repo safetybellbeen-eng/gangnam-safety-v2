@@ -16,6 +16,9 @@ export const state = {
   siteNotes: new Map(),   // siteId -> gnmap_v2_site_notes 행 (id/site_id/content/updated_at). 없으면 키가 없음.
   noteInFlight: new Set(), // 저장/삭제 요청이 진행 중인 site id (동시 요청 중복 방지)
   currentLocation: null,     // { lat, lng } 사용자가 버튼을 눌러 가져온 현재 위치. 자동 추적 없음.
-  currentLocationMarker: null, // kakao.maps.Marker 현재 위치 표시 (사업장 marker와 분리 관리, location.js 전용)
-  locationRequestInFlight: false // Geolocation 요청 진행 중 여부 (버튼 중복 클릭 방지)
+  currentLocationMarker: null, // 현재 위치 표시 객체 (사업장 marker와 분리 관리, location.js 전용)
+  locationRequestInFlight: false, // Geolocation 요청 진행 중 여부 (버튼 중복 클릭 방지)
+  adminUsers: [],          // gnmap_v2_profiles 목록 (admin.js loadUsers 결과). 관리자만 채워짐.
+  adminUserInFlight: new Set(), // status/role 변경 요청이 진행 중인 userId (중복 RPC 호출 방지)
+  adminMessage: ''          // 회원관리 패널에 표시할 최근 메시지(성공/실패/권한 없음 등)
 };

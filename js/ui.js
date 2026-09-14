@@ -6,6 +6,7 @@ import { panToSite, renderMarkers } from './map.js';
 import { getFilteredSortedSites, getDongOptions } from './sites.js';
 import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
+import { loadUsers, setUserStatus, setUserRole } from './admin.js';
 
 function displayValue(v) {
   return (v === null || v === undefined || v === '') ? '-' : v;
@@ -338,4 +339,111 @@ export function bindSearchAndSort(containerId) {
     state.amountFilter = amountSelect.value;
     renderSiteList(containerId);
   });
+}
+
+// 회원관리 패널을 렌더한다. loadUsers()로 채워진 state.adminUsers를 그린다 (관리자 전용).
+// 상태/역할은 select 변경만으로 DB에 반영되지 않고, 각자 "저장" 버튼을 눌러야 RPC가 호출된다.
+export async function renderAdminPanel(containerId) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+
+  const msgEl = document.createElement('p');
+  msgEl.id = 'admin-message';
+  msgEl.textContent = state.adminMessage;
+  container.appendChild(msgEl);
+
+  await loadUsers();
+
+  if (!state.adminUsers || state.adminUsers.length === 0) {
+    const empty = document.createElement('p');
+    empty.textContent = '표시할 회원이 없습니다.';
+    container.appendChild(empty);
+    return;
+  }
+
+  const currentUserId = state.user ? state.user.id : null;
+
+  state.adminUsers.forEach(u => {
+    const row = document.createElement('div');
+    row.className = 'admin-user-row';
+
+    const info = document.createElement('div');
+    info.className = 'admin-user-info';
+    [
+      ['이름', u.name],
+      ['이메일', u.email],
+      ['역할', u.role],
+      ['상태', u.status],
+      ['가입일', u.created_at]
+    ].forEach(([label, value]) => {
+      const line = document.createElement('div');
+      line.textContent = `${label}: ${displayValue(value)}`;
+      info.appendChild(line);
+    });
+    row.appendChild(info);
+
+    const isSelf = currentUserId === u.id;
+
+    // 상태 select + 저장 버튼
+    const statusSelect = document.createElement('select');
+    ['pending', 'approved', 'rejected', 'disabled'].forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s;
+      opt.textContent = s;
+      if (s === u.status) opt.selected = true;
+      // 자기 자신 보호: 본인 행에서는 rejected/disabled로 이동 불가
+      if (isSelf && (s === 'rejected' || s === 'disabled')) opt.disabled = true;
+      statusSelect.appendChild(opt);
+    });
+
+    const statusSaveBtn = document.createElement('button');
+    statusSaveBtn.type = 'button';
+    statusSaveBtn.textContent = '상태 저장';
+    statusSaveBtn.addEventListener('click', () =>
+      handleAdminChange(u.id, () => setUserStatus(u.id, statusSelect.value), containerId, [statusSaveBtn, roleSaveBtn])
+    );
+
+    // 역할 select + 저장 버튼
+    const roleSelect = document.createElement('select');
+    ['user', 'admin'].forEach(r => {
+      const opt = document.createElement('option');
+      opt.value = r;
+      opt.textContent = r;
+      if (r === u.role) opt.selected = true;
+      // 자기 자신 보호: 본인 행에서는 user로 강등 불가
+      if (isSelf && r === 'user') opt.disabled = true;
+      roleSelect.appendChild(opt);
+    });
+
+    const roleSaveBtn = document.createElement('button');
+    roleSaveBtn.type = 'button';
+    roleSaveBtn.textContent = '역할 저장';
+    roleSaveBtn.addEventListener('click', () =>
+      handleAdminChange(u.id, () => setUserRole(u.id, roleSelect.value), containerId, [statusSaveBtn, roleSaveBtn])
+    );
+
+    row.appendChild(statusSelect);
+    row.appendChild(statusSaveBtn);
+    row.appendChild(roleSelect);
+    row.appendChild(roleSaveBtn);
+
+    container.appendChild(row);
+  });
+}
+
+// status/role 변경 공통 처리. userId 기준 in-flight로 중복 요청을 막고,
+// 요청 시작 즉시 해당 사용자의 두 버튼(상태 저장/역할 저장)을 모두 disabled 한다.
+// 재렌더 전에 반드시 Set에서 삭제해야 새로 그려질 버튼이 정상적으로 활성화 상태로 시작한다.
+async function handleAdminChange(userId, action, containerId, buttons) {
+  if (state.adminUserInFlight.has(userId)) return;
+  state.adminUserInFlight.add(userId);
+  buttons.forEach(btn => { btn.disabled = true; });
+
+  try {
+    const result = await action();
+    state.adminMessage = result.message;
+  } finally {
+    state.adminUserInFlight.delete(userId);
+    await renderAdminPanel(containerId);
+  }
 }
