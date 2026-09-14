@@ -65,6 +65,16 @@
     <h1>인증 완료</h1>
     <p id="approved-role-badge"></p>
     <div id="site-list-panel">
+      <div id="site-search-bar">
+        <input type="text" id="site-search-input" placeholder="사업장명, 업체명, 주소, 동으로 검색">
+        <select id="site-sort-select">
+          <option value="default">기본순서</option>
+          <option value="name-asc">사업장명 가나다순</option>
+          <option value="company-asc">업체명 가나다순</option>
+          <option value="amount-desc">공사금액 높은순</option>
+          <option value="amount-asc">공사금액 낮은순</option>
+        </select>
+      </div>
       <div id="site-list"></div>
     </div>
     <div id="map-container"></div>
