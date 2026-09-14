@@ -10,6 +10,21 @@
   background: #fff;
   border-right: 1px solid #ddd;
 }
+#site-search-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid #ddd;
+}
+#site-search-input {
+  padding: 6px 8px;
+  font-size: 13px;
+}
+#site-sort-select {
+  padding: 4px;
+  font-size: 13px;
+}
 .site-list-item {
   padding: 10px 12px;
   border-bottom: 1px solid #eee;
