@@ -1,0 +1,22 @@
+/* map.css — STEP 4. 지도 컨테이너 최소 레이아웃. marker/경계선 스타일은 이후 STEP. */
+#app #view-approved {
+  max-width: none;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  position: relative;
+}
+#map-container {
+  width: 100%;
+  height: 100vh;
+}
+#view-approved h1,
+#approved-role-badge,
+#logout-approved {
+  position: absolute;
+  z-index: 10;
+  background: #fff;
+}
+#view-approved h1 { top: 0; left: 0; margin: 0; padding: 8px 12px; }
+#approved-role-badge { top: 40px; left: 0; padding: 4px 12px; }
+#logout-approved { top: 8px; right: 8px; }
