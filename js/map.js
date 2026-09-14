@@ -48,3 +48,33 @@ export async function initMap(containerId) {
 
   return state.map;
 }
+
+// 사업장 배열로 마커를 그린다. 기존 마커는 전부 정리한 뒤 새로 생성한다 (중복 방지, 재호출 가능).
+// marker 클릭 상세정보/클러스터링은 이번 STEP 범위가 아니다.
+export function renderMarkers(sites) {
+  clearMarkers();
+
+  if (!state.map || !sites || sites.length === 0) return;
+
+  sites.forEach(site => {
+    const lat = Number(site.lat);
+    const lng = Number(site.lng);
+    const isValid =
+      Number.isFinite(lat) && Number.isFinite(lng) &&
+      lat >= -90 && lat <= 90 &&
+      lng >= -180 && lng <= 180;
+
+    if (!isValid) return; // 유효하지 않은 좌표는 마커를 생성하지 않고 skip
+
+    const marker = new kakao.maps.Marker({
+      position: new kakao.maps.LatLng(lat, lng),
+      map: state.map
+    });
+    state.markers.push(marker);
+  });
+}
+
+export function clearMarkers() {
+  state.markers.forEach(marker => marker.setMap(null));
+  state.markers = [];
+}
