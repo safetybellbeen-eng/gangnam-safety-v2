@@ -5,6 +5,7 @@ import { state } from './state.js';
 import { panToSite, renderMarkers } from './map.js';
 import { getFilteredSortedSites, getDongOptions } from './sites.js';
 import { isFavorite, toggleFavorite } from './favorites.js';
+import { getNote, saveNote, deleteNote } from './notes.js';
 
 function displayValue(v) {
   return (v === null || v === undefined || v === '') ? '-' : v;
@@ -28,6 +29,70 @@ async function handleFavoriteToggle(siteId, triggerBtn) {
   if (detailFavBtn && detailFavBtn.dataset.siteId === String(siteId)) {
     detailFavBtn.textContent = nowFavorite ? '★ 즐겨찾기 해제' : '☆ 즐겨찾기 추가';
   }
+}
+
+// 상세 패널에 개인 메모 섹션(제목/textarea/저장/삭제)을 추가한다.
+// textarea.value만 사용하므로 XSS 위험이 없다 (innerHTML 미사용).
+function renderNoteSection(panel, siteId) {
+  const title = document.createElement('h3');
+  title.textContent = '개인 메모';
+  panel.appendChild(title);
+
+  const existing = getNote(siteId);
+
+  const textarea = document.createElement('textarea');
+  textarea.id = 'site-note-textarea';
+  textarea.value = existing ? existing.content : '';
+  panel.appendChild(textarea);
+
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button';
+  saveBtn.textContent = '저장';
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.type = 'button';
+  deleteBtn.textContent = '삭제';
+
+  saveBtn.addEventListener('click', async () => {
+    if (state.noteInFlight.has(siteId)) return;
+    state.noteInFlight.add(siteId);
+    saveBtn.disabled = true;
+    deleteBtn.disabled = true;
+
+    try {
+      const success = await saveNote(siteId, textarea.value);
+      if (success) {
+        // 저장(또는 빈 값이라 삭제로 위임된 경우 모두) 성공 시 최신 state 기준으로 textarea만 갱신, 화면은 유지.
+        const updated = getNote(siteId);
+        textarea.value = updated ? updated.content : '';
+      }
+    } finally {
+      state.noteInFlight.delete(siteId);
+      saveBtn.disabled = false;
+      deleteBtn.disabled = false;
+    }
+  });
+
+  deleteBtn.addEventListener('click', async () => {
+    if (state.noteInFlight.has(siteId)) return;
+    state.noteInFlight.add(siteId);
+    saveBtn.disabled = true;
+    deleteBtn.disabled = true;
+
+    try {
+      const success = await deleteNote(siteId);
+      if (success) {
+        textarea.value = '';
+      }
+    } finally {
+      state.noteInFlight.delete(siteId);
+      saveBtn.disabled = false;
+      deleteBtn.disabled = false;
+    }
+  });
+
+  panel.appendChild(saveBtn);
+  panel.appendChild(deleteBtn);
 }
 
 // 목록/마커 클릭이 공통으로 호출하는 선택 함수.
@@ -159,6 +224,8 @@ export function renderDetail(site) {
   favBtn.textContent = isFavorite(site.id) ? '★ 즐겨찾기 해제' : '☆ 즐겨찾기 추가';
   favBtn.addEventListener('click', () => handleFavoriteToggle(site.id, favBtn));
   panel.appendChild(favBtn);
+
+  renderNoteSection(panel, site.id);
 
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';
