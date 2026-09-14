@@ -21,7 +21,9 @@
   padding: 6px 8px;
   font-size: 13px;
 }
-#site-sort-select {
+#site-sort-select,
+#site-dong-select,
+#site-amount-select {
   padding: 4px;
   font-size: 13px;
 }
