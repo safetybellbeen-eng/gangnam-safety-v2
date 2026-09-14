@@ -1,7 +1,8 @@
 # 강남구 사업장 안전지도 V2 — CLAUDE.md
 
 ## 프로젝트 성격
-개발 중인 프로토타입 V2. V1(별도 리포지토리)은 참고 전용, 수정 금지.
+개발 중인 프로토타입 V2. 코드 리포지토리는 V1과 별도(V1은 참고 전용, 수정 금지).
+Supabase 프로젝트는 V1과 동일(motorrad-pulse)하며, V2는 `gnmap_v2_*` 테이블만 사용한다.
 
 ## Supabase 프로젝트 공유 (중요)
 Supabase 무료 티어는 조직당 활성 프로젝트 2개로 제한되며 이미 2개를 사용 중이므로,
@@ -48,7 +49,7 @@ gangnam-safety-v2/
 ```
 
 ## 사업장 ID 원칙
-- `gnmap_v2_sites.id`는 불변 PK. favorites/notes/supervision은 이 id를 FK로 참조.
+- `gnmap_v2_sites.id`는 불변 PK. gnmap_v2_favorites/gnmap_v2_site_notes는 이 id를 FK로 참조. supervision과 sites의 관계는 STEP 14까지 미확정.
 - 식별키 후보: 사업개시번호 단독 / 산재관리번호+사업개시번호 / 기타 공식번호 조합. **실제 데이터로 고유성·결측률 검증 전까지 확정 금지.**
 - 공식 번호는 전부 TEXT (앞자리 0 손실 방지).
 - UPDATE 과정에서 매칭에 사용한 식별자 컬럼이 의도치 않게 NULL로 바뀌거나 변경되지 않도록 검증한다.
@@ -59,7 +60,7 @@ gangnam-safety-v2/
 ## Excel Import 원칙
 - DELETE ALL → INSERT ALL 금지.
 - 흐름: parsing → 식별번호 추출 → validation → geocoding → RPC(단일 트랜잭션).
-- 기존 매칭 시 UPDATE(id 유지), 신규는 INSERT, 사라진 사업장은 `is_active=false` (하드 DELETE 금지 — CASCADE로 favorites/notes 파괴 방지).
+- 기존 매칭 시 UPDATE(id 유지), 신규는 INSERT, 사라진 사업장은 `is_active=false` (하드 DELETE 금지 — gnmap_v2_sites FK는 RESTRICT로 보호하며, 누락 사업장은 is_active=false 처리).
 - RPC 내부 오류 시 전체 rollback.
 
 ## Kakao API 보안
