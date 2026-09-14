@@ -1,1 +1,22 @@
-/* components.css — STEP 1 골격. 버튼/모달/토스트 등은 이후 STEP에서 채운다. */
+/* components.css — STEP 3B. 인증 테스트용 최소 폼 스타일. 대규모 디자인은 이후 STEP. */
+#app section {
+  max-width: 360px;
+  margin: 40px auto;
+  padding: 20px;
+}
+#app form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#app label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+}
+.form-error {
+  color: #c0392b;
+  font-size: 13px;
+  min-height: 1em;
+}

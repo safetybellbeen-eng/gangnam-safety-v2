@@ -1,1 +1,31 @@
--- seed.sql — 초기 시드 데이터는 필요한 STEP에서 작성한다.
+-- ============================================================
+-- seed.sql — V2 최초 관리자 bootstrap (STEP 3)
+-- 이 파일은 자동 실행되지 않는다. 딱 1회, 수동으로만 실행한다.
+-- 아직 실행하지 않는다.
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- 최초 admin 생성 절차
+--
+-- 1) V2 앱에서 일반 회원가입을 정상적으로 1회 진행한다.
+--    (auth.users에 계정이 생기고, handle_gnmap_v2_new_user 트리거가
+--     app='gangnam-safety-v2' metadata를 확인해 gnmap_v2_profiles를
+--     role='user', status='pending'으로 자동 생성한다.)
+--
+-- 2) Supabase 대시보드(Authentication → Users)에서 방금 가입한
+--    계정의 UUID를 확인한다.
+--
+-- 3) 아래 UPDATE의 <PASTE_USER_UUID_HERE>를 그 UUID로 바꿔
+--    SQL Editor에서 1회만 직접 실행한다.
+--    이 경로는 gnmap_v2_set_user_role/gnmap_v2_set_user_status RPC를
+--    거치지 않는 유일한 예외이며, "이미 admin인 사람이 없는" 최초 1회에만
+--    쓴다 — 이후의 모든 role/status 변경은 반드시 RPC로만 수행한다.
+-- ------------------------------------------------------------
+
+-- update public.gnmap_v2_profiles
+-- set role = 'admin', status = 'approved'
+-- where id = '<PASTE_USER_UUID_HERE>';
+
+-- 실행 후 확인:
+-- select id, email, role, status from public.gnmap_v2_profiles
+-- where id = '<PASTE_USER_UUID_HERE>';
