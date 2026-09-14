@@ -11,6 +11,29 @@ function displayValue(v) {
   return (v === null || v === undefined || v === '') ? '-' : v;
 }
 
+// 카카오맵 공식 웹 링크 형식(REST API 아님, REST Key 불필요)으로 길찾기 페이지 URL을 만든다.
+// 형식: https://map.kakao.com/link/to/{목적지명},{위도},{경도}
+// 목적지명에 콤마/특수문자가 있어도 깨지지 않도록 경로 세그먼트를 개별 encodeURIComponent한다.
+function buildKakaoDirectionsUrl(name, lat, lng) {
+  const safeName = encodeURIComponent(name || '목적지');
+  return `https://map.kakao.com/link/to/${safeName},${lat},${lng}`;
+}
+
+function isValidSiteCoord(site) {
+  const rawLat = site.lat;
+  const rawLng = site.lng;
+  const isBlank = (v) => v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
+  if (isBlank(rawLat) || isBlank(rawLng)) return false;
+
+  const lat = Number(rawLat);
+  const lng = Number(rawLng);
+  return (
+    Number.isFinite(lat) && Number.isFinite(lng) &&
+    lat >= -90 && lat <= 90 &&
+    lng >= -180 && lng <= 180
+  );
+}
+
 // 즐겨찾기 토글 공통 처리. DB 성공 후에만 버튼 표시를 확정 갱신한다(낙관적 갱신 금지).
 // 목록의 별표와 상세 패널의 별표(있다면)를 모두 같은 결과로 맞춘다.
 async function handleFavoriteToggle(siteId, triggerBtn) {
@@ -224,6 +247,19 @@ export function renderDetail(site) {
   favBtn.textContent = isFavorite(site.id) ? '★ 즐겨찾기 해제' : '☆ 즐겨찾기 추가';
   favBtn.addEventListener('click', () => handleFavoriteToggle(site.id, favBtn));
   panel.appendChild(favBtn);
+
+  const directionsBtn = document.createElement('button');
+  directionsBtn.type = 'button';
+  directionsBtn.textContent = '길찾기';
+  const hasValidCoord = isValidSiteCoord(site);
+  directionsBtn.disabled = !hasValidCoord;
+  if (hasValidCoord) {
+    directionsBtn.addEventListener('click', () => {
+      const url = buildKakaoDirectionsUrl(site.site_name || site.company_name, site.lat, site.lng);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    });
+  }
+  panel.appendChild(directionsBtn);
 
   renderNoteSection(panel, site.id);
 

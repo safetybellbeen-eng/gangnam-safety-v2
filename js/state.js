@@ -14,5 +14,8 @@ export const state = {
   favoriteSiteIds: new Set(), // 현재 로그인 사용자가 즐겨찾기한 site id 집합
   favoriteInFlight: new Set(), // 토글 요청이 진행 중인 site id (rapid click 중복 방지)
   siteNotes: new Map(),   // siteId -> gnmap_v2_site_notes 행 (id/site_id/content/updated_at). 없으면 키가 없음.
-  noteInFlight: new Set() // 저장/삭제 요청이 진행 중인 site id (동시 요청 중복 방지)
+  noteInFlight: new Set(), // 저장/삭제 요청이 진행 중인 site id (동시 요청 중복 방지)
+  currentLocation: null,     // { lat, lng } 사용자가 버튼을 눌러 가져온 현재 위치. 자동 추적 없음.
+  currentLocationMarker: null, // kakao.maps.Marker 현재 위치 표시 (사업장 marker와 분리 관리, location.js 전용)
+  locationRequestInFlight: false // Geolocation 요청 진행 중 여부 (버튼 중복 클릭 방지)
 };

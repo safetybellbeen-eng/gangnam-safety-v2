@@ -7,6 +7,7 @@ import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
 import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions } from './ui.js';
+import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
 
 const VIEWS = [
   'view-login', 'view-signup', 'view-signup-done',
@@ -75,6 +76,7 @@ function routeByProfile() {
 async function handleLogout() {
   await signOut();
   clearMarkers(); // 지도가 폐기되기 전에 마커를 먼저 정리
+  clearCurrentLocationMarker();
   closeDetail();
   state.map = null; // 재로그인 시 지도가 정상적으로 다시 초기화되도록 초기화
   state.sites = [];
@@ -86,14 +88,18 @@ async function handleLogout() {
   state.favoriteInFlight = new Set();
   state.siteNotes = new Map();
   state.noteInFlight = new Set();
+  state.currentLocation = null;
+  state.locationRequestInFlight = false;
   const searchInput = document.getElementById('site-search-input');
   const sortSelect = document.getElementById('site-sort-select');
   const dongSelect = document.getElementById('site-dong-select');
   const amountSelect = document.getElementById('site-amount-select');
+  const locationMsg = document.getElementById('location-message');
   if (searchInput) searchInput.value = '';
   if (sortSelect) sortSelect.value = 'default';
   if (dongSelect) dongSelect.innerHTML = '';
   if (amountSelect) amountSelect.value = 'all';
+  if (locationMsg) locationMsg.textContent = '';
   showView('view-login');
 }
 
@@ -104,6 +110,24 @@ function bindEvents() {
 
   ['logout-pending', 'logout-rejected', 'logout-disabled', 'logout-approved'].forEach(id => {
     document.getElementById(id).addEventListener('click', handleLogout);
+  });
+
+  document.getElementById('btn-current-location').addEventListener('click', async () => {
+    if (state.locationRequestInFlight) return;
+    state.locationRequestInFlight = true;
+
+    const btn = document.getElementById('btn-current-location');
+    const msgEl = document.getElementById('location-message');
+    btn.disabled = true;
+    msgEl.textContent = '';
+
+    try {
+      const result = await requestCurrentLocation();
+      msgEl.textContent = result.ok ? '' : result.message;
+    } finally {
+      btn.disabled = false;
+      state.locationRequestInFlight = false;
+    }
   });
 
   document.getElementById('login-form').addEventListener('submit', async (e) => {
