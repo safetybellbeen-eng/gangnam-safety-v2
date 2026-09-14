@@ -1,0 +1,1 @@
+-- schema.sql — STEP 2에서 작성한다. STEP 1에서는 실제 schema를 정의하지 않는다.

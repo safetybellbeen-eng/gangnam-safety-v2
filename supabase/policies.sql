@@ -1,0 +1,1 @@
+-- policies.sql — RLS 정책은 STEP 3에서 작성한다.

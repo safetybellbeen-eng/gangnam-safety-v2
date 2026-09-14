@@ -1,0 +1,1 @@
+-- functions.sql — RPC 함수는 해당 STEP(예: STEP 12 import RPC)에서 작성한다.
