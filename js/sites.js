@@ -28,7 +28,10 @@ function matchesQuery(site, query) {
 
 function matchesDong(site, selectedDong) {
   if (!selectedDong || selectedDong === 'all') return true;
-  return site.dong === selectedDong;
+  if (site.dong === null || site.dong === undefined) return false;
+  const siteDong = typeof site.dong === 'string' ? site.dong.trim() : site.dong;
+  const target = typeof selectedDong === 'string' ? selectedDong.trim() : selectedDong;
+  return siteDong === target;
 }
 
 // 금액 구간 경계(원 단위). 1억=100000000.
