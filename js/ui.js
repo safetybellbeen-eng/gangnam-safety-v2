@@ -4,9 +4,30 @@
 import { state } from './state.js';
 import { panToSite, renderMarkers } from './map.js';
 import { getFilteredSortedSites, getDongOptions } from './sites.js';
+import { isFavorite, toggleFavorite } from './favorites.js';
 
 function displayValue(v) {
   return (v === null || v === undefined || v === '') ? '-' : v;
+}
+
+// 즐겨찾기 토글 공통 처리. DB 성공 후에만 버튼 표시를 확정 갱신한다(낙관적 갱신 금지).
+// 목록의 별표와 상세 패널의 별표(있다면)를 모두 같은 결과로 맞춘다.
+async function handleFavoriteToggle(siteId, triggerBtn) {
+  if (triggerBtn) triggerBtn.disabled = true;
+
+  const success = await toggleFavorite(siteId);
+
+  if (triggerBtn) triggerBtn.disabled = false;
+  if (!success) return; // 실패 시 기존 state/표시 그대로 유지
+
+  const nowFavorite = isFavorite(siteId);
+  document.querySelectorAll(`.site-list-item[data-site-id="${siteId}"] .favorite-toggle-btn`)
+    .forEach(btn => { btn.textContent = nowFavorite ? '★' : '☆'; });
+
+  const detailFavBtn = document.getElementById('site-detail-favorite-btn');
+  if (detailFavBtn && detailFavBtn.dataset.siteId === String(siteId)) {
+    detailFavBtn.textContent = nowFavorite ? '★ 즐겨찾기 해제' : '☆ 즐겨찾기 추가';
+  }
 }
 
 // 목록/마커 클릭이 공통으로 호출하는 선택 함수.
@@ -40,9 +61,24 @@ export function renderSiteList(containerId) {
       item.className = 'site-list-item';
       item.dataset.siteId = site.id;
 
+      const titleRow = document.createElement('div');
+      titleRow.className = 'site-list-title-row';
+
+      const favBtn = document.createElement('button');
+      favBtn.type = 'button';
+      favBtn.className = 'favorite-toggle-btn';
+      favBtn.textContent = isFavorite(site.id) ? '★' : '☆';
+      favBtn.addEventListener('click', (e) => {
+        e.stopPropagation(); // 목록 항목 선택 이벤트로 전파되지 않도록 분리
+        handleFavoriteToggle(site.id, favBtn);
+      });
+
       const title = document.createElement('div');
       title.className = 'site-list-title';
       title.textContent = site.site_name || site.company_name || '-';
+
+      titleRow.appendChild(favBtn);
+      titleRow.appendChild(title);
 
       const company = document.createElement('div');
       company.className = 'site-list-company';
@@ -52,7 +88,7 @@ export function renderSiteList(containerId) {
       address.className = 'site-list-address';
       address.textContent = displayValue(site.address);
 
-      item.appendChild(title);
+      item.appendChild(titleRow);
       item.appendChild(company);
       item.appendChild(address);
 
@@ -115,6 +151,14 @@ export function renderDetail(site) {
     row.appendChild(valueEl);
     panel.appendChild(row);
   });
+
+  const favBtn = document.createElement('button');
+  favBtn.type = 'button';
+  favBtn.id = 'site-detail-favorite-btn';
+  favBtn.dataset.siteId = String(site.id);
+  favBtn.textContent = isFavorite(site.id) ? '★ 즐겨찾기 해제' : '☆ 즐겨찾기 추가';
+  favBtn.addEventListener('click', () => handleFavoriteToggle(site.id, favBtn));
+  panel.appendChild(favBtn);
 
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';

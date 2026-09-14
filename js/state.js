@@ -1,4 +1,4 @@
-// state.js — STEP 6B. 공용 애플리케이션 상태.
+// state.js — STEP 7A. 공용 애플리케이션 상태.
 export const state = {
   user: null,          // auth.users 세션 사용자
   profile: null,        // gnmap_v2_profiles 행 (role/status 포함)
@@ -10,5 +10,7 @@ export const state = {
   searchQuery: '',        // 검색어 (site_name/company_name/address/dong 대상)
   sortMode: 'default',    // 'default' | 'name-asc' | 'company-asc' | 'amount-desc' | 'amount-asc'
   selectedDong: 'all',     // 'all' 또는 특정 dong 값 (단일 선택)
-  amountFilter: 'all'      // 'all' | 'under-100m' | '100m-1b' | '1b-5b' | '5b-12b' | 'over-12b'
+  amountFilter: 'all',     // 'all' | 'under-100m' | '100m-1b' | '1b-5b' | '5b-12b' | 'over-12b'
+  favoriteSiteIds: new Set(), // 현재 로그인 사용자가 즐겨찾기한 site id 집합
+  favoriteInFlight: new Set() // 토글 요청이 진행 중인 site id (rapid click 중복 방지)
 };
