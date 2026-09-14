@@ -82,3 +82,10 @@
 .site-detail-value {
   font-size: 13px;
 }
+#site-note-textarea {
+  width: 100%;
+  min-height: 70px;
+  margin: 6px 0;
+  font-size: 13px;
+  box-sizing: border-box;
+}
