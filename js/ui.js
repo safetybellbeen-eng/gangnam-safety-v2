@@ -8,6 +8,7 @@ import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
 import { loadUsers, setUserStatus, setUserRole } from './admin.js';
 import { parseExcelFile } from './excel.js';
+import { runGeocodingForParsedRows } from './geocoding.js';
 
 function displayValue(v) {
   return (v === null || v === undefined || v === '') ? '-' : v;
@@ -454,6 +455,8 @@ async function handleAdminChange(userId, action, containerId, buttons) {
 export async function handleExcelFileSelect(file, containerId) {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
+  state.geocodeProgress = null; // 새 파일 선택 시 이전 geocoding 진행상황 초기화
+  state.geocodeInProgress = false;
 
   const loadingMsg = document.createElement('p');
   loadingMsg.textContent = '파일을 읽는 중...';
@@ -500,6 +503,28 @@ function renderUploadPreview(containerId) {
   });
   container.appendChild(summaryEl);
 
+  // geocoding 버튼 + 진행상황 표시 영역. ERROR가 아니고 address가 있는 행만 대상이 된다.
+  const geocodeSection = document.createElement('div');
+  geocodeSection.id = 'geocode-section';
+
+  const geocodeBtn = document.createElement('button');
+  geocodeBtn.type = 'button';
+  geocodeBtn.id = 'btn-geocode-start';
+  geocodeBtn.textContent = '주소 좌표 확인';
+  geocodeBtn.disabled = state.geocodeInProgress;
+  geocodeBtn.addEventListener('click', () => handleGeocodeStart(containerId));
+  geocodeSection.appendChild(geocodeBtn);
+
+  const progressEl = document.createElement('p');
+  progressEl.id = 'geocode-progress-text';
+  if (state.geocodeProgress) {
+    const p = state.geocodeProgress;
+    progressEl.textContent = `대상 ${p.total}건 중 완료 ${p.done}건 (성공 ${p.success} · 결과없음 ${p.notFound} · 오류 ${p.error})`;
+  }
+  geocodeSection.appendChild(progressEl);
+
+  container.appendChild(geocodeSection);
+
   // 미리보기는 목록이 매우 길어질 수 있으므로 최대 50건만 표시한다 (전체 데이터는 state.uploadParsedRows에 보존됨).
   const previewRows = state.uploadParsedRows.slice(0, 50);
 
@@ -521,6 +546,14 @@ function renderUploadPreview(containerId) {
     statusEl.textContent = row._validation === 'ERROR' ? '오류' : (row._validation === 'WARNING' ? '경고' : '정상');
     rowEl.appendChild(statusEl);
 
+    if (row._geocodeStatus) {
+      const geoEl = document.createElement('span');
+      geoEl.className = 'upload-geocode-badge';
+      const labelMap = { SUCCESS: '좌표 확인됨', NOT_FOUND: '주소 검색결과 없음', ERROR: '좌표 확인 실패', PENDING: '확인 대기' };
+      geoEl.textContent = labelMap[row._geocodeStatus] || row._geocodeStatus;
+      rowEl.appendChild(geoEl);
+    }
+
     if (row._validation === 'ERROR') {
       const errEl = document.createElement('span');
       errEl.className = 'upload-error-text';
@@ -540,5 +573,35 @@ function renderUploadPreview(containerId) {
     const moreMsg = document.createElement('p');
     moreMsg.textContent = `그 외 ${state.uploadParsedRows.length - 50}건은 표시되지 않았습니다.`;
     container.appendChild(moreMsg);
+  }
+}
+
+// "주소 좌표 확인" 버튼 클릭 처리. 중복 클릭을 막고, 진행 중에는 버튼을 disabled 한다.
+// geocoding 자체는 geocoding.js가 담당하며, 여기서는 진행상황 콜백으로 미리보기만 갱신한다.
+async function handleGeocodeStart(containerId) {
+  if (state.geocodeInProgress) return;
+  state.geocodeInProgress = true;
+  renderUploadPreview(containerId); // 버튼 disabled를 즉시 반영 (이 시점엔 아직 PENDING 표시 전)
+
+  let isFirstProgressTick = true;
+
+  try {
+    await runGeocodingForParsedRows((progress) => {
+      state.geocodeProgress = progress;
+      if (isFirstProgressTick) {
+        // runGeocodingForParsedRows가 대상 행을 PENDING으로 표시한 직후 호출되는 첫 콜백이므로,
+        // 여기서 전체를 다시 그려 각 행의 PENDING 배지가 실제로 화면에 나타나게 한다.
+        isFirstProgressTick = false;
+        renderUploadPreview(containerId);
+        return;
+      }
+      const progressEl = document.getElementById('geocode-progress-text');
+      if (progressEl) {
+        progressEl.textContent = `대상 ${progress.total}건 중 완료 ${progress.done}건 (성공 ${progress.success} · 결과없음 ${progress.notFound} · 오류 ${progress.error})`;
+      }
+    });
+  } finally {
+    state.geocodeInProgress = false;
+    renderUploadPreview(containerId); // 완료 후 각 행의 _geocodeStatus를 반영해 재렌더
   }
 }

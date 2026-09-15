@@ -20,5 +20,12 @@ export const state = {
   locationRequestInFlight: false, // Geolocation 요청 진행 중 여부 (버튼 중복 클릭 방지)
   adminUsers: [],          // gnmap_v2_profiles 목록 (admin.js loadUsers 결과). 관리자만 채워짐.
   adminUserInFlight: new Set(), // status/role 변경 요청이 진행 중인 userId (중복 RPC 호출 방지)
-  adminMessage: ''          // 회원관리 패널에 표시할 최근 메시지(성공/실패/권한 없음 등)
+  adminMessage: '',          // 회원관리 패널에 표시할 최근 메시지(성공/실패/권한 없음 등)
+  uploadParsedRows: [],       // excel.js 파싱+검증 결과 (아직 DB에 반영되지 않은 상태, STEP 11/12에서 사용)
+                                // 각 행은 geocoding 진행 시 _geocodeStatus('PENDING'|'SUCCESS'|'NOT_FOUND'|'ERROR')와
+                                // 성공 시 lat/lng, 실패 시 _geocodeError가 추가된다 (validation 필드는 그대로 유지).
+  uploadDetectedForm: null,   // 'form1' | 'form2' | null (자동 판별 결과)
+  uploadValidationSummary: null, // { total, validCount, warningCount, errorCount, invalidCount, duplicateCount } 요약
+  geocodeInProgress: false,   // geocoding 버튼 중복 클릭 방지
+  geocodeProgress: null        // { total, done, success, notFound, error } geocoding 진행 상태
 };
