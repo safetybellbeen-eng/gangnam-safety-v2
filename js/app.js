@@ -6,7 +6,7 @@ import { initMap, clearMarkers } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
-import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel } from './ui.js';
+import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect } from './ui.js';
 import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
 
 const VIEWS = [
@@ -47,6 +47,7 @@ function routeByProfile() {
       // 관리자에게만 회원 관리 버튼을 보여준다. UI 숨김은 편의 목적일 뿐,
       // 실제 데이터 접근/변경 보안은 RLS와 RPC 내부의 is_gnmap_v2_admin() 검증이 담당한다.
       document.getElementById('btn-admin-panel').style.display = isAdmin() ? 'inline-block' : 'none';
+      document.getElementById('btn-upload-panel').style.display = isAdmin() ? 'inline-block' : 'none';
       showView('view-approved');
       // approved 상태에서만 지도를 초기화한다. pending/rejected/disabled는 여기 도달하지 않는다.
       // 지도 초기화가 끝난 뒤에만 사업장을 조회해 마커/목록을 그린다. 조회 실패해도 지도는 유지된다.
@@ -100,6 +101,17 @@ async function handleLogout() {
   if (adminPanel) { adminPanel.style.display = 'none'; adminPanel.innerHTML = ''; }
   const adminBtn = document.getElementById('btn-admin-panel');
   if (adminBtn) adminBtn.style.display = 'none';
+  state.uploadParsedRows = [];
+  state.uploadDetectedForm = null;
+  state.uploadValidationSummary = null;
+  const uploadPanel = document.getElementById('upload-panel');
+  if (uploadPanel) uploadPanel.style.display = 'none';
+  const uploadPreview = document.getElementById('upload-preview');
+  if (uploadPreview) uploadPreview.innerHTML = '';
+  const uploadFileInput = document.getElementById('upload-file-input');
+  if (uploadFileInput) uploadFileInput.value = '';
+  const uploadBtn = document.getElementById('btn-upload-panel');
+  if (uploadBtn) uploadBtn.style.display = 'none';
   const searchInput = document.getElementById('site-search-input');
   const sortSelect = document.getElementById('site-sort-select');
   const dongSelect = document.getElementById('site-dong-select');
@@ -149,6 +161,19 @@ function bindEvents() {
       state.adminMessage = '';
       await renderAdminPanel('admin-panel');
     }
+  });
+
+  document.getElementById('btn-upload-panel').addEventListener('click', () => {
+    if (!isAdmin()) return; // UI 숨김 우회 방지(최종 방어는 STEP 12 RPC 내부의 관리자 검증)
+    const panel = document.getElementById('upload-panel');
+    panel.style.display = (panel.style.display === 'none') ? 'block' : 'none';
+  });
+
+  document.getElementById('upload-file-input').addEventListener('change', async (e) => {
+    if (!isAdmin()) return;
+    const file = e.target.files[0];
+    if (!file) return;
+    await handleExcelFileSelect(file, 'upload-preview');
   });
 
   document.getElementById('login-form').addEventListener('submit', async (e) => {
