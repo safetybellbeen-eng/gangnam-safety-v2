@@ -37,6 +37,33 @@ async function geocodeAddress(address) {
   }
 }
 
+// STEP 11G. Kakao keyword search 호출. Edge Function의 mode:'keyword' 경로를 사용한다.
+// 반환값: { success:true, candidates:[{placeName, addressName, roadAddressName, lat, lng}, ...] } | { success:false, reason }
+// 이 함수는 후보 목록만 가져온다 — 어떤 좌표도 여기서 확정/적용하지 않는다.
+async function geocodeKeyword(query) {
+  try {
+    const { data, error } = await sb.functions.invoke('gnmap-v2-geocode', {
+      body: { mode: 'keyword', query },
+    });
+    if (error) {
+      if (error.context && typeof error.context.json === 'function') {
+        try {
+          const body = await error.context.json();
+          if (body && typeof body.reason === 'string') {
+            return { success: false, reason: body.reason };
+          }
+        } catch (_parseErr) {
+          // 폴백
+        }
+      }
+      return { success: false, reason: 'INTERNAL_ERROR' };
+    }
+    return data;
+  } catch (_e) {
+    return { success: false, reason: 'INTERNAL_ERROR' };
+  }
+}
+
 // 동일 정규화 주소는 같은 파일 내에서 1회만 호출하고 결과를 재사용한다 (불필요한 Kakao 호출 절감).
 function normalizeForCache(address) {
   return (address || '').trim();
@@ -242,6 +269,146 @@ export async function runGeocodingForParsedRows(onProgress) {
         row._geocodeMethod = null;
         row._locationQuality = 'UNRESOLVED';
         progress.error++;
+      }
+
+      progress.done++;
+      if (typeof onProgress === 'function') onProgress({ ...progress });
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(CONCURRENCY, targets.length) }, () => worker());
+  await Promise.all(workers);
+
+  return progress;
+}
+
+// ------------------------------------------------------------
+// STEP 11G. Kakao keyword 후보검색 (실험). 결과는 후보 목록만 반환하며 lat/lng를 자동 반영하지 않는다.
+// ------------------------------------------------------------
+
+// 원본 주소에서 "동" 이름을 안전하게 추출한다. 새 정보를 추론하지 않고, 원본에 이미 있는 "OO동" 패턴만 사용한다.
+// 우선 괄호 안 동명("(논현동)")을 찾고, 없으면 "강남구 OO동" 형태(지번주소에서 괄호 없이 쓰이는 경우)를 찾는다.
+// 둘 다 실패하면 null (query 생성 시 동 없이 site_name+강남구로만 구성).
+function extractDongFromAddress(address) {
+  if (!address) return null;
+  const s = String(address);
+  const parenMatch = s.match(/\(([가-힣]{1,4}동)/);
+  if (parenMatch) return parenMatch[1];
+  const afterGuMatch = s.match(/구\s+([가-힣]{1,4}동)(?=[\s\d]|$)/);
+  if (afterGuMatch) return afterGuMatch[1];
+  return null;
+}
+
+// keyword query 생성. 1순위: 동+site_name. 동을 못 찾으면 site_name+강남구.
+function buildKeywordQuery(row) {
+  const dong = extractDongFromAddress(row.address);
+  const site = row.site_name || row.company_name || '';
+  if (!site) return null;
+  return dong ? `${dong} ${site}` : `${site} 강남구`;
+}
+
+// 후보 하나를 검증해 MATCH(강남구+원본 동 일치) / WEAK(강남구는 맞지만 동 불일치 또는 동 모름)로 분류한다.
+// site_name과 place_name의 문자열 유사도는 참고 점수로만 쓰고 이 분류에는 반영하지 않는다(자동확정 방지).
+// row 전체를 STRONG_CANDIDATE로 볼지는 이 함수가 아니라 호출부에서 MATCH 개수를 세어 판단한다
+// (MATCH 후보가 여럿이면 어느 것이 맞는지 모호하므로 row 전체를 WEAK로 낮춘다).
+function classifyCandidate(candidate, originalDong) {
+  const addr = candidate.roadAddressName || candidate.addressName || '';
+  const isGangnam = addr.includes('강남구');
+  if (!isGangnam) return null; // 강남구가 아니면 후보로도 보지 않는다.
+
+  if (originalDong && addr.includes(originalDong)) {
+    return 'MATCH';
+  }
+  // 동 불일치, 또는 원본 동을 알 수 없는 경우(추출 실패) 모두 WEAK로 취급한다.
+  return 'WEAK';
+}
+
+// UNRESOLVED 행에 대해 keyword search를 1건씩 실행하고, 후보 목록/상태를 row에 저장한다.
+// row._keywordQuery, row._keywordCandidates(최대 3개, 각 candidateStatus 포함), row._keywordSearchStatus를 채운다.
+// concurrency=CONCURRENCY로 제한하며, in-flight 캐시(같은 query 재사용)도 동일하게 적용한다.
+// targetRow를 넘기면 그 행 1건만 대상으로 실행한다(개별 "위치 후보 찾기" 버튼용).
+export async function runKeywordCandidateSearch(onProgress, targetRow) {
+  const targets = targetRow
+    ? [targetRow]
+    : state.uploadParsedRows.filter(row => row._locationQuality === 'UNRESOLVED');
+
+  targets.forEach(row => {
+    row._keywordQuery = null;
+    row._keywordCandidates = null;
+    row._keywordSearchStatus = 'PENDING';
+  });
+
+  const progress = { total: targets.length, done: 0, strong: 0, weak: 0, none: 0, error: 0 };
+  if (typeof onProgress === 'function') onProgress({ ...progress });
+
+  const inFlight = new Map();
+  function getOrCreate(query) {
+    const key = (query || '').trim();
+    let p = inFlight.get(key);
+    if (!p) {
+      p = geocodeKeyword(query);
+      inFlight.set(key, p);
+    }
+    return p;
+  }
+
+  let cursor = 0;
+  async function worker() {
+    while (cursor < targets.length) {
+      const row = targets[cursor];
+      cursor++;
+
+      const query = buildKeywordQuery(row);
+      row._keywordQuery = query;
+
+      if (!query) {
+        row._keywordSearchStatus = 'NO_CANDIDATE';
+        row._keywordCandidates = [];
+        progress.none++;
+        progress.done++;
+        if (typeof onProgress === 'function') onProgress({ ...progress });
+        continue;
+      }
+
+      const result = await getOrCreate(query);
+      const originalDong = extractDongFromAddress(row.address);
+
+      if (!result.success) {
+        if (result.reason === 'NOT_FOUND') {
+          row._keywordSearchStatus = 'NO_CANDIDATE';
+          row._keywordCandidates = [];
+          progress.none++;
+        } else {
+          row._keywordSearchStatus = 'ERROR';
+          row._keywordCandidates = [];
+          progress.error++;
+        }
+        progress.done++;
+        if (typeof onProgress === 'function') onProgress({ ...progress });
+        continue;
+      }
+
+      const classified = result.candidates.map(c => ({
+        ...c,
+        candidateStatus: classifyCandidate(c, originalDong),
+      })).filter(c => c.candidateStatus !== null);
+
+      row._keywordCandidates = classified;
+
+      // row 전체를 STRONG으로 보는 조건: "강남구+원본 동이 일치하는 유효 후보(MATCH)가 정확히 1건"일 때만.
+      // MATCH가 2건 이상이면 어느 후보가 맞는지 모호하므로 자동으로 명확하다고 판단하지 않고 WEAK로 낮춘다.
+      // 원본 동을 추출하지 못한 경우(classifyCandidate가 MATCH를 만들 수 없음)도 자연히 WEAK로 남는다.
+      const matchCount = classified.filter(c => c.candidateStatus === 'MATCH').length;
+
+      if (matchCount === 1) {
+        row._keywordSearchStatus = 'STRONG_CANDIDATE';
+        progress.strong++;
+      } else if (classified.length > 0) {
+        row._keywordSearchStatus = 'WEAK_CANDIDATE';
+        progress.weak++;
+      } else {
+        row._keywordSearchStatus = 'NO_CANDIDATE';
+        progress.none++;
       }
 
       progress.done++;

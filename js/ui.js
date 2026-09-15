@@ -8,7 +8,7 @@ import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
 import { loadUsers, setUserStatus, setUserRole } from './admin.js';
 import { parseExcelFile } from './excel.js';
-import { runGeocodingForParsedRows } from './geocoding.js';
+import { runGeocodingForParsedRows, runKeywordCandidateSearch } from './geocoding.js';
 
 function displayValue(v) {
   return (v === null || v === undefined || v === '') ? '-' : v;
@@ -564,6 +564,34 @@ function renderUploadPreview(containerId) {
       notFoundListEl.style.display = 'none';
       geocodeSection.appendChild(notFoundListEl);
     }
+
+    // STEP 11G: UNRESOLVED 건이 있으면 일괄 keyword 후보검색 버튼을 노출한다.
+    const unresolvedCount = state.uploadParsedRows.filter(r => r._locationQuality === 'UNRESOLVED').length;
+    if (unresolvedCount > 0) {
+      const keywordBtn = document.createElement('button');
+      keywordBtn.type = 'button';
+      keywordBtn.id = 'btn-keyword-search-all';
+      keywordBtn.textContent = `미확인 위치 후보 검색 (${unresolvedCount}건)`;
+      keywordBtn.disabled = state.keywordSearchInProgress;
+      keywordBtn.addEventListener('click', () => handleKeywordSearchAll(containerId));
+      geocodeSection.appendChild(keywordBtn);
+
+      if (state.keywordSearchSummary) {
+        const s = state.keywordSearchSummary;
+        const kwSummaryEl = document.createElement('p');
+        kwSummaryEl.id = 'keyword-search-summary';
+        kwSummaryEl.textContent =
+          `후보검색 완료 ${s.done}/${s.total} · 강한후보 ${s.strong} · 약한후보 ${s.weak} · 후보없음 ${s.none} · 오류 ${s.error}`;
+        geocodeSection.appendChild(kwSummaryEl);
+
+        const kwCsvBtn = document.createElement('button');
+        kwCsvBtn.type = 'button';
+        kwCsvBtn.id = 'btn-download-keyword-csv';
+        kwCsvBtn.textContent = '후보검색 결과 CSV 다운로드';
+        kwCsvBtn.addEventListener('click', downloadKeywordCandidatesCsv);
+        geocodeSection.appendChild(kwCsvBtn);
+      }
+    }
   }
 
   container.appendChild(geocodeSection);
@@ -617,6 +645,42 @@ function renderUploadPreview(containerId) {
       warnEl.className = 'upload-warning-text';
       warnEl.textContent = row._warnings.join(', ');
       rowEl.appendChild(warnEl);
+    }
+
+    // STEP 11G: UNRESOLVED 행에 개별 "위치 후보 찾기" 버튼과 후보 결과를 붙인다.
+    if (row._locationQuality === 'UNRESOLVED' && row.business_start_no) {
+      const findBtn = document.createElement('button');
+      findBtn.type = 'button';
+      findBtn.className = 'btn-find-candidate';
+      findBtn.textContent = '위치 후보 찾기';
+      findBtn.disabled = state.keywordSearchInProgress;
+      findBtn.addEventListener('click', () => handleKeywordSearchSingle(row, containerId));
+      rowEl.appendChild(findBtn);
+
+      if (row._keywordSearchStatus && row._keywordSearchStatus !== 'PENDING') {
+        const candWrap = document.createElement('div');
+        candWrap.className = 'keyword-candidate-wrap';
+
+        const statusLabelMap = {
+          STRONG_CANDIDATE: '강한 후보 있음',
+          WEAK_CANDIDATE: '약한 후보 있음',
+          NO_CANDIDATE: '후보 없음',
+          ERROR: '검색 오류',
+        };
+        const statusLine = document.createElement('div');
+        statusLine.textContent = statusLabelMap[row._keywordSearchStatus] || row._keywordSearchStatus;
+        candWrap.appendChild(statusLine);
+
+        (row._keywordCandidates || []).forEach((c, i) => {
+          const candLine = document.createElement('div');
+          candLine.className = 'keyword-candidate-item';
+          const addr = c.roadAddressName || c.addressName || '-';
+          candLine.textContent = `후보 ${i + 1}: ${c.placeName || '-'} · ${addr} (${c.candidateStatus === 'MATCH' ? '일치' : '약함'})`;
+          candWrap.appendChild(candLine);
+        });
+
+        rowEl.appendChild(candWrap);
+      }
     }
 
     container.appendChild(rowEl);
@@ -725,6 +789,78 @@ function downloadNotFoundCsv() {
   const a = document.createElement('a');
   a.href = url;
   a.download = 'geocode_notfound.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// STEP 11G: 개별 행 1건에 대해 keyword 후보검색을 실행한다. 좌표는 자동 반영하지 않는다(후보 표시만).
+async function handleKeywordSearchSingle(row, containerId) {
+  if (state.keywordSearchInProgress) return;
+  state.keywordSearchInProgress = true;
+  renderUploadPreview(containerId);
+
+  try {
+    await runKeywordCandidateSearch(() => {}, row);
+  } finally {
+    state.keywordSearchInProgress = false;
+    renderUploadPreview(containerId);
+  }
+}
+
+// STEP 11G: UNRESOLVED 전체에 대해 일괄 keyword 후보검색을 실행한다. 좌표는 자동 반영하지 않는다.
+async function handleKeywordSearchAll(containerId) {
+  if (state.keywordSearchInProgress) return;
+  state.keywordSearchInProgress = true;
+  renderUploadPreview(containerId);
+
+  try {
+    const summary = await runKeywordCandidateSearch((progress) => {
+      state.keywordSearchSummary = progress;
+      const summaryEl = document.getElementById('keyword-search-summary');
+      if (summaryEl) {
+        summaryEl.textContent = `후보검색 완료 ${progress.done}/${progress.total} · 강한후보 ${progress.strong} · 약한후보 ${progress.weak} · 후보없음 ${progress.none} · 오류 ${progress.error}`;
+      }
+    });
+    state.keywordSearchSummary = summary;
+  } finally {
+    state.keywordSearchInProgress = false;
+    renderUploadPreview(containerId);
+  }
+}
+
+// keyword 후보검색 결과를 CSV로 다운로드한다 (UNRESOLVED 전체 대상, 후보가 없으면 후보 컬럼은 빈 값).
+function downloadKeywordCandidatesCsv() {
+  const targets = state.uploadParsedRows.filter(r => r._locationQuality === 'UNRESOLVED');
+  const header = [
+    'business_start_no', 'site_name', 'original_address', 'keyword_query',
+    'candidate_status', 'candidate_place_name', 'candidate_address', 'candidate_lat', 'candidate_lng'
+  ];
+  const lines = [header.join(',')];
+
+  targets.forEach(row => {
+    const candidates = row._keywordCandidates && row._keywordCandidates.length > 0 ? row._keywordCandidates : [null];
+    candidates.forEach(c => {
+      const line = [
+        row.business_start_no || '',
+        row.site_name || row.company_name || '',
+        row.address || '',
+        row._keywordQuery || '',
+        row._keywordSearchStatus || '',
+        c ? (c.placeName || '') : '',
+        c ? (c.roadAddressName || c.addressName || '') : '',
+        c ? c.lat : '',
+        c ? c.lng : '',
+      ].map(csvEscape).join(',');
+      lines.push(line);
+    });
+  });
+
+  const csvContent = '\uFEFF' + lines.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'keyword_candidates.csv';
   a.click();
   URL.revokeObjectURL(url);
 }

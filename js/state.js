@@ -27,5 +27,7 @@ export const state = {
   uploadDetectedForm: null,   // 'form1' | 'form2' | null (자동 판별 결과)
   uploadValidationSummary: null, // { total, validCount, warningCount, errorCount, invalidCount, duplicateCount } 요약
   geocodeInProgress: false,   // geocoding 버튼 중복 클릭 방지
-  geocodeProgress: null        // { total, done, success, notFound, error } geocoding 진행 상태
+  geocodeProgress: null,       // { total, done, success, notFound, error } geocoding 진행 상태
+  keywordSearchInProgress: false, // STEP 11G. keyword 후보검색 버튼 중복 클릭 방지
+  keywordSearchSummary: null      // { total, done, strong, weak, none, error } keyword 후보검색 결과 요약
 };
