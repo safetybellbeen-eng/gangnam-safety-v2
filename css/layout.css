@@ -120,3 +120,50 @@
   font-size: 12px;
   color: #555;
 }
+#btn-upload-panel {
+  position: absolute;
+  z-index: 10;
+  top: 190px;
+  left: 0;
+  background: #fff;
+  padding: 4px 12px;
+}
+#upload-panel {
+  position: absolute;
+  z-index: 20;
+  top: 220px;
+  left: 0;
+  width: 360px;
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #ddd;
+  padding: 12px;
+}
+.upload-summary {
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.upload-preview-row {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.upload-preview-row.invalid,
+.upload-preview-row.error {
+  background: #fff5f5;
+}
+.upload-preview-row.warning {
+  background: #fffaf0;
+}
+.upload-error-text {
+  color: #c0392b;
+}
+.upload-warning-text {
+  color: #b7791f;
+}
+.upload-status-badge {
+  font-weight: bold;
+}
