@@ -1,7 +1,9 @@
 // supabase/functions/gnmap-v2-geocode/index.ts
 // STEP 11 — Browser → Edge Function → Kakao Local REST API geocoding.
+// STEP 11G: mode:'keyword'로 Kakao 키워드검색(후보 목록 반환)도 지원한다. 인증/권한/CORS는 완전히 공유.
 // KAKAO_REST_API_KEY는 여기(서버)에서만 읽는다. 절대 frontend에 노출하지 않는다.
-// 이 함수는 좌표 조회만 한다. gnmap_v2_sites DB 반영(INSERT/UPDATE)은 하지 않는다(STEP 12 범위).
+// 이 함수는 좌표 조회(및 키워드 후보 조회)만 한다. gnmap_v2_sites DB 반영(INSERT/UPDATE)은 하지 않는다(STEP 12 범위).
+// keyword 모드는 후보 목록만 반환하며, 어떤 좌표도 자동으로 확정/저장하지 않는다.
 
 // 허용 origin은 명시적으로 나열한다 (와일드카드 '*' 금지).
 // TODO: 실제 GitHub Pages 배포 주소로 교체 필요 (예: https://<owner>.github.io)
@@ -109,6 +111,76 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ success: false, reason: 'INVALID_REQUEST' }, 400, origin);
   }
 
+  const mode = (body as { mode?: unknown })?.mode === 'keyword' ? 'keyword' : 'address';
+
+  const kakaoKey = Deno.env.get('KAKAO_REST_API_KEY');
+  if (!kakaoKey) {
+    console.error('KAKAO_REST_API_KEY 환경변수 누락');
+    return jsonResponse({ success: false, reason: 'INTERNAL_ERROR' }, 500, origin);
+  }
+
+  if (mode === 'keyword') {
+    // ---- keyword search 전용 경로 (STEP 11G) ----
+    // 기존 address 검색과 인증/권한 로직은 완전히 공유하며, 이 지점부터만 분기한다.
+    const query = (body as { query?: unknown })?.query;
+    if (typeof query !== 'string') {
+      return jsonResponse({ success: false, reason: 'INVALID_REQUEST' }, 400, origin);
+    }
+    const trimmedQuery = query.trim();
+    if (trimmedQuery === '' || trimmedQuery.length > MAX_ADDRESS_LENGTH) {
+      return jsonResponse({ success: false, reason: 'INVALID_REQUEST' }, 400, origin);
+    }
+
+    const kakaoUrl =
+      'https://dapi.kakao.com/v2/local/search/keyword.json?' +
+      new URLSearchParams({ query: trimmedQuery, size: '3' }).toString();
+
+    let kakaoJson: any;
+    try {
+      const kakaoRes = await fetch(kakaoUrl, {
+        headers: { Authorization: `KakaoAK ${kakaoKey}` },
+      });
+      if (!kakaoRes.ok) {
+        console.error('Kakao keyword API 오류 status:', kakaoRes.status);
+        return jsonResponse({ success: false, reason: 'KAKAO_API_ERROR' }, 502, origin);
+      }
+      kakaoJson = await kakaoRes.json();
+    } catch (e) {
+      console.error('Kakao keyword API 호출 실패:', e);
+      return jsonResponse({ success: false, reason: 'KAKAO_API_ERROR' }, 502, origin);
+    }
+
+    const documents = kakaoJson?.documents;
+    if (!Array.isArray(documents) || documents.length === 0) {
+      return jsonResponse({ success: false, reason: 'NOT_FOUND' }, 200, origin);
+    }
+
+    // 상위 최대 3건만, 좌표 검증을 통과한 것만 후보로 반환한다.
+    // 자동으로 1건을 확정하지 않는다 — 후보 목록만 돌려주고 채택 여부는 frontend가 별도 규칙으로 판단.
+    const candidates = documents.slice(0, 3).map((doc: any) => {
+      const lat = Number(doc?.y);
+      const lng = Number(doc?.x);
+      const isValidCoord =
+        Number.isFinite(lat) && Number.isFinite(lng) &&
+        lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+      if (!isValidCoord) return null;
+      return {
+        placeName: doc?.place_name ?? null,
+        addressName: doc?.address_name ?? null,
+        roadAddressName: doc?.road_address_name ?? null,
+        lat,
+        lng,
+      };
+    }).filter((c: unknown) => c !== null);
+
+    if (candidates.length === 0) {
+      return jsonResponse({ success: false, reason: 'NOT_FOUND' }, 200, origin);
+    }
+
+    return jsonResponse({ success: true, candidates }, 200, origin);
+  }
+
+  // ---- address 검색 경로 (기존 STEP 11 동작, 변경 없음) ----
   const address = (body as { address?: unknown })?.address;
   if (typeof address !== 'string') {
     return jsonResponse({ success: false, reason: 'INVALID_REQUEST' }, 400, origin);
@@ -119,12 +191,6 @@ Deno.serve(async (req: Request) => {
   }
 
   // ---- 4) Kakao Local REST API 주소 검색 ----
-  const kakaoKey = Deno.env.get('KAKAO_REST_API_KEY');
-  if (!kakaoKey) {
-    console.error('KAKAO_REST_API_KEY 환경변수 누락');
-    return jsonResponse({ success: false, reason: 'INTERNAL_ERROR' }, 500, origin);
-  }
-
   const kakaoUrl =
     'https://dapi.kakao.com/v2/local/search/address.json?' +
     new URLSearchParams({ query: trimmed }).toString();
