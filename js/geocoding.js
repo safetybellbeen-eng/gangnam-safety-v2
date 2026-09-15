@@ -40,26 +40,37 @@ async function geocodeAddress(address) {
 // STEP 11G. Kakao keyword search 호출. Edge Function의 mode:'keyword' 경로를 사용한다.
 // 반환값: { success:true, candidates:[{placeName, addressName, roadAddressName, lat, lng}, ...] } | { success:false, reason }
 // 이 함수는 후보 목록만 가져온다 — 어떤 좌표도 여기서 확정/적용하지 않는다.
+//
+// STEP 11G-LIVE-DEBUG: 운영에서 keyword 요청이 전부 ERROR로 나오는 원인을 확인하기 위한 최소 계측.
+// console에는 query와 reason(및 에러 종류 이름)만 남기고, JWT/API key/Authorization/원본 응답 body는 절대 출력하지 않는다.
 async function geocodeKeyword(query) {
   try {
     const { data, error } = await sb.functions.invoke('gnmap-v2-geocode', {
       body: { mode: 'keyword', query },
     });
     if (error) {
+      // error.context가 없으면 Edge Function까지 도달하지 못한 상태(FunctionsFetchError/FunctionsRelayError 등
+      // 네트워크·CORS·타임아웃류)일 가능성이 높다 — 이 경우와 "Edge Function이 응답은 했지만 body.reason이
+      // 없거나 파싱 실패"한 경우를 구분해서 남긴다.
       if (error.context && typeof error.context.json === 'function') {
         try {
           const body = await error.context.json();
           if (body && typeof body.reason === 'string') {
+            console.warn('[keyword geocode] query:', query, '| reason:', body.reason);
             return { success: false, reason: body.reason };
           }
+          console.warn('[keyword geocode] query:', query, '| reason: (응답 body에 reason 필드 없음)');
         } catch (_parseErr) {
-          // 폴백
+          console.warn('[keyword geocode] query:', query, '| reason: (응답 body JSON 파싱 실패)');
         }
+      } else {
+        console.warn('[keyword geocode] query:', query, '| reason: (error.context 없음 — 네트워크 단계에서 실패, errorName:', error.name || error.constructor?.name, ')');
       }
       return { success: false, reason: 'INTERNAL_ERROR' };
     }
     return data;
-  } catch (_e) {
+  } catch (e) {
+    console.warn('[keyword geocode] query:', query, '| reason: (예외 발생, name:', e?.name, ')');
     return { success: false, reason: 'INTERNAL_ERROR' };
   }
 }
@@ -336,6 +347,7 @@ export async function runKeywordCandidateSearch(onProgress, targetRow) {
     row._keywordQuery = null;
     row._keywordCandidates = null;
     row._keywordSearchStatus = 'PENDING';
+    row._keywordSearchError = null;
   });
 
   const progress = { total: targets.length, done: 0, strong: 0, weak: 0, none: 0, error: 0 };
@@ -379,7 +391,9 @@ export async function runKeywordCandidateSearch(onProgress, targetRow) {
           row._keywordCandidates = [];
           progress.none++;
         } else {
+          // STEP 11G-LIVE-DEBUG: 실제 reason을 row에 남겨 UI에서 원인을 바로 확인할 수 있게 한다.
           row._keywordSearchStatus = 'ERROR';
+          row._keywordSearchError = result.reason || 'UNKNOWN';
           row._keywordCandidates = [];
           progress.error++;
         }

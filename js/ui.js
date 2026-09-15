@@ -668,7 +668,12 @@ function renderUploadPreview(containerId) {
           ERROR: '검색 오류',
         };
         const statusLine = document.createElement('div');
-        statusLine.textContent = statusLabelMap[row._keywordSearchStatus] || row._keywordSearchStatus;
+        // STEP 11G-LIVE-DEBUG: ERROR인 경우 row._keywordSearchError(reason)를 함께 보여준다.
+        const statusText = statusLabelMap[row._keywordSearchStatus] || row._keywordSearchStatus;
+        statusLine.textContent =
+          (row._keywordSearchStatus === 'ERROR' && row._keywordSearchError)
+            ? `${statusText} (${row._keywordSearchError})`
+            : statusText;
         candWrap.appendChild(statusLine);
 
         (row._keywordCandidates || []).forEach((c, i) => {
