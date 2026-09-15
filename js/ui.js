@@ -7,6 +7,7 @@ import { getFilteredSortedSites, getDongOptions } from './sites.js';
 import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
 import { loadUsers, setUserStatus, setUserRole } from './admin.js';
+import { parseExcelFile } from './excel.js';
 
 function displayValue(v) {
   return (v === null || v === undefined || v === '') ? '-' : v;
@@ -445,5 +446,99 @@ async function handleAdminChange(userId, action, containerId, buttons) {
   } finally {
     state.adminUserInFlight.delete(userId);
     await renderAdminPanel(containerId);
+  }
+}
+
+// 엑셀 파일 선택 시 파싱하고 결과 요약 + 미리보기 목록을 렌더한다.
+// 이번 STEP은 DB에 아무것도 반영하지 않는다 — geocoding/RPC는 STEP 11/12에서 이 결과(state.uploadParsedRows)를 이어받는다.
+export async function handleExcelFileSelect(file, containerId) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+
+  const loadingMsg = document.createElement('p');
+  loadingMsg.textContent = '파일을 읽는 중...';
+  container.appendChild(loadingMsg);
+
+  try {
+    await parseExcelFile(file, state);
+  } catch (err) {
+    console.error('엑셀 파싱 실패:', err);
+    container.innerHTML = '';
+    const errMsg = document.createElement('p');
+    errMsg.textContent = '파일을 읽는 중 오류가 발생했습니다.';
+    container.appendChild(errMsg);
+    return;
+  }
+
+  renderUploadPreview(containerId);
+}
+
+function renderUploadPreview(containerId) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+
+  const summary = state.uploadValidationSummary;
+
+  if (!state.uploadDetectedForm) {
+    const msg = document.createElement('p');
+    msg.textContent = '인식할 수 없는 양식입니다. 지원하는 엑셀 양식인지 확인해주세요.';
+    container.appendChild(msg);
+    return;
+  }
+
+  const summaryEl = document.createElement('div');
+  summaryEl.className = 'upload-summary';
+  const summaryLines = [
+    `인식된 양식: ${state.uploadDetectedForm}`,
+    `전체 ${summary.total}건 · 정상 ${summary.validCount}건 · 경고 ${summary.warningCount}건 · 오류 ${summary.errorCount}건` +
+      (summary.duplicateCount > 0 ? ` (그 중 배치 내 중복 ${summary.duplicateCount}건)` : '')
+  ];
+  summaryLines.forEach(line => {
+    const p = document.createElement('p');
+    p.textContent = line;
+    summaryEl.appendChild(p);
+  });
+  container.appendChild(summaryEl);
+
+  // 미리보기는 목록이 매우 길어질 수 있으므로 최대 50건만 표시한다 (전체 데이터는 state.uploadParsedRows에 보존됨).
+  const previewRows = state.uploadParsedRows.slice(0, 50);
+
+  previewRows.forEach(row => {
+    const rowEl = document.createElement('div');
+    const validationClass = row._validation === 'ERROR' ? 'error' : (row._validation === 'WARNING' ? 'warning' : '');
+    rowEl.className = 'upload-preview-row' + (validationClass ? ' ' + validationClass : '');
+
+    const nameEl = document.createElement('span');
+    nameEl.textContent = row.site_name || row.company_name || '-';
+    rowEl.appendChild(nameEl);
+
+    const bizNoEl = document.createElement('span');
+    bizNoEl.textContent = row.business_start_no || '(식별번호 없음)';
+    rowEl.appendChild(bizNoEl);
+
+    const statusEl = document.createElement('span');
+    statusEl.className = 'upload-status-badge';
+    statusEl.textContent = row._validation === 'ERROR' ? '오류' : (row._validation === 'WARNING' ? '경고' : '정상');
+    rowEl.appendChild(statusEl);
+
+    if (row._validation === 'ERROR') {
+      const errEl = document.createElement('span');
+      errEl.className = 'upload-error-text';
+      errEl.textContent = row._errors.join(', ');
+      rowEl.appendChild(errEl);
+    } else if (row._validation === 'WARNING') {
+      const warnEl = document.createElement('span');
+      warnEl.className = 'upload-warning-text';
+      warnEl.textContent = row._warnings.join(', ');
+      rowEl.appendChild(warnEl);
+    }
+
+    container.appendChild(rowEl);
+  });
+
+  if (state.uploadParsedRows.length > 50) {
+    const moreMsg = document.createElement('p');
+    moreMsg.textContent = `그 외 ${state.uploadParsedRows.length - 50}건은 표시되지 않았습니다.`;
+    container.appendChild(moreMsg);
   }
 }
