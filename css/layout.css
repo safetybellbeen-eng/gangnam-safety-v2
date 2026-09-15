@@ -167,3 +167,11 @@
 .upload-status-badge {
   font-weight: bold;
 }
+.upload-geocode-badge {
+  font-size: 11px;
+  color: #2c5282;
+}
+#geocode-section {
+  margin: 8px 0;
+  font-size: 12px;
+}
