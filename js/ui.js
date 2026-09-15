@@ -8,7 +8,7 @@ import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
 import { loadUsers, setUserStatus, setUserRole } from './admin.js';
 import { parseExcelFile } from './excel.js';
-import { runGeocodingForParsedRows, normalizeAddressForGeocoding } from './geocoding.js';
+import { runGeocodingForParsedRows } from './geocoding.js';
 
 function displayValue(v) {
   return (v === null || v === undefined || v === '') ? '-' : v;
@@ -592,9 +592,17 @@ function renderUploadPreview(containerId) {
     if (row._geocodeStatus) {
       const geoEl = document.createElement('span');
       geoEl.className = 'upload-geocode-badge';
-      const qualityLabelMap = { EXACT: '위치 확인', ESTIMATED: '위치 추정', UNRESOLVED: '위치 확인 필요' };
+      // ESTIMATED는 실제로 사용된 method(NORMALIZED/CORE_ADDRESS)에 따라 문구를 세분화한다.
+      const methodQualityLabelMap = {
+        NORMALIZED: '위치 추정(정제주소)',
+        CORE_ADDRESS: '위치 추정(핵심주소)',
+      };
+      const qualityLabelMap = { EXACT: '위치 확인', UNRESOLVED: '위치 확인 필요' };
       const statusLabelMap = { SUCCESS: '좌표 확인됨', NOT_FOUND: '주소 검색결과 없음', ERROR: '좌표 확인 실패', PENDING: '확인 대기' };
-      const qualityLabel = row._locationQuality ? qualityLabelMap[row._locationQuality] : null;
+      const qualityLabel =
+        (row._locationQuality === 'ESTIMATED' && methodQualityLabelMap[row._geocodeMethod]) ||
+        (row._locationQuality && qualityLabelMap[row._locationQuality]) ||
+        null;
       geoEl.textContent = qualityLabel || statusLabelMap[row._geocodeStatus] || row._geocodeStatus;
       rowEl.appendChild(geoEl);
     }
@@ -675,7 +683,7 @@ function toggleNotFoundList(containerId) {
       ['식별번호', row.business_start_no || '(없음)'],
       ['사업장명', row.site_name || row.company_name || '-'],
       ['원본 주소', row.address || '-'],
-      ['검색에 사용한 주소', normalizeAddressForGeocoding(row.address) || '-'],
+      ['검색에 사용한 주소', row._geocodeSearchedAddress || '-'],
     ];
     fields.forEach(([label, value]) => {
       const line = document.createElement('div');
@@ -706,7 +714,7 @@ function downloadNotFoundCsv() {
       row.business_start_no || '',
       row.site_name || row.company_name || '',
       row.address || '',
-      normalizeAddressForGeocoding(row.address) || '',
+      row._geocodeSearchedAddress || '',
     ].map(csvEscape).join(',');
     lines.push(line);
   });

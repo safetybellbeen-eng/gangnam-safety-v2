@@ -95,6 +95,29 @@ export function normalizeAddressForGeocoding(address) {
   return head;
 }
 
+// ------------------------------------------------------------
+// STEP 11E. 핵심 도로명주소(core road address)만 추출한다 — LEVEL 3 전용.
+// normalizeAddressForGeocoding과 달리 동명(괄호)조차 보존하지 않고, 순수 "시/구 + 도로명 + 건물번호"만 남긴다
+// (Kakao 공식 가이드상 주소검색은 상세주소를 뺀 핵심 도로명주소가 가장 매칭률이 높음).
+// 원본에 실제로 존재하는 도로명+건물번호 문자열만 그대로 사용한다 — 새 주소를 추론/생성하지 않는다.
+// 도로명 패턴이 명확하지 않으면(지번주소 등) null을 반환해 LEVEL 3를 skip하게 한다.
+export function extractCoreRoadAddress(address) {
+  if (!address) return null;
+
+  let a = String(address).replace(/^\(\d{5}\)\s*/, '').trim();
+  a = a.replace(/\s+/g, ' ');
+
+  // "서울(특별시)? 강남구" 같은 시/구 접두부를 도로명 앞까지 포함해서 찾는다.
+  // 도로명 패턴 자체가 없으면(지번주소 등) 핵심주소를 안전하게 추출할 수 없으므로 null.
+  const roadMatch = a.match(/[가-힣0-9]+(로|길)\s*\d+(-\d+)?/);
+  if (!roadMatch) return null;
+
+  const roadEndIndex = roadMatch.index + roadMatch[0].length;
+  const core = a.slice(0, roadEndIndex).trim();
+
+  return core || null;
+}
+
 // state.uploadParsedRows 중 ERROR가 아니고 address가 있는 행만 대상으로 geocoding을 순차/제한동시 실행한다.
 // concurrency는 4로 제한하며, 한 행의 실패가 나머지 행 처리를 막지 않는다.
 // LEVEL 1(원본 주소) 실패 시에만, 정제주소가 원본과 실질적으로 다른 경우 LEVEL 2(정제주소)를 재시도한다.
@@ -110,6 +133,7 @@ export async function runGeocodingForParsedRows(onProgress) {
     row._geocodeError = null;
     row._geocodeMethod = null;
     row._locationQuality = null;
+    row._geocodeSearchedAddress = null;
   });
 
   const progress = { total: targets.length, done: 0, success: 0, notFound: 0, error: 0 };
@@ -138,7 +162,10 @@ export async function runGeocodingForParsedRows(onProgress) {
       const row = targets[cursor];
       cursor++;
 
+      const originalWithoutZip = normalizeForCache(row.address).replace(/^\(\d{5}\)\s*/, '').replace(/\s+/g, ' ').trim();
+
       // LEVEL 1: 원본 주소
+      row._geocodeSearchedAddress = row.address;
       const originalResult = await getOrCreate(row.address);
 
       if (originalResult.success) {
@@ -149,44 +176,72 @@ export async function runGeocodingForParsedRows(onProgress) {
         row._geocodeMethod = 'ORIGINAL';
         row._locationQuality = 'EXACT';
         progress.success++;
-      } else {
-        // LEVEL 2: 정제주소가 원본과 실질적으로 다를 때만 재시도한다.
-        // 단순 우편번호 제거만으로 달라진 경우(예: "(06058) 서울특별시 강남구 논현동 106-7"
-        // → "서울특별시 강남구 논현동 106-7")는 이미 LEVEL 1에서 트림/공백 처리된 것과 실질적으로
-        // 같은 검색이므로 재시도 대상에서 제외한다 — 우편번호를 뺀 원본과 비교해서 판단한다.
-        const originalWithoutZip = normalizeForCache(row.address).replace(/^\(\d{5}\)\s*/, '').replace(/\s+/g, ' ').trim();
-        const normalizedAddress = normalizeAddressForGeocoding(row.address);
-        const isDifferent = normalizeForCache(normalizedAddress) !== originalWithoutZip;
+        progress.done++;
+        if (typeof onProgress === 'function') onProgress({ ...progress });
+        continue;
+      }
 
-        let finalResult = originalResult;
-        let usedNormalized = false;
+      // LEVEL 2: 정제주소가 원본과 실질적으로 다를 때만 재시도한다.
+      // 단순 우편번호 제거만으로 달라진 경우는 LEVEL 1과 실질적으로 같은 검색이므로 제외한다.
+      const normalizedAddress = normalizeAddressForGeocoding(row.address);
+      const normalizedIsDifferent = normalizeForCache(normalizedAddress) !== originalWithoutZip;
 
-        if (isDifferent) {
-          finalResult = await getOrCreate(normalizedAddress);
-          usedNormalized = true;
-        }
-
-        if (usedNormalized && finalResult.success) {
-          row.lat = finalResult.lat;
-          row.lng = finalResult.lng;
+      let level2Result = null;
+      if (normalizedIsDifferent) {
+        row._geocodeSearchedAddress = normalizedAddress;
+        level2Result = await getOrCreate(normalizedAddress);
+        if (level2Result.success) {
+          row.lat = level2Result.lat;
+          row.lng = level2Result.lng;
           row._geocodeStatus = 'SUCCESS';
           row._geocodeError = null;
           row._geocodeMethod = 'NORMALIZED';
           row._locationQuality = 'ESTIMATED';
           progress.success++;
-        } else if (finalResult.reason === 'NOT_FOUND' || originalResult.reason === 'NOT_FOUND') {
-          row._geocodeStatus = 'NOT_FOUND';
-          row._geocodeError = 'NOT_FOUND';
-          row._geocodeMethod = null;
-          row._locationQuality = 'UNRESOLVED';
-          progress.notFound++;
-        } else {
-          row._geocodeStatus = 'ERROR';
-          row._geocodeError = finalResult.reason || originalResult.reason || 'ERROR';
-          row._geocodeMethod = null;
-          row._locationQuality = 'UNRESOLVED';
-          progress.error++;
+          progress.done++;
+          if (typeof onProgress === 'function') onProgress({ ...progress });
+          continue;
         }
+      }
+
+      // LEVEL 3: 핵심 도로명주소. ORIGINAL/NORMALIZED와 실질적으로 다를 때만 재시도한다(중복 호출 방지).
+      const coreAddress = extractCoreRoadAddress(row.address);
+      const coreIsDifferentFromOriginal = coreAddress && normalizeForCache(coreAddress) !== originalWithoutZip;
+      const coreIsDifferentFromNormalized =
+        coreAddress && (!normalizedIsDifferent || normalizeForCache(coreAddress) !== normalizeForCache(normalizedAddress));
+
+      let level3Result = null;
+      if (coreAddress && coreIsDifferentFromOriginal && coreIsDifferentFromNormalized) {
+        row._geocodeSearchedAddress = coreAddress;
+        level3Result = await getOrCreate(coreAddress);
+        if (level3Result.success) {
+          row.lat = level3Result.lat;
+          row.lng = level3Result.lng;
+          row._geocodeStatus = 'SUCCESS';
+          row._geocodeError = null;
+          row._geocodeMethod = 'CORE_ADDRESS';
+          row._locationQuality = 'ESTIMATED';
+          progress.success++;
+          progress.done++;
+          if (typeof onProgress === 'function') onProgress({ ...progress });
+          continue;
+        }
+      }
+
+      // 모든 레벨 실패. 마지막으로 실제 호출했던 결과(있다면 LEVEL3, 없으면 LEVEL2, 없으면 LEVEL1)를 기준으로 상태를 정한다.
+      const lastResult = level3Result || level2Result || originalResult;
+      if (lastResult.reason === 'NOT_FOUND') {
+        row._geocodeStatus = 'NOT_FOUND';
+        row._geocodeError = 'NOT_FOUND';
+        row._geocodeMethod = null;
+        row._locationQuality = 'UNRESOLVED';
+        progress.notFound++;
+      } else {
+        row._geocodeStatus = 'ERROR';
+        row._geocodeError = lastResult.reason || 'ERROR';
+        row._geocodeMethod = null;
+        row._locationQuality = 'UNRESOLVED';
+        progress.error++;
       }
 
       progress.done++;
