@@ -68,6 +68,11 @@
     <span id="location-message"></span>
     <button type="button" id="btn-admin-panel" style="display:none">회원 관리</button>
     <div id="admin-panel" style="display:none"></div>
+    <button type="button" id="btn-upload-panel" style="display:none">엑셀 업로드</button>
+    <div id="upload-panel" style="display:none">
+      <input type="file" id="upload-file-input" accept=".xlsx,.xls">
+      <div id="upload-preview"></div>
+    </div>
     <div id="site-list-panel">
       <div id="site-search-bar">
         <input type="text" id="site-search-input" placeholder="사업장명, 업체명, 주소, 동으로 검색">
@@ -98,6 +103,7 @@
   </section>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>
