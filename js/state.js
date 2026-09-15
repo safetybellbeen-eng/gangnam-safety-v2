@@ -29,5 +29,7 @@ export const state = {
   geocodeInProgress: false,   // geocoding 버튼 중복 클릭 방지
   geocodeProgress: null,       // { total, done, success, notFound, error } geocoding 진행 상태
   keywordSearchInProgress: false, // STEP 11G. keyword 후보검색 버튼 중복 클릭 방지
-  keywordSearchSummary: null      // { total, done, strong, weak, none, error } keyword 후보검색 결과 요약
+  keywordSearchSummary: null,     // { total, done, strong, weak, none, error } keyword 후보검색 결과 요약
+  lotRecoveryInProgress: false,   // STEP 11H-1. Kakao LOT 복구 버튼 중복 클릭 방지
+  lotRecoverySummary: null        // { total, done, success, notFound, error } LOT 복구 결과 요약
 };

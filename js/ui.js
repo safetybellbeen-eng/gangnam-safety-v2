@@ -8,7 +8,7 @@ import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
 import { loadUsers, setUserStatus, setUserRole } from './admin.js';
 import { parseExcelFile } from './excel.js';
-import { runGeocodingForParsedRows, runKeywordCandidateSearch } from './geocoding.js';
+import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, buildLotQueries } from './geocoding.js';
 
 function displayValue(v) {
   return (v === null || v === undefined || v === '') ? '-' : v;
@@ -591,6 +591,29 @@ function renderUploadPreview(containerId) {
         kwCsvBtn.addEventListener('click', downloadKeywordCandidatesCsv);
         geocodeSection.appendChild(kwCsvBtn);
       }
+
+      // STEP 11H-1: 원본에 명시적 지번이 있는 UNRESOLVED 행만 대상으로 Kakao LOT 복구를 시도한다.
+      const lotTargetCount = state.uploadParsedRows.filter(
+        r => r._locationQuality === 'UNRESOLVED' && buildLotQueries(r).length > 0
+      ).length;
+      if (lotTargetCount > 0) {
+        const lotBtn = document.createElement('button');
+        lotBtn.type = 'button';
+        lotBtn.id = 'btn-lot-recovery';
+        lotBtn.textContent = `Kakao 지번(LOT) 재검색 (${lotTargetCount}건)`;
+        lotBtn.disabled = state.lotRecoveryInProgress;
+        lotBtn.addEventListener('click', () => handleLotRecovery(containerId));
+        geocodeSection.appendChild(lotBtn);
+
+        if (state.lotRecoverySummary) {
+          const s = state.lotRecoverySummary;
+          const lotSummaryEl = document.createElement('p');
+          lotSummaryEl.id = 'lot-recovery-summary';
+          lotSummaryEl.textContent =
+            `LOT 대상 ${s.total}건 · KAKAO LOT 성공 ${s.success}건 · 결과없음 ${s.notFound}건 · 오류 ${s.error}건`;
+          geocodeSection.appendChild(lotSummaryEl);
+        }
+      }
     }
   }
 
@@ -620,10 +643,11 @@ function renderUploadPreview(containerId) {
     if (row._geocodeStatus) {
       const geoEl = document.createElement('span');
       geoEl.className = 'upload-geocode-badge';
-      // ESTIMATED는 실제로 사용된 method(NORMALIZED/CORE_ADDRESS)에 따라 문구를 세분화한다.
+      // ESTIMATED는 실제로 사용된 method(NORMALIZED/CORE_ADDRESS/KAKAO_LOT)에 따라 문구를 세분화한다.
       const methodQualityLabelMap = {
         NORMALIZED: '위치 추정(정제주소)',
         CORE_ADDRESS: '위치 추정(핵심주소)',
+        KAKAO_LOT: '위치 추정(지번 재검색)',
       };
       const qualityLabelMap = { EXACT: '위치 확인', UNRESOLVED: '위치 확인 필요' };
       const statusLabelMap = { SUCCESS: '좌표 확인됨', NOT_FOUND: '주소 검색결과 없음', ERROR: '좌표 확인 실패', PENDING: '확인 대기' };
@@ -775,7 +799,10 @@ function csvEscape(value) {
 
 function downloadNotFoundCsv() {
   const notFoundRows = state.uploadParsedRows.filter(r => r._geocodeStatus === 'NOT_FOUND');
-  const header = ['business_start_no', 'site_name', 'original_address', 'searched_address'];
+  const header = [
+    'business_start_no', 'site_name', 'original_address', 'searched_address',
+    'lot_queries', 'successful_lot_query', 'geocode_method', 'location_quality', 'lat', 'lng'
+  ];
   const lines = [header.join(',')];
 
   notFoundRows.forEach(row => {
@@ -784,6 +811,12 @@ function downloadNotFoundCsv() {
       row.site_name || row.company_name || '',
       row.address || '',
       row._geocodeSearchedAddress || '',
+      (row._lotQueries || []).join(' | '),
+      row._lotSuccessfulQuery || '',
+      row._geocodeMethod || '',
+      row._locationQuality || '',
+      row.lat ?? '',
+      row.lng ?? '',
     ].map(csvEscape).join(',');
     lines.push(line);
   });
@@ -829,6 +862,29 @@ async function handleKeywordSearchAll(containerId) {
     state.keywordSearchSummary = summary;
   } finally {
     state.keywordSearchInProgress = false;
+    renderUploadPreview(containerId);
+  }
+}
+
+// STEP 11H-1: 원본에 명시적 지번이 있는 UNRESOLVED 행에 대해 Kakao LOT 재검색을 실행한다.
+// 성공한 행은 기존 cascade(ORIGINAL/NORMALIZED/CORE)와 동일하게 SUCCESS/ESTIMATED로 갱신되므로,
+// 완료 후 renderUploadPreview가 위치품질 요약(EXACT/ESTIMATED/확인필요)에도 자동 반영한다.
+async function handleLotRecovery(containerId) {
+  if (state.lotRecoveryInProgress) return;
+  state.lotRecoveryInProgress = true;
+  renderUploadPreview(containerId);
+
+  try {
+    const summary = await runKakaoLotRecovery((progress) => {
+      state.lotRecoverySummary = progress;
+      const summaryEl = document.getElementById('lot-recovery-summary');
+      if (summaryEl) {
+        summaryEl.textContent = `LOT 대상 ${progress.total}건 · KAKAO LOT 성공 ${progress.success}건 · 결과없음 ${progress.notFound}건 · 오류 ${progress.error}건`;
+      }
+    });
+    state.lotRecoverySummary = summary;
+  } finally {
+    state.lotRecoveryInProgress = false;
     renderUploadPreview(containerId);
   }
 }

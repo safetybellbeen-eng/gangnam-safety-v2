@@ -64,7 +64,7 @@ async function geocodeKeyword(query) {
           console.warn('[keyword geocode] query:', query, '| reason: (응답 body JSON 파싱 실패)');
         }
       } else {
-        console.warn('[keyword geocode] query:', query, '| reason: (error.context 없음 — 네트워크 단계에서 실패, errorName:', error.name || error.constructor?.name, ')');
+        console.warn('[keyword geocode] query:', query, '| reason: (error.context 없음 — 네트워크 단계에서 실패, errorName:', error.name || error.constructor?.name, ', message:', error.message, ')');
       }
       return { success: false, reason: 'INTERNAL_ERROR' };
     }
@@ -293,10 +293,6 @@ export async function runGeocodingForParsedRows(onProgress) {
   return progress;
 }
 
-// ------------------------------------------------------------
-// STEP 11G. Kakao keyword 후보검색 (실험). 결과는 후보 목록만 반환하며 lat/lng를 자동 반영하지 않는다.
-// ------------------------------------------------------------
-
 // 원본 주소에서 "동" 이름을 안전하게 추출한다. 새 정보를 추론하지 않고, 원본에 이미 있는 "OO동" 패턴만 사용한다.
 // 우선 괄호 안 동명("(논현동)")을 찾고, 없으면 "강남구 OO동" 형태(지번주소에서 괄호 없이 쓰이는 경우)를 찾는다.
 // 둘 다 실패하면 null (query 생성 시 동 없이 site_name+강남구로만 구성).
@@ -339,6 +335,23 @@ function classifyCandidate(candidate, originalDong) {
 // concurrency=CONCURRENCY로 제한하며, in-flight 캐시(같은 query 재사용)도 동일하게 적용한다.
 // targetRow를 넘기면 그 행 1건만 대상으로 실행한다(개별 "위치 후보 찾기" 버튼용).
 export async function runKeywordCandidateSearch(onProgress, targetRow) {
+  // STEP 11G-LIVE-DEBUG: keyword 검색 시작 시점의 세션 상태를 확인한다.
+  // 토큰 값 자체는 절대 출력하지 않고, 세션 존재 여부와 만료 예정 시각만 기록한다 —
+  // address geocoding이 끝난 뒤 한참 지나 keyword 버튼을 누르는 흐름이라 세션 만료 가능성을 배제하기 위함.
+  try {
+    const { data: sessionData } = await sb.auth.getSession();
+    const session = sessionData?.session;
+    if (!session) {
+      console.warn('[keyword geocode] 세션 없음 — 로그인 만료 가능성');
+    } else {
+      const expiresAt = session.expires_at ? new Date(session.expires_at * 1000).toISOString() : '(알 수 없음)';
+      const nowIso = new Date().toISOString();
+      console.warn('[keyword geocode] 세션 확인됨. 만료 예정:', expiresAt, '| 현재 시각:', nowIso);
+    }
+  } catch (_e) {
+    console.warn('[keyword geocode] 세션 확인 중 오류 발생');
+  }
+
   const targets = targetRow
     ? [targetRow]
     : state.uploadParsedRows.filter(row => row._locationQuality === 'UNRESOLVED');
@@ -436,3 +449,173 @@ export async function runKeywordCandidateSearch(onProgress, targetRow) {
   return progress;
 }
 
+// ------------------------------------------------------------
+// STEP 11H-1. Kakao LOT(지번) 복구 실험. 기존 ORIGINAL/NORMALIZED/CORE가 모두 실패해
+// UNRESOLVED로 남은 행 중, 원본 문자열에 지번이 명시적으로 존재하는 행에 한해서만
+// "서울 강남구 {법정동} {지번}" 형태로 Kakao address 검색(geocodeAddress, 기존 함수 재사용)을 재시도한다.
+// 새 provider/API/Edge Function 분기는 추가하지 않는다 — address geocoding 경로만 재사용.
+// ------------------------------------------------------------
+
+// 원본 주소에서 법정동을 추출한다 (STEP 11G extractDongFromAddress와 동일 규칙, 새 정보 추론 없음).
+function extractDongForLot(address) {
+  return extractDongFromAddress(address);
+}
+
+// 원본 주소에 명시적으로 존재하는 지번(본번 또는 본번-부번)만 추출한다.
+// 동명 뒤에 바로 이어지는 숫자 패턴만 지번 후보로 인정한다(도로명 앞 건물번호와 혼동 방지 목적으로
+// 항상 "동명 문자열이 실제로 등장하는 지점 이후"에서만 찾는다). 추측/생성 없음 — 원본에 없으면 빈 배열.
+//
+// 대표 패턴 3가지:
+//  - LOT_SINGLE: 동명 바로 뒤 지번 1개만 등장 (예: "(논현동)11-17")
+//  - LOT_MULTI: 동명 뒤 콤마로 구분된 지번 여러 개 (예: "논현동 150-4,150-10")
+//  - LOT_REPRESENTATIVE: "지번 외 N필지" 패턴에서 대표지번만 (예: "신사동 532-8외 2필지")
+// 이 함수는 세 경우 모두 "동명 등장 이후 최초로 나오는 연속된 지번 나열"만 파싱하고,
+// "외 N필지"의 N필지 자체는 번호가 없으므로 생성하지 않는다.
+//
+// 안전 규칙(콤마 구분 지번 검증): 각 콤마 구분 token은 독립적으로 완전한 지번이어야 한다.
+// 첫 번째 token은 본번 또는 본번-부번을 허용하지만, 두 번째 이후 token은 반드시 본번-부번
+// (하이픈 포함) 형태여야 채택한다. "111-5,6"처럼 두 번째 token이 부번만 있는 축약 표기("6")는
+// 그 자체로 완전한 지번인지 불확실하고, "111-6"으로 보정하는 것도 원본에 없는 추론이므로
+// 이런 불완전한 token을 만나면 그 이후는 모두 버리고 그 앞까지("111-5")만 채택한다.
+function extractLotNumbersFromAddress(address, dong) {
+  if (!address || !dong) return [];
+
+  const dongIndex = address.indexOf(dong);
+  if (dongIndex === -1) return [];
+
+  // 동명 직후부터 텍스트를 본다. 괄호/공백/콤마는 건너뛰고, 지번 패턴(본번 또는 본번-부번)이
+  // 연속해서 콤마로 나열되는 구간만 수집한다. 지번이 아닌 문자(한글 등)가 나오면 그 지점에서 중단한다.
+  const afterDong = address.slice(dongIndex + dong.length);
+
+  // 선행 공백/괄호/콤마 등 구분자만 건너뛴다 (예: "도곡동, 547-1"처럼 동명 직후 콤마가 오는 경우도 있음).
+  const cleaned = afterDong.replace(/^[),\s]*/, '');
+
+  const lotListMatch = cleaned.match(/^(\d{1,5}(?:-\d{1,4})?(?:\s*,\s*\d{1,5}(?:-\d{1,4})?)*)/);
+  if (!lotListMatch) return [];
+
+  const rawTokens = lotListMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+
+  const lots = [];
+  for (let i = 0; i < rawTokens.length; i++) {
+    const token = rawTokens[i];
+    const isFullLot = /^\d{1,5}-\d{1,4}$/.test(token); // 본번-부번(하이픈 포함) 완전한 지번
+    const isPlainNumber = /^\d{1,5}$/.test(token);       // 하이픈 없는 순수 본번
+
+    if (i === 0) {
+      // 첫 번째 token은 본번 또는 본번-부번 둘 다 허용.
+      if (isFullLot || isPlainNumber) {
+        lots.push(token);
+      } else {
+        break; // 첫 token부터 지번 형태가 아니면 더 볼 필요 없음.
+      }
+    } else {
+      // 두 번째 이후 token은 반드시 하이픈 있는 완전한 지번만 허용.
+      // 불완전한(부번만 있는 축약) token을 만나면 그 지점에서 나열 자체를 중단한다 — 이후 token도 버린다.
+      if (isFullLot) {
+        lots.push(token);
+      } else {
+        break;
+      }
+    }
+  }
+
+  return lots;
+}
+
+// 위 3개 함수를 조합해 이 행에 대한 LOT 검색주소 목록을 만든다.
+// 반환: string[] (검색 시도 순서대로). 지번을 찾지 못하면 빈 배열(LOT 대상 아님).
+export function buildLotQueries(row) {
+  const dong = extractDongForLot(row.address);
+  if (!dong) return [];
+
+  const lots = extractLotNumbersFromAddress(row.address, dong);
+  if (lots.length === 0) return [];
+
+  // LOT_MULTI/LOT_REPRESENTATIVE 모두 "원본에 명시된 지번을 순서대로" 검색한다.
+  // 대표지번만 있는 경우(예: "532-8외 2필지")는 lots가 1개뿐이므로 자연히 그 1건만 검색된다.
+  return lots.map(lot => `서울 강남구 ${dong} ${lot}`);
+}
+
+// UNRESOLVED 행(_locationQuality === 'UNRESOLVED') 중 LOT 검색주소를 만들 수 있는 행만 대상으로,
+// 명시된 지번을 순서대로 하나씩 시도한다 — 하나라도 성공하면 그 지점에서 멈춘다(요구사항 3번).
+// 모든 지번이 NOT_FOUND면 UNRESOLVED 유지. 이미 SUCCESS인 행(163건)은 targets에 포함되지 않으므로 건드리지 않는다.
+export async function runKakaoLotRecovery(onProgress) {
+  const targets = state.uploadParsedRows.filter(
+    row => row._locationQuality === 'UNRESOLVED' && buildLotQueries(row).length > 0
+  );
+
+  targets.forEach(row => {
+    row._lotQueries = buildLotQueries(row);
+    row._lotStatus = 'PENDING';
+    row._lotError = null;
+  });
+
+  const progress = { total: targets.length, done: 0, success: 0, notFound: 0, error: 0 };
+  if (typeof onProgress === 'function') onProgress({ ...progress });
+
+  // 같은 LOT 검색주소를 여러 행이 시도할 가능성은 낮지만, 다른 cascade 단계와 동일한 안전장치로
+  // in-flight Promise 캐시를 그대로 적용한다(중복 호출 방지).
+  const inFlight = new Map();
+  function getOrCreate(address) {
+    const key = normalizeForCache(address);
+    let p = inFlight.get(key);
+    if (!p) {
+      p = geocodeAddress(address);
+      inFlight.set(key, p);
+    }
+    return p;
+  }
+
+  let cursor = 0;
+  async function worker() {
+    while (cursor < targets.length) {
+      const row = targets[cursor];
+      cursor++;
+
+      let succeeded = false;
+      let lastReason = null;
+
+      // 요구사항 3: 첫 번째 지번 성공 시 종료, 실패 시 다음 명시적 지번을 순서대로 시도.
+      for (const lotQuery of row._lotQueries) {
+        const result = await getOrCreate(lotQuery);
+        if (result.success) {
+          row.lat = result.lat;
+          row.lng = result.lng;
+          row._geocodeStatus = 'SUCCESS';
+          row._geocodeError = null;
+          row._geocodeMethod = 'KAKAO_LOT';
+          row._locationQuality = 'ESTIMATED'; // EXACT로 분류하지 않는다(요구사항 6).
+          row._geocodeSearchedAddress = lotQuery;
+          row._lotSuccessfulQuery = lotQuery;
+          row._lotMatchedAddress = result.matchedAddress ?? null;
+          row._lotStatus = 'SUCCESS';
+          succeeded = true;
+          progress.success++;
+          break;
+        }
+        // NOT_FOUND가 아닌(네트워크/API 오류) 경우와 구분해서 기록한다(요구사항 7).
+        lastReason = result.reason;
+      }
+
+      if (!succeeded) {
+        if (lastReason && lastReason !== 'NOT_FOUND') {
+          row._lotStatus = 'ERROR';
+          row._lotError = lastReason;
+          progress.error++;
+        } else {
+          row._lotStatus = 'NOT_FOUND';
+          progress.notFound++;
+        }
+        // 모든 LOT 시도가 실패하면 UNRESOLVED 유지 — _locationQuality/_geocodeStatus를 바꾸지 않는다.
+      }
+
+      progress.done++;
+      if (typeof onProgress === 'function') onProgress({ ...progress });
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(CONCURRENCY, targets.length) }, () => worker());
+  await Promise.all(workers);
+
+  return progress;
+}
