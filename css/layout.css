@@ -91,7 +91,7 @@
 }
 #btn-admin-panel {
   position: absolute;
-  z-index: 10;
+  z-index: 30;
   top: 130px;
   left: 0;
   background: #fff;
@@ -99,7 +99,7 @@
 }
 #admin-panel {
   position: absolute;
-  z-index: 20;
+  z-index: 30;
   top: 160px;
   left: 0;
   width: 360px;
@@ -122,7 +122,7 @@
 }
 #btn-upload-panel {
   position: absolute;
-  z-index: 10;
+  z-index: 30;
   top: 190px;
   left: 0;
   background: #fff;
@@ -130,7 +130,7 @@
 }
 #upload-panel {
   position: absolute;
-  z-index: 20;
+  z-index: 30;
   top: 220px;
   left: 0;
   width: 360px;
