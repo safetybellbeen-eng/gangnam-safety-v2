@@ -8,7 +8,7 @@ import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
 import { loadUsers, setUserStatus, setUserRole } from './admin.js';
 import { parseExcelFile } from './excel.js';
-import { runGeocodingForParsedRows } from './geocoding.js';
+import { runGeocodingForParsedRows, normalizeAddressForGeocoding } from './geocoding.js';
 
 function displayValue(v) {
   return (v === null || v === undefined || v === '') ? '-' : v;
@@ -523,6 +523,49 @@ function renderUploadPreview(containerId) {
   }
   geocodeSection.appendChild(progressEl);
 
+  // 위치 품질 요약(전체/정확/추정/확인필요/오류) — geocoding을 1회 이상 실행한 뒤에만 의미 있는 값이 있다.
+  const qualityCounts = { EXACT: 0, ESTIMATED: 0, UNRESOLVED: 0 };
+  let errorCount = 0;
+  state.uploadParsedRows.forEach(row => {
+    if (row._locationQuality === 'EXACT') qualityCounts.EXACT++;
+    else if (row._locationQuality === 'ESTIMATED') qualityCounts.ESTIMATED++;
+    else if (row._locationQuality === 'UNRESOLVED') {
+      if (row._geocodeStatus === 'ERROR') errorCount++;
+      else qualityCounts.UNRESOLVED++;
+    }
+  });
+  const hasGeocodeRun = state.uploadParsedRows.some(row => row._geocodeStatus);
+  if (hasGeocodeRun) {
+    const qualityEl = document.createElement('p');
+    qualityEl.id = 'geocode-quality-summary';
+    qualityEl.textContent =
+      `전체 ${state.uploadParsedRows.length} · 정확 위치 ${qualityCounts.EXACT} · 추정 위치 ${qualityCounts.ESTIMATED} · ` +
+      `확인 필요 ${qualityCounts.UNRESOLVED} · 오류 ${errorCount}`;
+    geocodeSection.appendChild(qualityEl);
+
+    const notFoundCount = state.uploadParsedRows.filter(r => r._geocodeStatus === 'NOT_FOUND').length;
+    if (notFoundCount > 0) {
+      const toggleBtn = document.createElement('button');
+      toggleBtn.type = 'button';
+      toggleBtn.id = 'btn-toggle-notfound';
+      toggleBtn.textContent = `결과없음 ${notFoundCount}건 보기`;
+      toggleBtn.addEventListener('click', () => toggleNotFoundList(containerId));
+      geocodeSection.appendChild(toggleBtn);
+
+      const downloadBtn = document.createElement('button');
+      downloadBtn.type = 'button';
+      downloadBtn.id = 'btn-download-notfound-csv';
+      downloadBtn.textContent = '실패 목록 CSV 다운로드';
+      downloadBtn.addEventListener('click', downloadNotFoundCsv);
+      geocodeSection.appendChild(downloadBtn);
+
+      const notFoundListEl = document.createElement('div');
+      notFoundListEl.id = 'notfound-list';
+      notFoundListEl.style.display = 'none';
+      geocodeSection.appendChild(notFoundListEl);
+    }
+  }
+
   container.appendChild(geocodeSection);
 
   // 미리보기는 목록이 매우 길어질 수 있으므로 최대 50건만 표시한다 (전체 데이터는 state.uploadParsedRows에 보존됨).
@@ -549,8 +592,10 @@ function renderUploadPreview(containerId) {
     if (row._geocodeStatus) {
       const geoEl = document.createElement('span');
       geoEl.className = 'upload-geocode-badge';
-      const labelMap = { SUCCESS: '좌표 확인됨', NOT_FOUND: '주소 검색결과 없음', ERROR: '좌표 확인 실패', PENDING: '확인 대기' };
-      geoEl.textContent = labelMap[row._geocodeStatus] || row._geocodeStatus;
+      const qualityLabelMap = { EXACT: '위치 확인', ESTIMATED: '위치 추정', UNRESOLVED: '위치 확인 필요' };
+      const statusLabelMap = { SUCCESS: '좌표 확인됨', NOT_FOUND: '주소 검색결과 없음', ERROR: '좌표 확인 실패', PENDING: '확인 대기' };
+      const qualityLabel = row._locationQuality ? qualityLabelMap[row._locationQuality] : null;
+      geoEl.textContent = qualityLabel || statusLabelMap[row._geocodeStatus] || row._geocodeStatus;
       rowEl.appendChild(geoEl);
     }
 
@@ -604,4 +649,74 @@ async function handleGeocodeStart(containerId) {
     state.geocodeInProgress = false;
     renderUploadPreview(containerId); // 완료 후 각 행의 _geocodeStatus를 반영해 재렌더
   }
+}
+
+// "결과없음 N건 보기" 토글. business_start_no/site_name/원본 address/검색에 사용한 address를 보여준다.
+// 전체 재렌더 없이 이 영역만 채우거나 비운다(버튼 상태·진행 표시는 그대로 유지).
+function toggleNotFoundList(containerId) {
+  const listEl = document.getElementById('notfound-list');
+  if (!listEl) return;
+
+  const willOpen = listEl.style.display === 'none';
+  if (!willOpen) {
+    listEl.style.display = 'none';
+    listEl.innerHTML = '';
+    return;
+  }
+
+  listEl.innerHTML = '';
+  const notFoundRows = state.uploadParsedRows.filter(r => r._geocodeStatus === 'NOT_FOUND');
+
+  notFoundRows.forEach(row => {
+    const item = document.createElement('div');
+    item.className = 'notfound-item';
+
+    const fields = [
+      ['식별번호', row.business_start_no || '(없음)'],
+      ['사업장명', row.site_name || row.company_name || '-'],
+      ['원본 주소', row.address || '-'],
+      ['검색에 사용한 주소', normalizeAddressForGeocoding(row.address) || '-'],
+    ];
+    fields.forEach(([label, value]) => {
+      const line = document.createElement('div');
+      line.textContent = `${label}: ${value}`;
+      item.appendChild(line);
+    });
+
+    listEl.appendChild(item);
+  });
+
+  listEl.style.display = 'block';
+}
+
+// 결과없음(NOT_FOUND) 행만 CSV로 다운로드한다. 값에 콤마/줄바꿈이 있을 수 있어 큰따옴표로 감싸고
+// 내부 큰따옴표는 이스케이프한다(간단한 CSV escaping, 별도 라이브러리 사용하지 않음).
+function csvEscape(value) {
+  const s = String(value ?? '');
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+function downloadNotFoundCsv() {
+  const notFoundRows = state.uploadParsedRows.filter(r => r._geocodeStatus === 'NOT_FOUND');
+  const header = ['business_start_no', 'site_name', 'original_address', 'searched_address'];
+  const lines = [header.join(',')];
+
+  notFoundRows.forEach(row => {
+    const line = [
+      row.business_start_no || '',
+      row.site_name || row.company_name || '',
+      row.address || '',
+      normalizeAddressForGeocoding(row.address) || '',
+    ].map(csvEscape).join(',');
+    lines.push(line);
+  });
+
+  const csvContent = '\uFEFF' + lines.join('\n'); // BOM 추가 (엑셀에서 한글 깨짐 방지)
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'geocode_notfound.csv';
+  a.click();
+  URL.revokeObjectURL(url);
 }
