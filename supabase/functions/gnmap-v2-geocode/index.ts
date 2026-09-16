@@ -148,7 +148,8 @@ Deno.serve(async (req: Request) => {
     try {
       const jusoRes = await fetch(jusoUrl);
       if (!jusoRes.ok) {
-        console.error('JUSO API 오류 status:', jusoRes.status);
+        const errorBody = await jusoRes.text().catch(() => '(응답 본문 읽기 실패)');
+        console.error('JUSO API 오류 status:', jusoRes.status, '| body(앞 300자):', errorBody.slice(0, 300));
         return jsonResponse({ success: false, reason: 'JUSO_API_ERROR' }, 502, origin);
       }
       jusoJson = await jusoRes.json();
@@ -159,13 +160,18 @@ Deno.serve(async (req: Request) => {
 
     const common = jusoJson?.results?.common;
     if (!common) {
+      console.error('JUSO API 응답에 results.common 없음. 응답 키:', jusoJson ? Object.keys(jusoJson) : '(jusoJson 없음)');
       return jsonResponse({ success: false, reason: 'JUSO_API_ERROR' }, 502, origin);
     }
-    // JUSO 자체 에러코드(승인키 오류, 요청 파라미터 오류 등)는 원본 코드/메시지를 그대로 노출하지 않고
-    // 통일된 reason으로만 알린다 (민감정보 최소화).
+    // JUSO 자체 에러코드(승인키 오류, 요청 파라미터 오류 등)는 API 키 값 자체를 노출하지 않는 범위에서
+    // errorCode/errorMessage를 로그와 reason에 그대로 남긴다 — 42/42 전부 같은 실패라 원인 확인이 필요함(LIVE DEBUG).
     if (common.errorCode && common.errorCode !== '0') {
-      console.error('JUSO API 에러코드:', common.errorCode);
-      return jsonResponse({ success: false, reason: 'JUSO_API_ERROR' }, 502, origin);
+      console.error('JUSO API 에러코드:', common.errorCode, '| 에러메시지:', common.errorMessage);
+      return jsonResponse(
+        { success: false, reason: 'JUSO_API_ERROR', jusoErrorCode: common.errorCode, jusoErrorMessage: common.errorMessage ?? null },
+        502,
+        origin
+      );
     }
 
     const jusoList = jusoJson?.results?.juso;
