@@ -8,7 +8,7 @@ import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
 import { loadUsers, setUserStatus, setUserRole } from './admin.js';
 import { parseExcelFile } from './excel.js';
-import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, buildLotQueries } from './geocoding.js';
+import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, buildLotQueries, runJusoNormalize, buildJusoQuery, runKakaoJusoRecovery } from './geocoding.js';
 
 function displayValue(v) {
   return (v === null || v === undefined || v === '') ? '-' : v;
@@ -614,6 +614,56 @@ function renderUploadPreview(containerId) {
           geocodeSection.appendChild(lotSummaryEl);
         }
       }
+
+      // STEP 11H-3: 원본에 도로명+건물번호(또는 지번, LOT fallback)가 있는 UNRESOLVED 행만 대상으로
+      // JUSO 검증을 시도한다. buildJusoQuery는 이제 buildJusoQueryInfo 기반으로 ROAD/LOT 둘 다 포함한다.
+      const jusoTargetCount = state.uploadParsedRows.filter(
+        r => r._locationQuality === 'UNRESOLVED' && buildJusoQuery(r) !== null
+      ).length;
+      if (jusoTargetCount > 0) {
+        const jusoBtn = document.createElement('button');
+        jusoBtn.type = 'button';
+        jusoBtn.id = 'btn-juso-normalize';
+        jusoBtn.textContent = `행안부 주소 재검색 (${jusoTargetCount}건)`;
+        jusoBtn.disabled = state.jusoNormalizeInProgress;
+        jusoBtn.addEventListener('click', () => handleJusoNormalize(containerId));
+        geocodeSection.appendChild(jusoBtn);
+
+        if (state.jusoNormalizeSummary) {
+          const s = state.jusoNormalizeSummary;
+          const jusoSummaryEl = document.createElement('p');
+          jusoSummaryEl.id = 'juso-normalize-summary';
+          jusoSummaryEl.textContent =
+            `대상 ${s.total} · 단일일치 ${s.matched} · 모호 ${s.ambiguous} · 검증불일치 ${s.noMatch} · 결과없음 ${s.notFound} · 오류 ${s.error} (좌표는 아직 미확정)`;
+          geocodeSection.appendChild(jusoSummaryEl);
+        }
+      }
+
+      // STEP 11H-4: JUSO 검증에서 정확히 1건 일치(MATCHED)한 행만 대상으로 한다.
+      // AMBIGUOUS/NO_MATCH는 절대 이 대상에 포함되지 않는다 — Kakao 자동호출 금지.
+      const kakaoJusoTargetCount = state.uploadParsedRows.filter(
+        r => r._locationQuality === 'UNRESOLVED' &&
+          r._jusoStatus === 'MATCHED' &&
+          r._jusoMatchedCandidate
+      ).length;
+      if (kakaoJusoTargetCount > 0) {
+        const kakaoJusoBtn = document.createElement('button');
+        kakaoJusoBtn.type = 'button';
+        kakaoJusoBtn.id = 'btn-kakao-juso-recovery';
+        kakaoJusoBtn.textContent = `JUSO 주소로 좌표 확정 (${kakaoJusoTargetCount}건)`;
+        kakaoJusoBtn.disabled = state.kakaoJusoInProgress;
+        kakaoJusoBtn.addEventListener('click', () => handleKakaoJusoRecovery(containerId));
+        geocodeSection.appendChild(kakaoJusoBtn);
+
+        if (state.kakaoJusoSummary) {
+          const s = state.kakaoJusoSummary;
+          const kakaoJusoSummaryEl = document.createElement('p');
+          kakaoJusoSummaryEl.id = 'kakao-juso-summary';
+          kakaoJusoSummaryEl.textContent =
+            `대상 ${s.total}건 · 좌표복구 ${s.success}건 · 결과없음 ${s.notFound}건 · 오류 ${s.error}건`;
+          geocodeSection.appendChild(kakaoJusoSummaryEl);
+        }
+      }
     }
   }
 
@@ -643,11 +693,12 @@ function renderUploadPreview(containerId) {
     if (row._geocodeStatus) {
       const geoEl = document.createElement('span');
       geoEl.className = 'upload-geocode-badge';
-      // ESTIMATED는 실제로 사용된 method(NORMALIZED/CORE_ADDRESS/KAKAO_LOT)에 따라 문구를 세분화한다.
+      // ESTIMATED는 실제로 사용된 method(NORMALIZED/CORE_ADDRESS/KAKAO_LOT/KAKAO_JUSO)에 따라 문구를 세분화한다.
       const methodQualityLabelMap = {
         NORMALIZED: '위치 추정(정제주소)',
         CORE_ADDRESS: '위치 추정(핵심주소)',
         KAKAO_LOT: '위치 추정(지번 재검색)',
+        KAKAO_JUSO: '위치 추정(행안부 주소)',
       };
       const qualityLabelMap = { EXACT: '위치 확인', UNRESOLVED: '위치 확인 필요' };
       const statusLabelMap = { SUCCESS: '좌표 확인됨', NOT_FOUND: '주소 검색결과 없음', ERROR: '좌표 확인 실패', PENDING: '확인 대기' };
@@ -709,6 +760,36 @@ function renderUploadPreview(containerId) {
         });
 
         rowEl.appendChild(candWrap);
+      }
+
+      // STEP 11H-3: JUSO 정규화 결과(있다면)도 함께 보여준다. 좌표는 없으므로 도로명/지번주소 텍스트만 표시.
+      if (row._jusoStatus && row._jusoStatus !== 'PENDING') {
+        const jusoWrap = document.createElement('div');
+        jusoWrap.className = 'juso-candidate-wrap';
+
+        const jusoStatusLabelMap = {
+          MATCHED: 'JUSO 단일일치',
+          AMBIGUOUS: 'JUSO 모호(복수일치)',
+          NO_MATCH: 'JUSO 검증불일치',
+          NOT_FOUND: 'JUSO 결과 없음',
+          ERROR: 'JUSO 검색 오류',
+        };
+        const jusoStatusLine = document.createElement('div');
+        const jusoStatusText = jusoStatusLabelMap[row._jusoStatus] || row._jusoStatus;
+        jusoStatusLine.textContent =
+          (row._jusoStatus === 'ERROR' && row._jusoError)
+            ? `${jusoStatusText} (${row._jusoError})`
+            : jusoStatusText;
+        jusoWrap.appendChild(jusoStatusLine);
+
+        (row._jusoCandidates || []).forEach((c, i) => {
+          const jusoLine = document.createElement('div');
+          jusoLine.className = 'juso-candidate-item';
+          jusoLine.textContent = `JUSO 후보 ${i + 1}: ${c.roadAddr || '-'} (지번: ${c.jibunAddr || '-'})`;
+          jusoWrap.appendChild(jusoLine);
+        });
+
+        rowEl.appendChild(jusoWrap);
       }
     }
 
@@ -885,6 +966,50 @@ async function handleLotRecovery(containerId) {
     state.lotRecoverySummary = summary;
   } finally {
     state.lotRecoveryInProgress = false;
+    renderUploadPreview(containerId);
+  }
+}
+
+// STEP 11H-3: 원본에 도로명+건물번호가 있는 UNRESOLVED 행에 대해 JUSO(행안부) 정규화를 실행한다.
+// JUSO는 좌표를 반환하지 않으므로 _locationQuality/lat/lng는 변경되지 않는다 — 후보(row._jusoCandidates)만 채워진다.
+async function handleJusoNormalize(containerId) {
+  if (state.jusoNormalizeInProgress) return;
+  state.jusoNormalizeInProgress = true;
+  renderUploadPreview(containerId);
+
+  try {
+    const summary = await runJusoNormalize((progress) => {
+      state.jusoNormalizeSummary = progress;
+      const summaryEl = document.getElementById('juso-normalize-summary');
+      if (summaryEl) {
+        summaryEl.textContent = `대상 ${progress.total} · 단일일치 ${progress.matched} · 모호 ${progress.ambiguous} · 검증불일치 ${progress.noMatch} · 결과없음 ${progress.notFound} · 오류 ${progress.error} (좌표는 아직 미확정)`;
+      }
+    });
+    state.jusoNormalizeSummary = summary;
+  } finally {
+    state.jusoNormalizeInProgress = false;
+    renderUploadPreview(containerId);
+  }
+}
+
+// STEP 11H-4: JUSO 정규화 성공 행의 1위 후보 도로명주소로 Kakao 좌표를 확정한다.
+// 성공한 행은 ESTIMATED로 갱신되어 위치품질 요약(EXACT/ESTIMATED/확인필요)에도 자동 반영된다.
+async function handleKakaoJusoRecovery(containerId) {
+  if (state.kakaoJusoInProgress) return;
+  state.kakaoJusoInProgress = true;
+  renderUploadPreview(containerId);
+
+  try {
+    const summary = await runKakaoJusoRecovery((progress) => {
+      state.kakaoJusoSummary = progress;
+      const summaryEl = document.getElementById('kakao-juso-summary');
+      if (summaryEl) {
+        summaryEl.textContent = `대상 ${progress.total}건 · 좌표복구 ${progress.success}건 · 결과없음 ${progress.notFound}건 · 오류 ${progress.error}건`;
+      }
+    });
+    state.kakaoJusoSummary = summary;
+  } finally {
+    state.kakaoJusoInProgress = false;
     renderUploadPreview(containerId);
   }
 }

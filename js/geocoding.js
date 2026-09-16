@@ -75,6 +75,39 @@ async function geocodeKeyword(query) {
   }
 }
 
+// STEP 11H-3. 행정안전부(JUSO) 도로명주소 정규화 호출. Edge Function의 mode:'juso' 경로를 사용한다.
+// 반환값: { success:true, candidates:[{roadAddr, jibunAddr, zipNo, admCd}, ...] } | { success:false, reason }
+// JUSO는 주소 정규화 전용이며 좌표를 반환하지 않는다 — 좌표는 정규화된 roadAddr로 KAKAO_JUSO 단계(geocodeAddress)를
+// 별도로 호출해야 얻는다. 이 함수 자체는 좌표를 반환/적용하지 않는다.
+async function geocodeJuso(query) {
+  try {
+    const { data, error } = await sb.functions.invoke('gnmap-v2-geocode', {
+      body: { mode: 'juso', query },
+    });
+    if (error) {
+      if (error.context && typeof error.context.json === 'function') {
+        try {
+          const body = await error.context.json();
+          if (body && typeof body.reason === 'string') {
+            console.warn('[juso normalize] query:', query, '| reason:', body.reason);
+            return { success: false, reason: body.reason };
+          }
+          console.warn('[juso normalize] query:', query, '| reason: (응답 body에 reason 필드 없음)');
+        } catch (_parseErr) {
+          console.warn('[juso normalize] query:', query, '| reason: (응답 body JSON 파싱 실패)');
+        }
+      } else {
+        console.warn('[juso normalize] query:', query, '| reason: (error.context 없음 — 네트워크 단계에서 실패, errorName:', error.name || error.constructor?.name, ')');
+      }
+      return { success: false, reason: 'INTERNAL_ERROR' };
+    }
+    return data;
+  } catch (e) {
+    console.warn('[juso normalize] query:', query, '| reason: (예외 발생, name:', e?.name, ')');
+    return { success: false, reason: 'INTERNAL_ERROR' };
+  }
+}
+
 // 동일 정규화 주소는 같은 파일 내에서 1회만 호출하고 결과를 재사용한다 (불필요한 Kakao 호출 절감).
 function normalizeForCache(address) {
   return (address || '').trim();
@@ -616,6 +649,286 @@ export async function runKakaoLotRecovery(onProgress) {
 
   const workers = Array.from({ length: Math.min(CONCURRENCY, targets.length) }, () => worker());
   await Promise.all(workers);
+
+  return progress;
+}
+
+// ------------------------------------------------------------
+// STEP 11H-3. JUSO(행정안전부) 주소 정규화 실험.
+// 기존 cascade(ORIGINAL/NORMALIZED/CORE/LOT)가 모두 실패해 UNRESOLVED로 남은 행 중,
+// 원본에 도로명+건물번호가 명시적으로 존재하는 행에 한해서만 JUSO로 정규화를 시도한다.
+// JUSO는 좌표를 반환하지 않으므로, 여기서 lat/lng를 확정하거나 DB에 쓰지 않는다 — 정규화 결과(후보)만 저장한다.
+// 좌표 확정(KAKAO_JUSO 단계)은 이번 STEP 범위가 아니다.
+// ------------------------------------------------------------
+
+// 원본 주소에서 JUSO query를 만든다. 도로명+건물번호가 있으면 그것을 우선 사용하고(ROAD 방식),
+// 도로명이 없으면 STEP 11H-1과 동일한 규칙(extractDongFromAddress/extractLotNumbersFromAddress)으로
+// 법정동+지번을 추출해 LOT 방식으로 대체한다 — 원본에 명시된 동+완전한 지번만 사용하며 새 지번을 추론하지 않는다.
+// 둘 다 없으면 null(BLOCK/INSUFFICIENT 등 JUSO 대상 아님).
+//
+// buildJusoQuery가 반환하는 값에는 ROAD/LOT 구분이 필요하므로, 대신 buildJusoQueryInfo를 내부적으로 쓰고
+// 이 함수는 하위 호환을 위해 query 문자열만 반환한다.
+export function buildJusoQuery(row) {
+  const info = buildJusoQueryInfo(row);
+  return info ? info.query : null;
+}
+
+// query 문자열과 그 종류(ROAD|LOT)를 함께 반환한다. 검증 단계(compareJusoCandidate)에서
+// ROAD/LOT 중 어느 규칙으로 후보를 검증해야 하는지 알아야 하므로 이 정보가 필요하다.
+export function buildJusoQueryInfo(row) {
+  if (!row || !row.address) return null;
+  const address = String(row.address).replace(/^\(\d{5}\)\s*/, '').trim();
+
+  const roadMatch = address.match(/([가-힣0-9]+(?:로|길))\s*(\d+(?:-\d+)?)/);
+  if (roadMatch) {
+    const buildingNoRaw = roadMatch[2];
+    const [mainNo, subNo] = buildingNoRaw.split('-');
+    return {
+      query: `서울 강남구 ${roadMatch[1]} ${buildingNoRaw}`,
+      type: 'ROAD',
+      road: roadMatch[1],
+      buildingMainNo: mainNo,
+      buildingSubNo: subNo ?? null, // 부번이 원본에 없으면 null (0으로 임의 채우지 않음)
+    };
+  }
+
+  const dong = extractDongFromAddress(address);
+  if (!dong) return null;
+  const lots = extractLotNumbersFromAddress(address, dong);
+  if (lots.length === 0) return null;
+  // LOT_MULTI/REPRESENTATIVE 모두 대표(첫) 지번만 사용한다(원본에 명시된 것만, 92301903847와 동일 원칙).
+  const lotRaw = lots[0];
+  const [lotMainNo, lotSubNo] = lotRaw.split('-');
+  return {
+    query: `서울 강남구 ${dong} ${lotRaw}`,
+    type: 'LOT',
+    dong,
+    lotMainNo,
+    lotSubNo: lotSubNo ?? null,
+  };
+}
+
+// JUSO 후보 1건이 원본 query와 정확히 일치하는지 구조화 필드로 검증한다(includes 문자열 포함 비교 금지).
+// ROAD: 시/구(강남구) + 도로명(rn) + 건물본번(buldMnnm) + 건물부번(buldSlno) 정확히 일치해야 VALID_MATCH.
+// LOT: 시/구(강남구) + 법정동(emdNm) + 지번본번(lnbrMnnm) + 지번부번(lnbrSlno) 정확히 일치해야 VALID_MATCH.
+// 부번이 원본에 없는 경우(subNo=null)는 후보의 부번이 없거나 '0'일 때만 일치로 본다(부번 임의 매칭 금지).
+function isCandidateValidMatch(candidate, queryInfo) {
+  if (!candidate) return false;
+  const sggMatches = candidate.sggNm === '강남구';
+  if (!sggMatches) return false;
+
+  if (queryInfo.type === 'ROAD') {
+    const roadMatches = candidate.rn === queryInfo.road;
+    const mainMatches = String(candidate.buldMnnm) === String(queryInfo.buildingMainNo);
+    const candidateSub = candidate.buldSlno;
+    const subMatches = queryInfo.buildingSubNo === null
+      ? (candidateSub === null || candidateSub === undefined || String(candidateSub) === '0')
+      : String(candidateSub) === String(queryInfo.buildingSubNo);
+    return roadMatches && mainMatches && subMatches;
+  }
+
+  if (queryInfo.type === 'LOT') {
+    const dongMatches = candidate.emdNm === queryInfo.dong;
+    const mainMatches = String(candidate.lnbrMnnm) === String(queryInfo.lotMainNo);
+    const candidateSub = candidate.lnbrSlno;
+    const subMatches = queryInfo.lotSubNo === null
+      ? (candidateSub === null || candidateSub === undefined || String(candidateSub) === '0')
+      : String(candidateSub) === String(queryInfo.lotSubNo);
+    return dongMatches && mainMatches && subMatches;
+  }
+
+  return false;
+}
+
+// UNRESOLVED 행(_locationQuality === 'UNRESOLVED') 중 JUSO query를 만들 수 있는 행만 대상으로 한다.
+// JUSO 결과를 받은 뒤 구조화 필드로 후보를 검증해 MATCHED(정확히 1건 일치)/AMBIGUOUS(2건 이상 일치)/
+// NO_MATCH(일치 0건)/NOT_FOUND(JUSO 결과 자체 없음)/ERROR로 분류한다.
+// _jusoStatus==='SUCCESS'라는 단순 판정은 더 이상 쓰지 않는다 — 검증 결과만으로 상태를 정한다.
+// _locationQuality/_geocodeStatus/lat/lng는 이 함수에서 변경하지 않는다(좌표 확정은 KAKAO_JUSO 단계).
+export async function runJusoNormalize(onProgress) {
+  const targets = state.uploadParsedRows.filter(
+    row => row._locationQuality === 'UNRESOLVED' && buildJusoQueryInfo(row) !== null
+  );
+
+  targets.forEach(row => {
+    const info = buildJusoQueryInfo(row);
+    row._jusoQuery = info.query;
+    row._jusoQueryInfo = info;
+    row._jusoStatus = 'PENDING';
+    row._jusoError = null;
+    row._jusoCandidates = null;
+    row._jusoMatchedCandidate = null;
+  });
+
+  const progress = { total: targets.length, done: 0, matched: 0, ambiguous: 0, noMatch: 0, notFound: 0, error: 0 };
+  if (typeof onProgress === 'function') onProgress({ ...progress });
+
+  const inFlight = new Map();
+  function getOrCreate(query) {
+    const key = (query || '').trim();
+    let p = inFlight.get(key);
+    if (!p) {
+      p = geocodeJuso(query);
+      inFlight.set(key, p);
+    }
+    return p;
+  }
+
+  let cursor = 0;
+  async function worker() {
+    while (cursor < targets.length) {
+      const row = targets[cursor];
+      cursor++;
+
+      const result = await getOrCreate(row._jusoQuery);
+
+      if (!result.success) {
+        if (result.reason === 'NOT_FOUND') {
+          row._jusoStatus = 'NOT_FOUND';
+          row._jusoCandidates = [];
+          progress.notFound++;
+        } else {
+          row._jusoStatus = 'ERROR';
+          row._jusoError = result.reason || 'UNKNOWN';
+          row._jusoCandidates = [];
+          progress.error++;
+        }
+        progress.done++;
+        if (typeof onProgress === 'function') onProgress({ ...progress });
+        continue;
+      }
+
+      row._jusoCandidates = result.candidates;
+      const validMatches = result.candidates.filter(c => isCandidateValidMatch(c, row._jusoQueryInfo));
+
+      if (validMatches.length === 1) {
+        row._jusoStatus = 'MATCHED';
+        row._jusoMatchedCandidate = validMatches[0];
+        progress.matched++;
+      } else if (validMatches.length >= 2) {
+        row._jusoStatus = 'AMBIGUOUS';
+        progress.ambiguous++;
+      } else {
+        row._jusoStatus = 'NO_MATCH';
+        progress.noMatch++;
+      }
+
+      progress.done++;
+      if (typeof onProgress === 'function') onProgress({ ...progress });
+    }
+  }
+
+  const jusoWorkers = Array.from({ length: Math.min(CONCURRENCY, targets.length) }, () => worker());
+  await Promise.all(jusoWorkers);
+
+  return progress;
+}
+
+// ------------------------------------------------------------
+// STEP 11H-4. KAKAO_JUSO 단계 — JUSO가 "구조화 필드로 검증해 확정한(MATCHED)" 도로명/지번주소로
+// Kakao 주소검색(mode:'address')을 재시도해 좌표를 확정한다.
+// JUSO 검색결과 1위를 그대로 쓰지 않는다 — row._jusoMatchedCandidate(검증을 통과한 유일한 후보)만 사용한다.
+// AMBIGUOUS(검증 통과 후보 2건 이상)나 NO_MATCH는 이 단계에 절대 들어오지 않는다(targets 필터에서 제외).
+// ------------------------------------------------------------
+
+// 대상은 반드시 _jusoStatus === 'MATCHED'이고 _jusoMatchedCandidate가 존재하는 행만 허용한다.
+// 성공 시 row.lat/lng, _geocodeMethod='KAKAO_JUSO', _locationQuality='ESTIMATED'로 갱신한다(EXACT 아님).
+// 1차: matchedCandidate.roadAddrPart1(없으면 roadAddr)로 시도. 그 결과가 NOT_FOUND이고 jibunAddr가 있으면
+// 2차로 jibunAddr를 시도한다. 첫 성공에서 종료. 둘 다 실패하면 UNRESOLVED 유지.
+export async function runKakaoJusoRecovery(onProgress) {
+  const targets = state.uploadParsedRows.filter(
+    row => row._locationQuality === 'UNRESOLVED' &&
+      row._jusoStatus === 'MATCHED' &&
+      row._jusoMatchedCandidate
+  );
+
+  targets.forEach(row => {
+    row._kakaoJusoStatus = 'PENDING';
+    row._kakaoJusoError = null;
+    row._jusoKakaoQuery = null;
+    row._jusoKakaoMatchedAddress = null;
+  });
+
+  const progress = { total: targets.length, done: 0, success: 0, notFound: 0, error: 0 };
+  if (typeof onProgress === 'function') onProgress({ ...progress });
+
+  const inFlight = new Map();
+  function getOrCreate(address) {
+    const key = (address || '').trim();
+    let p = inFlight.get(key);
+    if (!p) {
+      p = geocodeAddress(address);
+      inFlight.set(key, p);
+    }
+    return p;
+  }
+
+  let cursor = 0;
+  async function worker() {
+    while (cursor < targets.length) {
+      const row = targets[cursor];
+      cursor++;
+
+      const matched = row._jusoMatchedCandidate;
+      const primaryAddress = matched.roadAddrPart1 || matched.roadAddr;
+
+      let finalResult = null;
+      let finalQuery = null;
+
+      if (primaryAddress) {
+        const primaryResult = await getOrCreate(primaryAddress);
+        if (primaryResult.success) {
+          finalResult = primaryResult;
+          finalQuery = primaryAddress;
+        } else if (primaryResult.reason === 'NOT_FOUND' && matched.jibunAddr) {
+          // 1차(도로명) NOT_FOUND이고 지번주소가 있으면만 2차로 시도한다. 성공/실패 여부와 관계없이
+          // 이 2차 결과가 최종 결과가 된다(추가 fallback 없음).
+          finalResult = await getOrCreate(matched.jibunAddr);
+          finalQuery = matched.jibunAddr;
+        } else {
+          finalResult = primaryResult;
+          finalQuery = primaryAddress;
+        }
+      } else if (matched.jibunAddr) {
+        // 도로명 주소 자체가 없으면 지번주소로만 시도.
+        finalResult = await getOrCreate(matched.jibunAddr);
+        finalQuery = matched.jibunAddr;
+      } else {
+        finalResult = { success: false, reason: 'NOT_FOUND' };
+        finalQuery = null;
+      }
+
+      row._jusoKakaoQuery = finalQuery;
+
+      if (finalResult.success) {
+        row.lat = finalResult.lat;
+        row.lng = finalResult.lng;
+        row._geocodeStatus = 'SUCCESS';
+        row._geocodeError = null;
+        row._geocodeMethod = 'KAKAO_JUSO';
+        row._locationQuality = 'ESTIMATED'; // EXACT로 분류하지 않는다.
+        row._geocodeSearchedAddress = finalQuery;
+        row._jusoKakaoMatchedAddress = finalResult.matchedAddress ?? null;
+        row._kakaoJusoStatus = 'SUCCESS';
+        progress.success++;
+      } else if (finalResult.reason === 'NOT_FOUND') {
+        // 두 주소(도로명/지번) 모두 NOT_FOUND — UNRESOLVED 유지.
+        row._kakaoJusoStatus = 'NOT_FOUND';
+        progress.notFound++;
+      } else {
+        // API/network 오류 — NOT_FOUND와 구분해서 기록, UNRESOLVED 유지.
+        row._kakaoJusoStatus = 'ERROR';
+        row._kakaoJusoError = finalResult.reason || 'UNKNOWN';
+        progress.error++;
+      }
+
+      progress.done++;
+      if (typeof onProgress === 'function') onProgress({ ...progress });
+    }
+  }
+
+  const kakaoJusoWorkers = Array.from({ length: Math.min(CONCURRENCY, targets.length) }, () => worker());
+  await Promise.all(kakaoJusoWorkers);
 
   return progress;
 }
