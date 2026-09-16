@@ -163,6 +163,11 @@ Deno.serve(async (req: Request) => {
       console.error('JUSO API 응답에 results.common 없음. 응답 키:', jusoJson ? Object.keys(jusoJson) : '(jusoJson 없음)');
       return jsonResponse({ success: false, reason: 'JUSO_API_ERROR' }, 502, origin);
     }
+
+    // STEP11 JUSO 진단 로그: 요청 keyword와 JUSO 응답 요약(errorCode/errorMessage/건수)을 항상 남긴다.
+    // confmKey(승인키)는 절대 여기에 포함하지 않는다.
+    console.log('[JUSO 진단] keyword:', trimmedQuery, '| errorCode:', common.errorCode, '| errorMessage:', common.errorMessage);
+
     // JUSO 자체 에러코드(승인키 오류, 요청 파라미터 오류 등)는 API 키 값 자체를 노출하지 않는 범위에서
     // errorCode/errorMessage를 로그와 reason에 그대로 남긴다 — 42/42 전부 같은 실패라 원인 확인이 필요함(LIVE DEBUG).
     if (common.errorCode && common.errorCode !== '0') {
@@ -175,6 +180,27 @@ Deno.serve(async (req: Request) => {
     }
 
     const jusoList = jusoJson?.results?.juso;
+
+    // STEP11 JUSO 진단 로그: 결과 건수와, 있다면 첫 candidate의 구조화 필드를 남긴다.
+    console.log('[JUSO 진단] jusoList.length:', Array.isArray(jusoList) ? jusoList.length : '(배열 아님)');
+    if (Array.isArray(jusoList) && jusoList.length > 0) {
+      const first = jusoList[0];
+      console.log(
+        '[JUSO 진단] 첫 candidate:',
+        'roadAddr=', first?.roadAddr,
+        '| roadAddrPart1=', first?.roadAddrPart1,
+        '| jibunAddr=', first?.jibunAddr,
+        '| siNm=', first?.siNm,
+        '| sggNm=', first?.sggNm,
+        '| emdNm=', first?.emdNm,
+        '| rn=', first?.rn,
+        '| buldMnnm=', first?.buldMnnm,
+        '| buldSlno=', first?.buldSlno,
+        '| lnbrMnnm=', first?.lnbrMnnm,
+        '| lnbrSlno=', first?.lnbrSlno
+      );
+    }
+
     if (!Array.isArray(jusoList) || jusoList.length === 0) {
       return jsonResponse({ success: false, reason: 'NOT_FOUND' }, 200, origin);
     }
