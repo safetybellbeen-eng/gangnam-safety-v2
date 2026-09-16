@@ -114,7 +114,76 @@ Deno.serve(async (req: Request) => {
   }
 
   const modeRaw = (body as { mode?: unknown })?.mode;
-  const mode = modeRaw === 'keyword' ? 'keyword' : (modeRaw === 'juso' ? 'juso' : 'address');
+  const mode = modeRaw === 'keyword' ? 'keyword'
+    : (modeRaw === 'juso' ? 'juso'
+    : (modeRaw === 'juso-diagnostic' ? 'juso-diagnostic' : 'address'));
+
+  if (mode === 'juso-diagnostic') {
+    // ---- STEP11 JUSO A/B/C 일회성 진단 전용 경로 ----
+    // 인증/권한/CORS는 위에서 이미 검증 완료(JWT + admin + approved, 기존과 동일).
+    // 고정된 3개 주소 × 3가지 keyword 조합(A/B/C) = 9회만 호출한다. 요청 body는 참조하지 않는다.
+    // buildJusoQueryInfo/isCandidateValidMatch/mode:'juso' 등 운영 로직은 전혀 건드리지 않는다.
+    const jusoKey = Deno.env.get('JUSO_CONFM_KEY');
+    if (!jusoKey) {
+      console.error('JUSO_CONFM_KEY 환경변수 누락');
+      return jsonResponse({ success: false, reason: 'INTERNAL_ERROR' }, 500, origin);
+    }
+
+    const diagnosticAddresses = ['선릉로162길 5', '선릉로158길 13-9', '도산대로59길 28'];
+    const variants: Array<{ variant: string; build: (addr: string) => string }> = [
+      { variant: 'A', build: (addr) => `서울 강남구 ${addr}` },
+      { variant: 'B', build: (addr) => addr },
+      { variant: 'C', build: (addr) => `강남구 ${addr}` },
+    ];
+
+    const results: any[] = [];
+
+    for (const address of diagnosticAddresses) {
+      for (const { variant, build } of variants) {
+        const keyword = build(address);
+        const url =
+          'https://business.juso.go.kr/addrlink/addrLinkApi.do?' +
+          new URLSearchParams({
+            confmKey: jusoKey,
+            currentPage: '1',
+            countPerPage: '5',
+            keyword,
+            resultType: 'json',
+          }).toString();
+
+        try {
+          const res = await fetch(url);
+          const json: any = await res.json();
+          const common = json?.results?.common;
+          const jusoList = json?.results?.juso;
+          results.push({
+            address,
+            variant,
+            keyword,
+            errorCode: common?.errorCode ?? null,
+            errorMessage: common?.errorMessage ?? null,
+            totalCount: common?.totalCount ?? null,
+            resultCount: Array.isArray(jusoList) ? jusoList.length : 0,
+            firstRoadAddrPart1: Array.isArray(jusoList) && jusoList.length > 0 ? (jusoList[0]?.roadAddrPart1 ?? null) : null,
+          });
+        } catch (e) {
+          results.push({
+            address,
+            variant,
+            keyword,
+            errorCode: null,
+            errorMessage: '진단 요청 실패',
+            totalCount: null,
+            resultCount: 0,
+            firstRoadAddrPart1: null,
+          });
+        }
+      }
+    }
+
+    // confmKey는 results/로그 어디에도 포함하지 않는다(위 push 객체들에 confmKey 필드 자체가 없음).
+    return jsonResponse({ success: true, results }, 200, origin);
+  }
 
   if (mode === 'juso') {
     // ---- JUSO(행정안전부 도로명주소) 정규화 전용 경로 (STEP 11H-3) ----
