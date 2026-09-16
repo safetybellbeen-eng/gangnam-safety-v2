@@ -811,6 +811,13 @@ export async function runJusoNormalize(onProgress) {
       } else {
         row._jusoStatus = 'NO_MATCH';
         progress.noMatch++;
+        // STEP11 JUSO 진단 로그: 검증에 실패한 경우에만(NOT_FOUND 40건은 제외) 원본/keyword/candidates/queryInfo를 남긴다.
+        console.log('[JUSO NO_MATCH]', {
+          originalAddress: row.address,
+          keyword: row._jusoQuery,
+          candidates: row._jusoCandidates,
+          queryInfo: row._jusoQueryInfo,
+        });
       }
 
       progress.done++;
