@@ -1,9 +1,11 @@
 // supabase/functions/gnmap-v2-geocode/index.ts
 // STEP 11 — Browser → Edge Function → Kakao Local REST API geocoding.
 // STEP 11G: mode:'keyword'로 Kakao 키워드검색(후보 목록 반환)도 지원한다. 인증/권한/CORS는 완전히 공유.
-// KAKAO_REST_API_KEY는 여기(서버)에서만 읽는다. 절대 frontend에 노출하지 않는다.
-// 이 함수는 좌표 조회(및 키워드 후보 조회)만 한다. gnmap_v2_sites DB 반영(INSERT/UPDATE)은 하지 않는다(STEP 12 범위).
-// keyword 모드는 후보 목록만 반환하며, 어떤 좌표도 자동으로 확정/저장하지 않는다.
+// STEP 11H-3: mode:'juso'로 행정안전부 도로명주소 API 정규화를 지원한다. 좌표는 반환하지 않는다
+// (JUSO는 주소 정규화 전용 — 좌표는 정규화된 주소로 별도 mode:'address' 호출을 통해 얻는다, KAKAO_JUSO 단계).
+// KAKAO_REST_API_KEY/JUSO_CONFM_KEY는 여기(서버)에서만 읽는다. 절대 frontend에 노출하지 않는다.
+// 이 함수는 좌표/주소 조회만 한다. gnmap_v2_sites DB 반영(INSERT/UPDATE)은 하지 않는다(STEP 12 범위).
+// keyword/juso 모드는 후보(또는 정규화 결과) 목록만 반환하며, 어떤 좌표도 자동으로 확정/저장하지 않는다.
 
 // 허용 origin은 명시적으로 나열한다 (와일드카드 '*' 금지).
 // TODO: 실제 GitHub Pages 배포 주소로 교체 필요 (예: https://<owner>.github.io)
@@ -111,7 +113,87 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ success: false, reason: 'INVALID_REQUEST' }, 400, origin);
   }
 
-  const mode = (body as { mode?: unknown })?.mode === 'keyword' ? 'keyword' : 'address';
+  const modeRaw = (body as { mode?: unknown })?.mode;
+  const mode = modeRaw === 'keyword' ? 'keyword' : (modeRaw === 'juso' ? 'juso' : 'address');
+
+  if (mode === 'juso') {
+    // ---- JUSO(행정안전부 도로명주소) 정규화 전용 경로 (STEP 11H-3) ----
+    // 인증/권한/CORS는 위에서 이미 검증 완료. Kakao 키는 필요 없다.
+    const query = (body as { query?: unknown })?.query;
+    if (typeof query !== 'string') {
+      return jsonResponse({ success: false, reason: 'INVALID_REQUEST' }, 400, origin);
+    }
+    const trimmedQuery = query.trim();
+    if (trimmedQuery === '' || trimmedQuery.length > MAX_ADDRESS_LENGTH) {
+      return jsonResponse({ success: false, reason: 'INVALID_REQUEST' }, 400, origin);
+    }
+
+    const jusoKey = Deno.env.get('JUSO_CONFM_KEY');
+    if (!jusoKey) {
+      console.error('JUSO_CONFM_KEY 환경변수 누락');
+      return jsonResponse({ success: false, reason: 'INTERNAL_ERROR' }, 500, origin);
+    }
+
+    const jusoUrl =
+      'https://business.juso.go.kr/addrlink/addrLinkApi.do?' +
+      new URLSearchParams({
+        confmKey: jusoKey,
+        currentPage: '1',
+        countPerPage: '5',
+        keyword: trimmedQuery,
+        resultType: 'json',
+      }).toString();
+
+    let jusoJson: any;
+    try {
+      const jusoRes = await fetch(jusoUrl);
+      if (!jusoRes.ok) {
+        console.error('JUSO API 오류 status:', jusoRes.status);
+        return jsonResponse({ success: false, reason: 'JUSO_API_ERROR' }, 502, origin);
+      }
+      jusoJson = await jusoRes.json();
+    } catch (e) {
+      console.error('JUSO API 호출 실패:', e);
+      return jsonResponse({ success: false, reason: 'JUSO_API_ERROR' }, 502, origin);
+    }
+
+    const common = jusoJson?.results?.common;
+    if (!common) {
+      return jsonResponse({ success: false, reason: 'JUSO_API_ERROR' }, 502, origin);
+    }
+    // JUSO 자체 에러코드(승인키 오류, 요청 파라미터 오류 등)는 원본 코드/메시지를 그대로 노출하지 않고
+    // 통일된 reason으로만 알린다 (민감정보 최소화).
+    if (common.errorCode && common.errorCode !== '0') {
+      console.error('JUSO API 에러코드:', common.errorCode);
+      return jsonResponse({ success: false, reason: 'JUSO_API_ERROR' }, 502, origin);
+    }
+
+    const jusoList = jusoJson?.results?.juso;
+    if (!Array.isArray(jusoList) || jusoList.length === 0) {
+      return jsonResponse({ success: false, reason: 'NOT_FOUND' }, 200, origin);
+    }
+
+    // 좌표는 포함하지 않는다 — JUSO는 정규화 전용, 좌표는 이후 KAKAO_JUSO 단계(mode:'address')에서 얻는다.
+    // 상위 최대 5건만, 자동으로 1건을 확정하지 않고 후보 목록만 반환한다.
+    // frontend가 원본 query와 기계적으로 정확히 대조(본번/부번 일치 등)할 수 있도록 구조화 필드를 그대로 전달한다.
+    const candidates = jusoList.slice(0, 5).map((j: any) => ({
+      roadAddr: j?.roadAddr ?? null,
+      roadAddrPart1: j?.roadAddrPart1 ?? null,
+      jibunAddr: j?.jibunAddr ?? null,
+      zipNo: j?.zipNo ?? null,
+      admCd: j?.admCd ?? null,
+      siNm: j?.siNm ?? null,
+      sggNm: j?.sggNm ?? null,
+      emdNm: j?.emdNm ?? null,
+      rn: j?.rn ?? null,
+      buldMnnm: j?.buldMnnm ?? null,
+      buldSlno: j?.buldSlno ?? null,
+      lnbrMnnm: j?.lnbrMnnm ?? null,
+      lnbrSlno: j?.lnbrSlno ?? null,
+    }));
+
+    return jsonResponse({ success: true, candidates }, 200, origin);
+  }
 
   const kakaoKey = Deno.env.get('KAKAO_REST_API_KEY');
   if (!kakaoKey) {
