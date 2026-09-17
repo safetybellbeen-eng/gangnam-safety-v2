@@ -119,9 +119,10 @@ Deno.serve(async (req: Request) => {
     : (modeRaw === 'juso-diagnostic' ? 'juso-diagnostic' : 'address'));
 
   if (mode === 'juso-diagnostic') {
-    // ---- STEP11 JUSO A/B/C 일회성 진단 전용 경로 ----
+    // ---- STEP11 JUSO hstryYn=Y 가설 진단 전용 경로 ----
     // 인증/권한/CORS는 위에서 이미 검증 완료(JWT + admin + approved, 기존과 동일).
-    // 고정된 3개 주소 × 3가지 keyword 조합(A/B/C) = 9회만 호출한다. 요청 body는 참조하지 않는다.
+    // 고정 3개 주소 × A형식("서울 강남구"+도로명+건물번호) + hstryYn='Y' = 3회만 호출한다.
+    // (기존 A/B/C 9회 진단에서 세 형식 모두 0건 확인됨 — 이번엔 hstryYn 가설만 검증)
     // buildJusoQueryInfo/isCandidateValidMatch/mode:'juso' 등 운영 로직은 전혀 건드리지 않는다.
     const jusoKey = Deno.env.get('JUSO_CONFM_KEY');
     if (!jusoKey) {
@@ -130,54 +131,47 @@ Deno.serve(async (req: Request) => {
     }
 
     const diagnosticAddresses = ['선릉로162길 5', '선릉로158길 13-9', '도산대로59길 28'];
-    const variants: Array<{ variant: string; build: (addr: string) => string }> = [
-      { variant: 'A', build: (addr) => `서울 강남구 ${addr}` },
-      { variant: 'B', build: (addr) => addr },
-      { variant: 'C', build: (addr) => `강남구 ${addr}` },
-    ];
-
     const results: any[] = [];
 
     for (const address of diagnosticAddresses) {
-      for (const { variant, build } of variants) {
-        const keyword = build(address);
-        const url =
-          'https://business.juso.go.kr/addrlink/addrLinkApi.do?' +
-          new URLSearchParams({
-            confmKey: jusoKey,
-            currentPage: '1',
-            countPerPage: '5',
-            keyword,
-            resultType: 'json',
-          }).toString();
+      const keyword = `서울 강남구 ${address}`;
+      const url =
+        'https://business.juso.go.kr/addrlink/addrLinkApi.do?' +
+        new URLSearchParams({
+          confmKey: jusoKey,
+          currentPage: '1',
+          countPerPage: '5',
+          keyword,
+          resultType: 'json',
+          hstryYn: 'Y',
+        }).toString();
 
-        try {
-          const res = await fetch(url);
-          const json: any = await res.json();
-          const common = json?.results?.common;
-          const jusoList = json?.results?.juso;
-          results.push({
-            address,
-            variant,
-            keyword,
-            errorCode: common?.errorCode ?? null,
-            errorMessage: common?.errorMessage ?? null,
-            totalCount: common?.totalCount ?? null,
-            resultCount: Array.isArray(jusoList) ? jusoList.length : 0,
-            firstRoadAddrPart1: Array.isArray(jusoList) && jusoList.length > 0 ? (jusoList[0]?.roadAddrPart1 ?? null) : null,
-          });
-        } catch (e) {
-          results.push({
-            address,
-            variant,
-            keyword,
-            errorCode: null,
-            errorMessage: '진단 요청 실패',
-            totalCount: null,
-            resultCount: 0,
-            firstRoadAddrPart1: null,
-          });
-        }
+      try {
+        const res = await fetch(url);
+        const json: any = await res.json();
+        const common = json?.results?.common;
+        const jusoList = json?.results?.juso;
+        results.push({
+          address,
+          keyword,
+          hstryYn: 'Y',
+          errorCode: common?.errorCode ?? null,
+          errorMessage: common?.errorMessage ?? null,
+          totalCount: common?.totalCount ?? null,
+          resultCount: Array.isArray(jusoList) ? jusoList.length : 0,
+          firstRoadAddrPart1: Array.isArray(jusoList) && jusoList.length > 0 ? (jusoList[0]?.roadAddrPart1 ?? null) : null,
+        });
+      } catch (e) {
+        results.push({
+          address,
+          keyword,
+          hstryYn: 'Y',
+          errorCode: null,
+          errorMessage: '진단 요청 실패',
+          totalCount: null,
+          resultCount: 0,
+          firstRoadAddrPart1: null,
+        });
       }
     }
 
