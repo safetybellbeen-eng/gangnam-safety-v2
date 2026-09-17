@@ -1058,3 +1058,90 @@ export async function runApproximateDiagnostic(rows) {
 
   return results;
 }
+
+// ------------------------------------------------------------
+// STEP11 APPROXIMATE 2차 진단 전용 (일회성). runApproximateDiagnostic(1차, 건물번호 포함)과는
+// 완전히 별도의 진단 함수 — 1차 운영/기존 로직은 이 함수에서 전혀 참조/수정하지 않는다.
+// 목적: 건물번호를 뺀 "도로명 자체"로 Kakao keyword 검색 시 동일 도로상의 실제 후보를 얻을 수 있는지 확인.
+// 좌표를 적용하지 않고 DB/state/UI를 건드리지 않는다.
+// ------------------------------------------------------------
+
+// Kakao 후보 1건이 "서울 + 강남구 + 원본 roadName과 정확히 같은 도로"인지 검증한다.
+// roadAddressName 자체가 없는 후보(addressName만 있는 경우)는 이번 도로명 진단에서는 인정하지 않는다.
+function isSameRoadCandidate(candidate, originalRoadName) {
+  const roadAddr = candidate.roadAddressName;
+  if (!roadAddr) return false; // roadAddressName 없으면 자동 후보로 인정하지 않음(요구사항 명시)
+
+  const hasSeoul = /서울/.test(roadAddr);
+  const hasGangnam = /강남구/.test(roadAddr);
+  if (!hasSeoul || !hasGangnam) return false;
+
+  const roadMatch = roadAddr.match(/([가-힣0-9]+(?:로|길))/);
+  const parsedRoadName = roadMatch ? roadMatch[1] : null;
+
+  return parsedRoadName === originalRoadName;
+}
+
+// 진단 전용 실행 함수. rows(5건)를 인자로 받아 결과 배열만 반환한다.
+// query는 "서울 강남구 {roadName}"만 사용한다(건물번호 없음, ±N 생성 없음).
+export async function runRoadOnlyApproximateDiagnostic(rows) {
+  const results = [];
+
+  for (const row of rows) {
+    const structure = extractApproximateStructure(row.address); // 기존 함수 재사용(수정 없음), roadName만 사용
+    if (!structure) {
+      results.push({
+        business_start_no: row.business_start_no,
+        original_address: row.address,
+        roadName: null,
+        query: null,
+        totalCandidateCount: 0,
+        sameRoadCandidateCount: 0,
+        verdict: 'REJECTED',
+        candidates: [],
+      });
+      continue;
+    }
+
+    const roadName = structure.roadName;
+    const query = `서울 강남구 ${roadName}`;
+    const result = await geocodeKeyword(query); // 기존 함수 그대로 재사용(수정 없음)
+
+    if (!result.success) {
+      results.push({
+        business_start_no: row.business_start_no,
+        original_address: row.address,
+        roadName,
+        query,
+        totalCandidateCount: 0,
+        sameRoadCandidateCount: 0,
+        verdict: result.reason === 'NOT_FOUND' ? 'NOT_FOUND' : 'REJECTED',
+        candidates: [],
+      });
+      continue;
+    }
+
+    const sameRoadCandidates = result.candidates.filter(c => isSameRoadCandidate(c, roadName));
+
+    results.push({
+      business_start_no: row.business_start_no,
+      original_address: row.address,
+      roadName,
+      query,
+      totalCandidateCount: result.candidates.length,
+      sameRoadCandidateCount: sameRoadCandidates.length,
+      // 여러 후보가 나와도 실패(AMBIGUOUS) 처리하지 않는다 — 목적은 "동일 도로 대표 위치 확보 가능성" 확인이므로
+      // 1건 이상이면 ROAD_CANDIDATE로 기록한다. 어떤 후보를 대표점으로 쓸지는 이번 진단에서 결정하지 않는다.
+      verdict: sameRoadCandidates.length > 0 ? 'ROAD_CANDIDATE' : 'REJECTED',
+      candidates: sameRoadCandidates.map(c => ({
+        placeName: c.placeName,
+        roadAddressName: c.roadAddressName,
+        addressName: c.addressName,
+        lat: c.lat,
+        lng: c.lng,
+      })),
+    });
+  }
+
+  return results;
+}
