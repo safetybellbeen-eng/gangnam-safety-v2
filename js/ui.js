@@ -8,7 +8,7 @@ import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
 import { loadUsers, setUserStatus, setUserRole } from './admin.js';
 import { parseExcelFile } from './excel.js';
-import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, buildLotQueries, runJusoNormalize, buildJusoQuery, runKakaoJusoRecovery } from './geocoding.js';
+import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, buildLotQueries, runJusoNormalize, buildJusoQuery, runKakaoJusoRecovery, runRoadApproximateRecovery, extractApproximateStructure } from './geocoding.js';
 
 function displayValue(v) {
   return (v === null || v === undefined || v === '') ? '-' : v;
@@ -523,12 +523,13 @@ function renderUploadPreview(containerId) {
   }
   geocodeSection.appendChild(progressEl);
 
-  // 위치 품질 요약(전체/정확/추정/확인필요/오류) — geocoding을 1회 이상 실행한 뒤에만 의미 있는 값이 있다.
-  const qualityCounts = { EXACT: 0, ESTIMATED: 0, UNRESOLVED: 0 };
+  // 위치 품질 요약(전체/정확/추정/대표위치/확인필요/오류) — geocoding을 1회 이상 실행한 뒤에만 의미 있는 값이 있다.
+  const qualityCounts = { EXACT: 0, ESTIMATED: 0, APPROXIMATE: 0, UNRESOLVED: 0 };
   let errorCount = 0;
   state.uploadParsedRows.forEach(row => {
     if (row._locationQuality === 'EXACT') qualityCounts.EXACT++;
     else if (row._locationQuality === 'ESTIMATED') qualityCounts.ESTIMATED++;
+    else if (row._locationQuality === 'APPROXIMATE') qualityCounts.APPROXIMATE++;
     else if (row._locationQuality === 'UNRESOLVED') {
       if (row._geocodeStatus === 'ERROR') errorCount++;
       else qualityCounts.UNRESOLVED++;
@@ -540,7 +541,7 @@ function renderUploadPreview(containerId) {
     qualityEl.id = 'geocode-quality-summary';
     qualityEl.textContent =
       `전체 ${state.uploadParsedRows.length} · 정확 위치 ${qualityCounts.EXACT} · 추정 위치 ${qualityCounts.ESTIMATED} · ` +
-      `확인 필요 ${qualityCounts.UNRESOLVED} · 오류 ${errorCount}`;
+      `대표 위치(확인요망) ${qualityCounts.APPROXIMATE} · 확인 필요 ${qualityCounts.UNRESOLVED} · 오류 ${errorCount}`;
     geocodeSection.appendChild(qualityEl);
 
     const notFoundCount = state.uploadParsedRows.filter(r => r._geocodeStatus === 'NOT_FOUND').length;
@@ -664,6 +665,30 @@ function renderUploadPreview(containerId) {
           geocodeSection.appendChild(kakaoJusoSummaryEl);
         }
       }
+
+      // STEP11 운영: ORIGINAL/NORMALIZED/CORE/LOT 이후 남은 UNRESOLVED 중 도로명 구조를
+      // 안전하게 추출할 수 있는 행(LOT_FAILED/BLOCK/INSUFFICIENT는 자동 제외)만 대상으로 한다.
+      const roadApproximateTargetCount = state.uploadParsedRows.filter(
+        r => r._locationQuality === 'UNRESOLVED' && extractApproximateStructure(r.address) !== null
+      ).length;
+      if (roadApproximateTargetCount > 0) {
+        const roadApproximateBtn = document.createElement('button');
+        roadApproximateBtn.type = 'button';
+        roadApproximateBtn.id = 'btn-road-approximate';
+        roadApproximateBtn.textContent = `동일 도로 대표 위치 확보 (${roadApproximateTargetCount}건)`;
+        roadApproximateBtn.disabled = state.roadApproximateInProgress;
+        roadApproximateBtn.addEventListener('click', () => handleRoadApproximateRecovery(containerId));
+        geocodeSection.appendChild(roadApproximateBtn);
+
+        if (state.roadApproximateSummary) {
+          const s = state.roadApproximateSummary;
+          const roadApproximateSummaryEl = document.createElement('p');
+          roadApproximateSummaryEl.id = 'road-approximate-summary';
+          roadApproximateSummaryEl.textContent =
+            `대상 ${s.total}건 · 대표위치 확보 ${s.success}건(⚠ 확인요망) · 결과없음 ${s.notFound}건 · 오류 ${s.error}건`;
+          geocodeSection.appendChild(roadApproximateSummaryEl);
+        }
+      }
     }
   }
 
@@ -700,7 +725,11 @@ function renderUploadPreview(containerId) {
         KAKAO_LOT: '위치 추정(지번 재검색)',
         KAKAO_JUSO: '위치 추정(행안부 주소)',
       };
-      const qualityLabelMap = { EXACT: '위치 확인', UNRESOLVED: '위치 확인 필요' };
+      const qualityLabelMap = {
+        EXACT: '위치 확인',
+        UNRESOLVED: '위치 확인 필요',
+        APPROXIMATE: '⚠ 위치 확인요망 (동일 도로 대표 위치)',
+      };
       const statusLabelMap = { SUCCESS: '좌표 확인됨', NOT_FOUND: '주소 검색결과 없음', ERROR: '좌표 확인 실패', PENDING: '확인 대기' };
       const qualityLabel =
         (row._locationQuality === 'ESTIMATED' && methodQualityLabelMap[row._geocodeMethod]) ||
@@ -1010,6 +1039,28 @@ async function handleKakaoJusoRecovery(containerId) {
     state.kakaoJusoSummary = summary;
   } finally {
     state.kakaoJusoInProgress = false;
+    renderUploadPreview(containerId);
+  }
+}
+
+// STEP11 운영: 동일 도로 대표 위치(APPROXIMATE) 확보. 성공한 행은 위치품질 요약(EXACT/ESTIMATED/
+// APPROXIMATE/확인필요)에도 자동 반영된다. 결과는 항상 APPROXIMATE이며 EXACT/ESTIMATED로 승격되지 않는다.
+async function handleRoadApproximateRecovery(containerId) {
+  if (state.roadApproximateInProgress) return;
+  state.roadApproximateInProgress = true;
+  renderUploadPreview(containerId);
+
+  try {
+    const summary = await runRoadApproximateRecovery((progress) => {
+      state.roadApproximateSummary = progress;
+      const summaryEl = document.getElementById('road-approximate-summary');
+      if (summaryEl) {
+        summaryEl.textContent = `대상 ${progress.total}건 · 대표위치 확보 ${progress.success}건(⚠ 확인요망) · 결과없음 ${progress.notFound}건 · 오류 ${progress.error}건`;
+      }
+    });
+    state.roadApproximateSummary = summary;
+  } finally {
+    state.roadApproximateInProgress = false;
     renderUploadPreview(containerId);
   }
 }

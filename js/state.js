@@ -35,5 +35,7 @@ export const state = {
   jusoNormalizeInProgress: false, // STEP 11H-3. JUSO 정규화 버튼 중복 클릭 방지
   jusoNormalizeSummary: null,     // { total, done, matched, ambiguous, noMatch, notFound, error } JUSO 검증 결과 요약
   kakaoJusoInProgress: false,     // STEP 11H-4. KAKAO_JUSO 좌표 확정 버튼 중복 클릭 방지
-  kakaoJusoSummary: null          // { total, done, success, notFound, error } KAKAO_JUSO 좌표 확정 결과 요약
+  kakaoJusoSummary: null,         // { total, done, success, notFound, error } KAKAO_JUSO 좌표 확정 결과 요약
+  roadApproximateInProgress: false, // STEP11 운영. ROAD APPROXIMATE 버튼 중복 클릭 방지
+  roadApproximateSummary: null      // { total, done, success, notFound, error } ROAD APPROXIMATE 결과 요약
 };

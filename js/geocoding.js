@@ -654,10 +654,137 @@ export async function runKakaoLotRecovery(onProgress) {
 }
 
 // ------------------------------------------------------------
-// STEP 11H-3. JUSO(행정안전부) 주소 정규화 실험.
-// 기존 cascade(ORIGINAL/NORMALIZED/CORE/LOT)가 모두 실패해 UNRESOLVED로 남은 행 중,
-// 원본에 도로명+건물번호가 명시적으로 존재하는 행에 한해서만 JUSO로 정규화를 시도한다.
-// JUSO는 좌표를 반환하지 않으므로, 여기서 lat/lng를 확정하거나 DB에 쓰지 않는다 — 정규화 결과(후보)만 저장한다.
+// STEP11 운영 전환 — KAKAO_ROAD_APPROXIMATE. cascade 최종 단계.
+// ORIGINAL/NORMALIZED/CORE/LOT가 모두 실패해 UNRESOLVED로 남은 행 중, 도로명 구조를 안전하게
+// 추출할 수 있는 행만 대상으로 "서울 강남구 {roadName}"(건물번호 없음, 진단에서 검증 완료)로
+// 동일 도로상의 실제 Kakao 위치를 대표 핀으로 확보한다.
+// 이 좌표는 사업장의 정확한 위치가 아니라 "동일 도로상의 업무 참고용 대표 위치"이며, 절대 EXACT/ESTIMATED로
+// 승격하지 않는다 — 항상 location_quality='APPROXIMATE'로만 저장한다.
+// ------------------------------------------------------------
+
+// 후보 문자열에서 건물본번을 파싱한다(대표점 선택용 deterministic 참고값 — 거리/정확도 판단에는 쓰지 않는다).
+function parseApproximateBuildingMainNo(candidate) {
+  const text = candidate.roadAddressName || '';
+  const m = text.match(/([가-힣0-9]+(?:로|길))\s*(\d+)/);
+  return m ? m[2] : null;
+}
+
+// 대표점 선택(운영용, deterministic). 진단에서 쓴 pickRepresentativeCandidate와 달리
+// 동률(diff 동일) 시 Kakao 반환순서에 의존하지 않고 roadAddressName 오름차순 → lat → lng 순으로 확정한다.
+function pickRoadApproximateCandidate(sameRoadCandidates, originalDong, originalMainNo) {
+  if (sameRoadCandidates.length === 0) return null;
+
+  const dongMatched = sameRoadCandidates.filter(c => candidateDongMatches(c, originalDong));
+  const pool = dongMatched.length > 0 ? dongMatched : sameRoadCandidates;
+
+  const withDiff = pool.map(c => {
+    const mainNo = parseApproximateBuildingMainNo(c);
+    const a = Number(originalMainNo);
+    const b = Number(mainNo);
+    const diff = (Number.isFinite(a) && Number.isFinite(b)) ? Math.abs(a - b) : null;
+    return { candidate: c, diff };
+  }).filter(x => x.diff !== null);
+
+  // 건물번호 파싱이 전혀 안 되면(diff 계산 불가) pool 전체 중 deterministic 정렬만으로 고른다 —
+  // 이 경우도 UNRESOLVED로 남기지 않고 동일 도로 대표점을 확정한다(대상은 이미 동일도로 검증을 통과했으므로).
+  const candidates = withDiff.length > 0 ? withDiff : pool.map(c => ({ candidate: c, diff: null }));
+
+  let finalGroup = candidates;
+  if (withDiff.length > 0) {
+    const minDiff = Math.min(...withDiff.map(x => x.diff));
+    finalGroup = withDiff.filter(x => x.diff === minDiff);
+  }
+
+  // deterministic tie-break: roadAddressName 오름차순 → lat → lng.
+  finalGroup.sort((x, y) => {
+    const an = x.candidate.roadAddressName || '';
+    const bn = y.candidate.roadAddressName || '';
+    if (an !== bn) return an < bn ? -1 : 1;
+    if (x.candidate.lat !== y.candidate.lat) return x.candidate.lat - y.candidate.lat;
+    return x.candidate.lng - y.candidate.lng;
+  });
+
+  return finalGroup[0].candidate;
+}
+
+// UNRESOLVED이고 도로명 구조 추출이 가능한 행만 대상으로 한다(LOT_FAILED/BLOCK/INSUFFICIENT처럼
+// 도로명 자체가 없는 행은 extractApproximateStructure가 null을 반환해 자동으로 제외된다).
+// EXACT/ESTIMATED 행은 UNRESOLVED가 아니므로 이 필터에 애초에 들어오지 않는다(수정 금지 보호).
+export async function runRoadApproximateRecovery(onProgress) {
+  const targets = state.uploadParsedRows.filter(
+    row => row._locationQuality === 'UNRESOLVED' && extractApproximateStructure(row.address) !== null
+  );
+
+  targets.forEach(row => {
+    row._roadApproximateStatus = 'PENDING';
+  });
+
+  const progress = { total: targets.length, done: 0, success: 0, notFound: 0, error: 0 };
+  if (typeof onProgress === 'function') onProgress({ ...progress });
+
+  const inFlight = new Map();
+  function getOrCreate(query) {
+    const key = (query || '').trim();
+    let p = inFlight.get(key);
+    if (!p) {
+      p = geocodeKeyword(query);
+      inFlight.set(key, p);
+    }
+    return p;
+  }
+
+  let cursor = 0;
+  async function worker() {
+    while (cursor < targets.length) {
+      const row = targets[cursor];
+      cursor++;
+
+      const structure = extractApproximateStructure(row.address);
+      const query = `서울 강남구 ${structure.roadName}`;
+      const result = await getOrCreate(query);
+
+      if (!result.success) {
+        row._roadApproximateStatus = result.reason === 'NOT_FOUND' ? 'NOT_FOUND' : 'ERROR';
+        if (row._roadApproximateStatus === 'NOT_FOUND') progress.notFound++;
+        else progress.error++;
+        progress.done++;
+        if (typeof onProgress === 'function') onProgress({ ...progress });
+        continue;
+      }
+
+      const sameRoadCandidates = result.candidates.filter(c => isSameRoadCandidate(c, structure.roadName));
+      const chosen = pickRoadApproximateCandidate(sameRoadCandidates, structure.dong, structure.buildingMainNo);
+
+      if (!chosen) {
+        row._roadApproximateStatus = 'NOT_FOUND';
+        progress.notFound++;
+        progress.done++;
+        if (typeof onProgress === 'function') onProgress({ ...progress });
+        continue;
+      }
+
+      // 공통 provenance 필드만 사용한다(새 전용 필드 추가하지 않음). 원본 row.address는 변경하지 않는다.
+      row.lat = chosen.lat;
+      row.lng = chosen.lng;
+      row._geocodeStatus = 'SUCCESS';
+      row._geocodeError = null;
+      row._geocodeMethod = 'KAKAO_ROAD_APPROXIMATE';
+      row._locationQuality = 'APPROXIMATE'; // EXACT/ESTIMATED로 승격하지 않는다.
+      row._geocodeSearchedAddress = query;
+      row._matchedAddress = chosen.roadAddressName;
+      row._roadApproximateStatus = 'SUCCESS';
+      progress.success++;
+
+      progress.done++;
+      if (typeof onProgress === 'function') onProgress({ ...progress });
+    }
+  }
+
+  const roadApproximateWorkers = Array.from({ length: Math.min(CONCURRENCY, targets.length) }, () => worker());
+  await Promise.all(roadApproximateWorkers);
+
+  return progress;
+}
 // 좌표 확정(KAKAO_JUSO 단계)은 이번 STEP 범위가 아니다.
 // ------------------------------------------------------------
 
@@ -949,7 +1076,7 @@ export async function runKakaoJusoRecovery(onProgress) {
 // 원본 주소에서 district/dong/roadName/buildingMainNo/buildingSubNo를 구조화 추출한다.
 // buildJusoQueryInfo의 ROAD 파싱 로직과 동일한 원칙(원본에 실제 있는 도로명+건물번호만 사용, 추측 금지)을
 // 진단 전용으로 복제한 것이며, 운영 함수(buildJusoQueryInfo)는 그대로 둔다(수정하지 않음).
-function extractApproximateStructure(address) {
+export function extractApproximateStructure(address) {
   const clean = String(address || '').replace(/^\(\d{5}\)\s*/, '').trim();
   const dong = extractDongFromAddress(clean); // 기존 함수 재사용(수정 없음)
   const roadMatch = clean.match(/([가-힣0-9]+(?:로|길))\s*(\d+)(?:-(\d+))?/);
