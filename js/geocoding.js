@@ -939,3 +939,122 @@ export async function runKakaoJusoRecovery(onProgress) {
 
   return progress;
 }
+
+// ------------------------------------------------------------
+// STEP11 APPROXIMATE 진단 전용 (일회성). 운영 cascade/state/DB/UI와 완전히 분리된 진단 함수.
+// 목적: UNRESOLVED 대표 ROAD 5건에 대해 기존 geocodeKeyword(mode:'keyword', 신규 API 아님)만으로
+// "인근 대표 위치"를 실제로 확보할 수 있는지 확인한다. 좌표를 row에 적용하지 않고, DB에 쓰지 않는다.
+// ------------------------------------------------------------
+
+// 원본 주소에서 district/dong/roadName/buildingMainNo/buildingSubNo를 구조화 추출한다.
+// buildJusoQueryInfo의 ROAD 파싱 로직과 동일한 원칙(원본에 실제 있는 도로명+건물번호만 사용, 추측 금지)을
+// 진단 전용으로 복제한 것이며, 운영 함수(buildJusoQueryInfo)는 그대로 둔다(수정하지 않음).
+function extractApproximateStructure(address) {
+  const clean = String(address || '').replace(/^\(\d{5}\)\s*/, '').trim();
+  const dong = extractDongFromAddress(clean); // 기존 함수 재사용(수정 없음)
+  const roadMatch = clean.match(/([가-힣0-9]+(?:로|길))\s*(\d+)(?:-(\d+))?/);
+  if (!roadMatch) return null;
+  return {
+    district: '강남구',
+    dong: dong || null,
+    roadName: roadMatch[1],
+    buildingMainNo: roadMatch[2],
+    buildingSubNo: roadMatch[3] || null,
+  };
+}
+
+// Kakao가 반환한 addressName/roadAddressName 문자열에서 구/도로명/건물번호를 정규식으로 파싱한다.
+// Edge Function이 구조화 필드(rn/sggNm 등)를 주지 않으므로(keyword mode는 문자열만 반환) 여기서 직접 분해한다.
+function parseKakaoAddressString(addrString) {
+  if (!addrString) return null;
+  const guMatch = addrString.match(/([가-힣]+시)?\s*강남구/);
+  const roadMatch = addrString.match(/([가-힣0-9]+(?:로|길))\s*(\d+)(?:-(\d+))?/);
+  return {
+    isGangnam: !!guMatch,
+    roadName: roadMatch ? roadMatch[1] : null,
+    buildingMainNo: roadMatch ? roadMatch[2] : null,
+    buildingSubNo: roadMatch ? (roadMatch[3] || null) : null,
+  };
+}
+
+// 후보 1건을 원본 구조와 대조해 판정한다. district+roadName이 정확히 일치해야 후보로 인정하고,
+// 그 중 건물본번/부번까지 일치하면 EXACT, 아니면(같은 도로 위 다른 번지) APPROXIMATE로 구분한다.
+// 문자열 includes가 아니라 파싱된 필드끼리 정확히 비교한다(다른 구/다른 도로는 즉시 탈락).
+function classifyApproximateCandidate(candidate, originalStructure) {
+  const parsed = parseKakaoAddressString(candidate.roadAddressName) || parseKakaoAddressString(candidate.addressName);
+  if (!parsed) return 'REJECTED';
+  if (!parsed.isGangnam) return 'REJECTED';
+  if (!parsed.roadName || parsed.roadName !== originalStructure.roadName) return 'REJECTED';
+
+  const mainMatches = parsed.buildingMainNo === originalStructure.buildingMainNo;
+  const subMatches = originalStructure.buildingSubNo === null
+    ? (parsed.buildingSubNo === null)
+    : parsed.buildingSubNo === originalStructure.buildingSubNo;
+
+  if (mainMatches && subMatches) return 'EXACT_CANDIDATE';
+  return 'APPROXIMATE_CANDIDATE';
+}
+
+// 진단 전용 실행 함수. rows(5건)를 인자로 받아 결과 배열만 반환한다.
+// row.lat/lng를 절대 설정하지 않고, state.uploadParsedRows를 건드리지 않는다(운영 데이터 미접근).
+export async function runApproximateDiagnostic(rows) {
+  const results = [];
+
+  for (const row of rows) {
+    const structure = extractApproximateStructure(row.address);
+    if (!structure) {
+      results.push({
+        business_start_no: row.business_start_no,
+        original_address: row.address,
+        query: null,
+        candidateCount: 0,
+        validCount: 0,
+        verdict: 'REJECTED',
+        candidates: [],
+      });
+      continue;
+    }
+
+    const query = `서울 ${structure.district} ${structure.roadName} ${structure.buildingMainNo}${structure.buildingSubNo ? '-' + structure.buildingSubNo : ''}`;
+    const result = await geocodeKeyword(query); // 기존 함수 그대로 재사용(수정 없음)
+
+    if (!result.success) {
+      results.push({
+        business_start_no: row.business_start_no,
+        original_address: row.address,
+        query,
+        candidateCount: 0,
+        validCount: 0,
+        verdict: result.reason === 'NOT_FOUND' ? 'NOT_FOUND' : 'REJECTED',
+        candidates: [],
+      });
+      continue;
+    }
+
+    const classified = result.candidates.map(c => ({
+      ...c,
+      verdict: classifyApproximateCandidate(c, structure),
+    }));
+    const validOnes = classified.filter(c => c.verdict === 'EXACT_CANDIDATE' || c.verdict === 'APPROXIMATE_CANDIDATE');
+    const exactOnes = validOnes.filter(c => c.verdict === 'EXACT_CANDIDATE');
+    const approxOnes = validOnes.filter(c => c.verdict === 'APPROXIMATE_CANDIDATE');
+
+    let verdict;
+    if (validOnes.length === 0) verdict = 'REJECTED';
+    else if (validOnes.length >= 2) verdict = 'AMBIGUOUS'; // 구조검증 통과 후보가 2건 이상이면 자동확정 금지
+    else if (exactOnes.length === 1) verdict = 'EXACT_CANDIDATE';
+    else verdict = 'APPROXIMATE_CANDIDATE';
+
+    results.push({
+      business_start_no: row.business_start_no,
+      original_address: row.address,
+      query,
+      candidateCount: result.candidates.length,
+      validCount: validOnes.length,
+      verdict,
+      candidates: classified,
+    });
+  }
+
+  return results;
+}
