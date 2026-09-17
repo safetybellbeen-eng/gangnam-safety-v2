@@ -1145,3 +1145,130 @@ export async function runRoadOnlyApproximateDiagnostic(rows) {
 
   return results;
 }
+
+// ------------------------------------------------------------
+// STEP11 APPROXIMATE 3차 진단(ROAD 41건 전체 분석) — 일회성 진단 함수.
+// 기존 runApproximateDiagnostic(1차)/runRoadOnlyApproximateDiagnostic(2차, 대표5건)는 그대로 두고
+// 삭제/수정하지 않는다. 이 함수는 검증된 "도로명만 검색" 방식(2차 진단 결과 5/5 ROAD_CANDIDATE)을
+// 41건 전체로 확대한 분석 전용 함수다. row.lat/lng를 적용하지 않고 DB/state/UI를 건드리지 않는다.
+// ------------------------------------------------------------
+
+// 원본 주소에서 동을 추출하고, 후보 문자열(roadAddressName 우선, 없으면 addressName)에도 같은 동 문자열이
+// 포함되는지 확인한다. 동 비교는 "우선순위 판단"용 참고값이며, 동 불일치가 후보 자체를 탈락시키지는 않는다.
+function candidateDongMatches(candidate, originalDong) {
+  if (!originalDong) return false;
+  const text = candidate.roadAddressName || candidate.addressName || '';
+  return text.includes(originalDong);
+}
+
+// 후보 문자열에서 건물본번/부번을 파싱한다(참고값 산출용, 새 검색어 생성에는 쓰지 않음).
+function parseCandidateBuildingNo(candidate) {
+  const text = candidate.roadAddressName || '';
+  const m = text.match(/([가-힣0-9]+(?:로|길))\s*(\d+)(?:-(\d+))?/);
+  if (!m) return null;
+  return { mainNo: m[2], subNo: m[3] || null };
+}
+
+// 원본 건물본번과 후보 건물본번의 "숫자 차이"를 참고값으로 계산한다(부번은 이번 비교에 포함하지 않음 —
+// 본번 차이가 더 안정적인 참고 지표이므로). 파싱 실패 시 null(비교 불가).
+function buildingNoDiff(originalMainNo, candidateMainNo) {
+  const a = Number(originalMainNo);
+  const b = Number(candidateMainNo);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  return Math.abs(a - b);
+}
+
+// 대표후보 선택 분석(제안 규칙 그대로 산출, 실제 적용은 이번 단계에서 하지 않음):
+// 1) 동일도로 후보 중 원본 동과 일치하는 집합이 있으면 그 집합을 우선.
+//    없으면 동일도로 후보 전체를 대상으로 한다.
+// 2) 그 집합에서 건물본번 숫자차이가 가장 작은 후보를 선택.
+// 3) 최소 차이 후보가 2개 이상이면 AUTO_SELECT 대신 AMBIGUOUS.
+// 4) 건물번호 구조 파싱이 안 되는 후보뿐이면 MANUAL_REQUIRED.
+//
+// 주의(위험성 보고): 도로명주소 건물번호는 부여 방식상 인접 번호가 실제 인접 위치를 보장하지 않는다.
+// 따라서 이 "숫자차이 최소" 선택은 어디까지나 분석/참고 지표이며, 이 결과를 그대로 좌표로 확정하면
+// 실제로는 멀리 떨어진 위치를 "가장 가깝다"고 잘못 판단할 위험이 있다. 이번 단계는 분석까지만 수행한다.
+function pickRepresentativeCandidate(sameRoadCandidates, originalDong, originalMainNo) {
+  if (sameRoadCandidates.length === 0) return { verdict: 'NO_CANDIDATE', chosen: null, diff: null };
+
+  const dongMatched = sameRoadCandidates.filter(c => candidateDongMatches(c, originalDong));
+  const pool = dongMatched.length > 0 ? dongMatched : sameRoadCandidates;
+
+  const withDiff = pool.map(c => {
+    const parsed = parseCandidateBuildingNo(c);
+    const diff = parsed ? buildingNoDiff(originalMainNo, parsed.mainNo) : null;
+    return { candidate: c, diff };
+  }).filter(x => x.diff !== null);
+
+  if (withDiff.length === 0) return { verdict: 'MANUAL_REQUIRED', chosen: null, diff: null };
+
+  const minDiff = Math.min(...withDiff.map(x => x.diff));
+  const minGroup = withDiff.filter(x => x.diff === minDiff);
+
+  if (minGroup.length > 1) return { verdict: 'AMBIGUOUS', chosen: null, diff: minDiff };
+
+  return { verdict: 'AUTO_SELECT', chosen: minGroup[0].candidate, diff: minDiff };
+}
+
+// 진단 전용 실행 함수. rows(최대 41건)를 인자로 받아 분석 결과 배열만 반환한다.
+export async function runRoadOnlyApproximateBulkDiagnostic(rows) {
+  const results = [];
+
+  for (const row of rows) {
+    const structure = extractApproximateStructure(row.address); // 기존 함수 재사용(수정 없음)
+    if (!structure) {
+      results.push({
+        business_start_no: row.business_start_no,
+        original_address: row.address,
+        roadName: null,
+        buildingNo: null,
+        candidateCount: 0,
+        chosen: null,
+        diff: null,
+        verdict: 'MANUAL_REQUIRED',
+      });
+      continue;
+    }
+
+    const roadName = structure.roadName;
+    const buildingNo = structure.buildingSubNo ? `${structure.buildingMainNo}-${structure.buildingSubNo}` : structure.buildingMainNo;
+    const query = `서울 강남구 ${roadName}`;
+    const result = await geocodeKeyword(query); // 기존 함수 그대로 재사용(수정 없음)
+
+    if (!result.success) {
+      results.push({
+        business_start_no: row.business_start_no,
+        original_address: row.address,
+        roadName,
+        buildingNo,
+        candidateCount: 0,
+        chosen: null,
+        diff: null,
+        verdict: result.reason === 'NOT_FOUND' ? 'NO_CANDIDATE' : 'MANUAL_REQUIRED',
+      });
+      continue;
+    }
+
+    const sameRoadCandidates = result.candidates.filter(c => isSameRoadCandidate(c, roadName)); // 기존 함수 재사용
+    const pick = pickRepresentativeCandidate(sameRoadCandidates, structure.dong, structure.buildingMainNo);
+
+    results.push({
+      business_start_no: row.business_start_no,
+      original_address: row.address,
+      roadName,
+      buildingNo,
+      candidateCount: sameRoadCandidates.length,
+      chosen: pick.chosen ? {
+        placeName: pick.chosen.placeName,
+        roadAddressName: pick.chosen.roadAddressName,
+        addressName: pick.chosen.addressName,
+        lat: pick.chosen.lat,
+        lng: pick.chosen.lng,
+      } : null,
+      diff: pick.diff,
+      verdict: pick.verdict,
+    });
+  }
+
+  return results;
+}
