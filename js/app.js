@@ -6,7 +6,7 @@ import { initMap, clearMarkers } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
-import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect } from './ui.js';
+import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel } from './ui.js';
 import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
 
 const VIEWS = [
@@ -166,7 +166,11 @@ function bindEvents() {
   document.getElementById('btn-upload-panel').addEventListener('click', () => {
     if (!isAdmin()) return; // UI 숨김 우회 방지(최종 방어는 STEP 12 RPC 내부의 관리자 검증)
     const panel = document.getElementById('upload-panel');
-    panel.style.display = (panel.style.display === 'none') ? 'block' : 'none';
+    const willOpen = panel.style.display === 'none';
+    panel.style.display = willOpen ? 'block' : 'none';
+    if (willOpen) {
+      renderUploadHistoryPanel('upload-history'); // STEP13-5: 패널을 열 때 최근 업로드 이력을 표시한다.
+    }
   });
 
   document.getElementById('upload-file-input').addEventListener('change', async (e) => {

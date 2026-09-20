@@ -40,5 +40,9 @@ export const state = {
   roadApproximateSummary: null,     // { total, done, success, notFound, error } ROAD APPROXIMATE 결과 요약
   uploadImportInProgress: false,    // STEP12-C. DB import(gnmap_v2_import_sites RPC) 버튼 중복 클릭 방지
   uploadImportResult: null,         // 마지막 RPC 응답 { success, history_id, total_rows, inserted, updated, review_count } | { success:false, message }
-  uploadFileName: null               // STEP12-C. RPC payload의 file_name에 쓸 현재 업로드 파일명
+  uploadFileName: null,              // STEP12-C. RPC payload의 file_name에 쓸 현재 업로드 파일명
+  importPreviewInProgress: false,    // STEP13. 사전 검증(신규/갱신 예정 계산) 중복 클릭 방지
+  importPreview: null,               // { success, total, updateCount, insertCount } | { success:false, message }
+  uploadHistoryList: [],             // STEP13. 최근 업로드 이력 목록
+  uploadHistoryLoading: false        // STEP13. 업로드 이력 조회 중 여부
 };

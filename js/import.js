@@ -65,3 +65,57 @@ export async function importSitesToDatabase(fileName, sourceForm) {
     return { success: false, message: 'DB 반영 요청을 보내지 못했습니다.' };
   }
 }
+
+// STEP13-1/2: 업로드 직전 확인용 — 이번 batch의 business_start_no 목록을 현재 gnmap_v2_sites와
+// 대조해 신규 예정/갱신 예정 건수를 계산한다. DB에 아무것도 쓰지 않는 순수 조회(SELECT)이며,
+// RPC 호출 없이 이 함수만으로는 저장이 발생하지 않는다.
+// 반환: { success:true, total, updateCount, insertCount } | { success:false, message }
+export async function previewImportImpact(fileName, sourceForm) {
+  const payload = buildImportPayload(fileName, sourceForm);
+  const businessStartNos = payload.rows.map(r => r.business_start_no);
+
+  if (businessStartNos.length === 0) {
+    return { success: false, message: '대상 행이 없습니다.' };
+  }
+
+  try {
+    const { data, error } = await sb
+      .from('gnmap_v2_sites')
+      .select('business_start_no')
+      .in('business_start_no', businessStartNos);
+
+    if (error) {
+      console.error('사전 검증 조회 실패:', error);
+      return { success: false, message: error.message || '사전 검증 조회에 실패했습니다.' };
+    }
+
+    const existingSet = new Set((data || []).map(r => r.business_start_no));
+    const updateCount = businessStartNos.filter(no => existingSet.has(no)).length;
+    const insertCount = businessStartNos.length - updateCount;
+
+    return { success: true, total: businessStartNos.length, updateCount, insertCount };
+  } catch (e) {
+    console.error('사전 검증 조회 예외:', e);
+    return { success: false, message: '사전 검증 조회 요청을 보내지 못했습니다.' };
+  }
+}
+
+// STEP13-5/6: 관리자 화면에 표시할 최근 업로드 이력을 조회한다. RLS가 admin만 select를 허용한다.
+export async function loadUploadHistory(limit = 10) {
+  try {
+    const { data, error } = await sb
+      .from('gnmap_v2_upload_history')
+      .select('id, uploaded_by_name, file_name, source_form, total_rows, confirmed_rows, review_rows, uploaded_at')
+      .order('uploaded_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error('업로드 이력 조회 실패:', error);
+      return [];
+    }
+    return data || [];
+  } catch (e) {
+    console.error('업로드 이력 조회 예외:', e);
+    return [];
+  }
+}

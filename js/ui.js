@@ -9,7 +9,7 @@ import { getNote, saveNote, deleteNote } from './notes.js';
 import { loadUsers, setUserStatus, setUserRole } from './admin.js';
 import { parseExcelFile } from './excel.js';
 import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, buildLotQueries, runJusoNormalize, buildJusoQuery, runKakaoJusoRecovery, runRoadApproximateRecovery, extractApproximateStructure } from './geocoding.js';
-import { importSitesToDatabase } from './import.js';
+import { importSitesToDatabase, previewImportImpact, loadUploadHistory } from './import.js';
 
 function displayValue(v) {
   return (v === null || v === undefined || v === '') ? '-' : v;
@@ -459,6 +459,43 @@ async function handleAdminChange(userId, action, containerId, buttons) {
   }
 }
 
+// STEP13-5: 관리자 업로드 영역(upload-panel)이 열릴 때 최근 업로드 이력을 조회해 표시한다.
+// containerId가 가리키는 요소 안에 이력 목록을 렌더한다(예: 'upload-history' div).
+export async function renderUploadHistoryPanel(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  container.innerHTML = '';
+  const loadingMsg = document.createElement('p');
+  loadingMsg.textContent = '업로드 이력을 불러오는 중...';
+  container.appendChild(loadingMsg);
+
+  const list = await loadUploadHistory(10);
+  state.uploadHistoryList = list;
+
+  container.innerHTML = '';
+  const heading = document.createElement('p');
+  heading.textContent = '최근 업로드 이력';
+  container.appendChild(heading);
+
+  if (list.length === 0) {
+    const emptyMsg = document.createElement('p');
+    emptyMsg.textContent = '업로드 이력이 없습니다.';
+    container.appendChild(emptyMsg);
+    return;
+  }
+
+  list.forEach(h => {
+    const row = document.createElement('div');
+    row.className = 'upload-history-row';
+    const when = h.uploaded_at ? new Date(h.uploaded_at).toLocaleString() : '';
+    row.textContent =
+      `${when} · ${h.file_name || '-'} (${h.source_form || '-'}) · ` +
+      `${h.uploaded_by_name || '-'} · 전체 ${h.total_rows ?? '-'}건 · 확정 ${h.confirmed_rows ?? '-'}건 · 확인필요 ${h.review_rows ?? '-'}건`;
+    container.appendChild(row);
+  });
+}
+
 // 엑셀 파일 선택 시 파싱하고 결과 요약 + 미리보기 목록을 렌더한다.
 // 이번 STEP은 DB에 아무것도 반영하지 않는다 — geocoding/RPC는 STEP 11/12에서 이 결과(state.uploadParsedRows)를 이어받는다.
 export async function handleExcelFileSelect(file, containerId) {
@@ -700,27 +737,55 @@ function renderUploadPreview(containerId) {
           geocodeSection.appendChild(roadApproximateSummaryEl);
         }
       }
-
-      // STEP12-C: geocoding 결과를 실제 DB(gnmap_v2_sites)에 반영한다. 버튼을 눌러야만 실행되며
-      // 자동 실행은 없다. ERROR 행은 애초에 payload에서 제외된다(import.js).
-      const importBtn = document.createElement('button');
-      importBtn.type = 'button';
-      importBtn.id = 'btn-import-to-db';
-      importBtn.textContent = 'DB에 저장';
-      importBtn.disabled = state.uploadImportInProgress;
-      importBtn.addEventListener('click', () => handleImportToDatabase(containerId));
-      geocodeSection.appendChild(importBtn);
-
-      if (state.uploadImportResult) {
-        const r = state.uploadImportResult;
-        const importResultEl = document.createElement('p');
-        importResultEl.id = 'import-result-summary';
-        importResultEl.textContent = r.success
-          ? `저장 완료 · 전체 ${r.total_rows}건 · 신규 ${r.inserted}건 · 갱신 ${r.updated}건 · 확인필요 ${r.review_count}건`
-          : `저장 실패: ${r.message}`;
-        geocodeSection.appendChild(importResultEl);
-      }
     }
+  }
+
+  // STEP12-C: geocoding 결과를 실제 DB(gnmap_v2_sites)에 반영한다. 버튼을 눌러야만 실행되며
+  // 자동 실행은 없다. ERROR 행은 애초에 payload에서 제외된다(import.js).
+  // unresolvedCount와 무관하게(UNRESOLVED=0이어도) 파싱된 데이터가 있으면 항상 이 영역이 존재해야 한다.
+  const importTargetRows = state.uploadParsedRows.filter(row => row._validation !== 'ERROR');
+  const canImport =
+    !!state.uploadDetectedForm &&
+    importTargetRows.length > 0 &&
+    importTargetRows.every(row =>
+      ['EXACT', 'ESTIMATED', 'APPROXIMATE', 'UNRESOLVED'].includes(row._locationQuality)
+    ) &&
+    !state.uploadImportInProgress;
+
+  const importBtn = document.createElement('button');
+  importBtn.type = 'button';
+  importBtn.id = 'btn-import-to-db';
+  importBtn.textContent = 'DB에 저장';
+  importBtn.disabled = !canImport || state.importPreviewInProgress;
+  importBtn.addEventListener('click', () => handleImportToDatabase(containerId));
+  geocodeSection.appendChild(importBtn);
+
+  if (!canImport) {
+    const importHintEl = document.createElement('p');
+    importHintEl.id = 'import-hint';
+    importHintEl.textContent = '주소 좌표 확인을 완료한 후 저장할 수 있습니다.';
+    geocodeSection.appendChild(importHintEl);
+  }
+
+  // STEP13-1/2: 업로드 직전 신규/갱신 예정 건수를 표시한다(RPC 실행 전, 순수 조회 결과).
+  if (state.importPreview) {
+    const p = state.importPreview;
+    const previewEl = document.createElement('p');
+    previewEl.id = 'import-preview-summary';
+    previewEl.textContent = p.success
+      ? `저장 시 예상: 전체 ${p.total}건 · 신규 예정 ${p.insertCount}건 · 갱신 예정 ${p.updateCount}건`
+      : `사전 검증 실패: ${p.message}`;
+    geocodeSection.appendChild(previewEl);
+  }
+
+  if (state.uploadImportResult) {
+    const r = state.uploadImportResult;
+    const importResultEl = document.createElement('p');
+    importResultEl.id = 'import-result-summary';
+    importResultEl.textContent = r.success
+      ? `저장 완료 · 전체 ${r.total_rows}건 · 신규 ${r.inserted}건 · 갱신 ${r.updated}건 · 확인필요 ${r.review_count}건`
+      : `저장 실패: ${r.message}`;
+    geocodeSection.appendChild(importResultEl);
   }
 
   container.appendChild(geocodeSection);
@@ -1096,13 +1161,41 @@ async function handleRoadApproximateRecovery(containerId) {
   }
 }
 
-// STEP12-C: geocoding 결과를 실제 DB에 반영한다. 성공 시에만 지도/목록을 새로고침하며,
-// initApp()(전체 재인증/재초기화)은 호출하지 않는다 — loadActiveSites + renderSiteList만 재실행한다.
+// STEP12-C/13: geocoding 결과를 실제 DB에 반영한다.
+// 흐름: 1) 사전 검증(previewImportImpact)으로 신규/갱신 예정 건수를 먼저 계산해 화면에 보여준다.
+//       2) 브라우저 confirm으로 최종 확인을 받는다(취소 시 아무 것도 실행되지 않음).
+//       3) 실제 RPC(importSitesToDatabase) 호출 — 여기서만 DB write가 발생한다.
+// 성공 시에만 지도/목록을 새로고침하며, initApp()(전체 재인증/재초기화)은 호출하지 않는다.
 // 실패해도 state.uploadParsedRows(파싱/검증/geocoding 결과)는 그대로 유지되어 업로드 패널이 안 사라진다.
 async function handleImportToDatabase(containerId) {
-  if (state.uploadImportInProgress) return;
+  if (state.uploadImportInProgress || state.importPreviewInProgress) return;
+
+  // 1) 사전 검증: 신규/갱신 예정 건수 계산 (DB write 없음, 순수 조회)
+  state.importPreviewInProgress = true;
+  renderUploadPreview(containerId);
+
+  let preview;
+  try {
+    preview = await previewImportImpact(state.uploadFileName, state.uploadDetectedForm);
+    state.importPreview = preview;
+  } finally {
+    state.importPreviewInProgress = false;
+    renderUploadPreview(containerId);
+  }
+
+  if (!preview.success) {
+    return; // 사전 검증 실패 메시지는 이미 화면에 표시됨. 저장을 진행하지 않는다.
+  }
+
+  // 2) 최종 확인 (취소 시 저장하지 않음)
+  const confirmed = window.confirm(
+    `전체 ${preview.total}건 중 신규 ${preview.insertCount}건, 갱신 ${preview.updateCount}건을 저장하시겠습니까?`
+  );
+  if (!confirmed) return;
+
+  // 3) 실제 DB 반영
   state.uploadImportInProgress = true;
-  renderUploadPreview(containerId); // 버튼 disabled 즉시 반영
+  renderUploadPreview(containerId);
 
   try {
     const result = await importSitesToDatabase(state.uploadFileName, state.uploadDetectedForm);
@@ -1113,6 +1206,12 @@ async function handleImportToDatabase(containerId) {
       const sites = await loadActiveSites();
       state.sites = sites;
       renderSiteList('site-list');
+
+      // STEP13-6: 저장 성공 직후 업로드 이력을 다시 불러와 최신 상태로 갱신한다.
+      // upload-history 컨테이너가 화면에 있을 때만(업로드 패널이 열려 있을 때) 갱신한다.
+      if (document.getElementById('upload-history')) {
+        await renderUploadHistoryPanel('upload-history');
+      }
     }
   } finally {
     state.uploadImportInProgress = false;
