@@ -37,5 +37,8 @@ export const state = {
   kakaoJusoInProgress: false,     // STEP 11H-4. KAKAO_JUSO 좌표 확정 버튼 중복 클릭 방지
   kakaoJusoSummary: null,         // { total, done, success, notFound, error } KAKAO_JUSO 좌표 확정 결과 요약
   roadApproximateInProgress: false, // STEP11 운영. ROAD APPROXIMATE 버튼 중복 클릭 방지
-  roadApproximateSummary: null      // { total, done, success, notFound, error } ROAD APPROXIMATE 결과 요약
+  roadApproximateSummary: null,     // { total, done, success, notFound, error } ROAD APPROXIMATE 결과 요약
+  uploadImportInProgress: false,    // STEP12-C. DB import(gnmap_v2_import_sites RPC) 버튼 중복 클릭 방지
+  uploadImportResult: null,         // 마지막 RPC 응답 { success, history_id, total_rows, inserted, updated, review_count } | { success:false, message }
+  uploadFileName: null               // STEP12-C. RPC payload의 file_name에 쓸 현재 업로드 파일명
 };

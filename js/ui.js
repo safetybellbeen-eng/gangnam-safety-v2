@@ -3,12 +3,13 @@
 // 전부 textContent 또는 createElement 기반 DOM 생성으로만 넣는다.
 import { state } from './state.js';
 import { panToSite, renderMarkers } from './map.js';
-import { getFilteredSortedSites, getDongOptions } from './sites.js';
+import { getFilteredSortedSites, getDongOptions, loadActiveSites } from './sites.js';
 import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
 import { loadUsers, setUserStatus, setUserRole } from './admin.js';
 import { parseExcelFile } from './excel.js';
 import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, buildLotQueries, runJusoNormalize, buildJusoQuery, runKakaoJusoRecovery, runRoadApproximateRecovery, extractApproximateStructure } from './geocoding.js';
+import { importSitesToDatabase } from './import.js';
 
 function displayValue(v) {
   return (v === null || v === undefined || v === '') ? '-' : v;
@@ -217,6 +218,14 @@ export function renderDetail(site) {
   const panel = document.getElementById('site-detail-panel');
   panel.innerHTML = '';
   panel.style.display = 'block';
+
+  // STEP12-C: APPROXIMATE(동일 도로 대표 위치)인 사업장은 정확한 위치가 아님을 명확히 알린다.
+  if (site.location_quality === 'APPROXIMATE') {
+    const warningEl = document.createElement('p');
+    warningEl.className = 'site-detail-approximate-warning';
+    warningEl.textContent = '⚠ 위치 확인요망: 정확한 사업장 위치를 확인하지 못해 동일 도로상의 대표 위치에 표시했습니다.';
+    panel.appendChild(warningEl);
+  }
 
   const rows = [
     ['사업장명', site.site_name],
@@ -457,6 +466,8 @@ export async function handleExcelFileSelect(file, containerId) {
   container.innerHTML = '';
   state.geocodeProgress = null; // 새 파일 선택 시 이전 geocoding 진행상황 초기화
   state.geocodeInProgress = false;
+  state.uploadFileName = file.name; // STEP12-C: RPC payload의 file_name에 사용
+  state.uploadImportResult = null; // 새 파일 선택 시 이전 import 결과 초기화
 
   const loadingMsg = document.createElement('p');
   loadingMsg.textContent = '파일을 읽는 중...';
@@ -688,6 +699,26 @@ function renderUploadPreview(containerId) {
             `대상 ${s.total}건 · 대표위치 확보 ${s.success}건(⚠ 확인요망) · 결과없음 ${s.notFound}건 · 오류 ${s.error}건`;
           geocodeSection.appendChild(roadApproximateSummaryEl);
         }
+      }
+
+      // STEP12-C: geocoding 결과를 실제 DB(gnmap_v2_sites)에 반영한다. 버튼을 눌러야만 실행되며
+      // 자동 실행은 없다. ERROR 행은 애초에 payload에서 제외된다(import.js).
+      const importBtn = document.createElement('button');
+      importBtn.type = 'button';
+      importBtn.id = 'btn-import-to-db';
+      importBtn.textContent = 'DB에 저장';
+      importBtn.disabled = state.uploadImportInProgress;
+      importBtn.addEventListener('click', () => handleImportToDatabase(containerId));
+      geocodeSection.appendChild(importBtn);
+
+      if (state.uploadImportResult) {
+        const r = state.uploadImportResult;
+        const importResultEl = document.createElement('p');
+        importResultEl.id = 'import-result-summary';
+        importResultEl.textContent = r.success
+          ? `저장 완료 · 전체 ${r.total_rows}건 · 신규 ${r.inserted}건 · 갱신 ${r.updated}건 · 확인필요 ${r.review_count}건`
+          : `저장 실패: ${r.message}`;
+        geocodeSection.appendChild(importResultEl);
       }
     }
   }
@@ -1061,6 +1092,30 @@ async function handleRoadApproximateRecovery(containerId) {
     state.roadApproximateSummary = summary;
   } finally {
     state.roadApproximateInProgress = false;
+    renderUploadPreview(containerId);
+  }
+}
+
+// STEP12-C: geocoding 결과를 실제 DB에 반영한다. 성공 시에만 지도/목록을 새로고침하며,
+// initApp()(전체 재인증/재초기화)은 호출하지 않는다 — loadActiveSites + renderSiteList만 재실행한다.
+// 실패해도 state.uploadParsedRows(파싱/검증/geocoding 결과)는 그대로 유지되어 업로드 패널이 안 사라진다.
+async function handleImportToDatabase(containerId) {
+  if (state.uploadImportInProgress) return;
+  state.uploadImportInProgress = true;
+  renderUploadPreview(containerId); // 버튼 disabled 즉시 반영
+
+  try {
+    const result = await importSitesToDatabase(state.uploadFileName, state.uploadDetectedForm);
+    state.uploadImportResult = result;
+
+    if (result.success) {
+      // DB 반영 성공 시에만 지도/목록을 다시 불러온다. 로그인/지도 재초기화는 하지 않는다.
+      const sites = await loadActiveSites();
+      state.sites = sites;
+      renderSiteList('site-list');
+    }
+  } finally {
+    state.uploadImportInProgress = false;
     renderUploadPreview(containerId);
   }
 }

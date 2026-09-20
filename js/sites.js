@@ -2,7 +2,7 @@
 import { sb } from './api.js';
 import { state } from './state.js';
 
-const SITE_COLUMNS = 'id, company_name, site_name, address, lat, lng, dong, amount, status, is_active';
+const SITE_COLUMNS = 'id, company_name, site_name, address, lat, lng, dong, amount, status, is_active, location_quality';
 
 // is_active=true인 사업장을 전부 조회한다. 좌표 유무로 조회 자체를 제한하지 않는다 —
 // 좌표 없는 사업장도 목록에는 표시되어야 하며, 마커 생성 여부만 map.js의 좌표 검증이 담당한다.
