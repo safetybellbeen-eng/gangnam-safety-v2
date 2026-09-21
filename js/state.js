@@ -44,5 +44,6 @@ export const state = {
   importPreviewInProgress: false,    // STEP13. 사전 검증(신규/갱신 예정 계산) 중복 클릭 방지
   importPreview: null,               // { success, total, updateCount, insertCount } | { success:false, message }
   uploadHistoryList: [],             // STEP13. 최근 업로드 이력 목록
-  uploadHistoryLoading: false        // STEP13. 업로드 이력 조회 중 여부
+  uploadHistoryLoading: false,       // STEP13. 업로드 이력 조회 중 여부
+  supervisions: []                    // STEP14. gnmap_v2_supervisions 목록 (사업장 연결 없음, 캠페인 단위 상황판)
 };

@@ -10,6 +10,8 @@ import { loadUsers, setUserStatus, setUserRole } from './admin.js';
 import { parseExcelFile } from './excel.js';
 import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, buildLotQueries, runJusoNormalize, buildJusoQuery, runKakaoJusoRecovery, runRoadApproximateRecovery, extractApproximateStructure } from './geocoding.js';
 import { importSitesToDatabase, previewImportImpact, loadUploadHistory } from './import.js';
+import { loadSupervisions, createSupervision, updateSupervision, deleteSupervision } from './supervision.js';
+import { isAdmin } from './auth.js';
 
 function displayValue(v) {
   return (v === null || v === undefined || v === '') ? '-' : v;
@@ -457,6 +459,156 @@ async function handleAdminChange(userId, action, containerId, buttons) {
     state.adminUserInFlight.delete(userId);
     await renderAdminPanel(containerId);
   }
+}
+
+// STEP14. 감독일정 상태값 -> 한글 표시.
+const SUPERVISION_STATUS_LABEL = { scheduled: '예정', ongoing: '진행중', done: '완료' };
+// 목록 정렬 우선순위: 진행중 -> 예정 -> 완료.
+const SUPERVISION_STATUS_ORDER = { ongoing: 0, scheduled: 1, done: 2 };
+
+// 감독일정 상황판을 렌더한다. approved 전체가 조회 가능, admin만 등록/수정/삭제 버튼이 보인다
+// (최종 방어는 RLS: INSERT/UPDATE/DELETE 정책 자체가 admin만 허용).
+export async function renderSupervisionPanel(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  // container(supervision-panel) 전체를 비우면 이미 index.html에 있는 supervision-form 마크업까지
+  // 사라지므로, 여기서는 그 안의 목록/등록버튼 영역만 다시 그린다(폼은 별도 show/hide로만 다룬다).
+  let listWrap = document.getElementById('supervision-list-wrap');
+  if (!listWrap) {
+    listWrap = document.createElement('div');
+    listWrap.id = 'supervision-list-wrap';
+    container.appendChild(listWrap);
+  }
+  listWrap.innerHTML = '';
+
+  const rows = await loadSupervisions();
+  state.supervisions = rows;
+
+  const newBtn = document.getElementById('btn-sv-new');
+  if (newBtn) {
+    newBtn.style.display = isAdmin() ? 'inline-block' : 'none';
+    const freshNewBtn = newBtn.cloneNode(true); // 이전 클릭 리스너 제거(재렌더 시 중복 바인딩 방지)
+    newBtn.replaceWith(freshNewBtn);
+    freshNewBtn.addEventListener('click', () => showSupervisionForm(containerId, null));
+  }
+
+  const listEl = document.createElement('div');
+  listEl.id = 'supervision-list';
+  listWrap.appendChild(listEl);
+
+  if (rows.length === 0) {
+    const empty = document.createElement('p');
+    empty.textContent = '등록된 감독일정이 없습니다.';
+    listEl.appendChild(empty);
+    return;
+  }
+
+  const sorted = [...rows].sort((a, b) => {
+    const orderDiff = SUPERVISION_STATUS_ORDER[a.status] - SUPERVISION_STATUS_ORDER[b.status];
+    if (orderDiff !== 0) return orderDiff;
+    return (a.start_date || '') < (b.start_date || '') ? 1 : -1; // 같은 상태 안에서는 최근 시작일 우선
+  });
+
+  sorted.forEach(sv => {
+    const row = document.createElement('div');
+    row.className = 'supervision-row';
+
+    const info = document.createElement('div');
+    info.className = 'supervision-info';
+    [
+      ['감독명', sv.title],
+      ['담당자', sv.manager_name || '-'],
+      ['기간', `${sv.start_date} ~ ${sv.end_date}`],
+      ['상태', SUPERVISION_STATUS_LABEL[sv.status] || sv.status],
+    ].forEach(([label, value]) => {
+      const line = document.createElement('div');
+      line.textContent = `${label}: ${value}`;
+      info.appendChild(line);
+    });
+    row.appendChild(info);
+
+    if (isAdmin()) {
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.textContent = '수정';
+      editBtn.addEventListener('click', () => showSupervisionForm(containerId, sv));
+      row.appendChild(editBtn);
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.textContent = '삭제';
+      deleteBtn.addEventListener('click', () => handleDeleteSupervision(containerId, sv.id));
+      row.appendChild(deleteBtn);
+    }
+
+    listEl.appendChild(row);
+  });
+}
+
+// 등록/수정 폼을 채우고 연다. existing이 null이면 신규 등록, 있으면 그 값으로 폼을 채운다.
+function showSupervisionForm(containerId, existing) {
+  const form = document.getElementById('supervision-form');
+  const errorEl = document.getElementById('supervision-form-error');
+  errorEl.textContent = '';
+  form.style.display = 'block';
+
+  document.getElementById('sv-id').value = existing ? existing.id : '';
+  document.getElementById('sv-title').value = existing ? existing.title : '';
+  document.getElementById('sv-manager').value = existing ? (existing.manager_name || '') : '';
+  document.getElementById('sv-start').value = existing ? existing.start_date : '';
+  document.getElementById('sv-end').value = existing ? existing.end_date : '';
+  document.getElementById('sv-status').value = existing ? existing.status : 'scheduled';
+
+  const saveBtn = document.getElementById('btn-sv-save');
+  const newSaveBtn = saveBtn.cloneNode(true); // 이전 클릭 리스너 제거(중복 바인딩 방지)
+  saveBtn.replaceWith(newSaveBtn);
+  newSaveBtn.addEventListener('click', () => handleSaveSupervision(containerId, existing ? existing.id : null));
+
+  const cancelBtn = document.getElementById('btn-sv-cancel');
+  const newCancelBtn = cancelBtn.cloneNode(true);
+  cancelBtn.replaceWith(newCancelBtn);
+  newCancelBtn.addEventListener('click', () => { form.style.display = 'none'; });
+}
+
+// 등록/수정 저장. 감독명/시작일/종료일 필수, 종료일>=시작일, status 허용값만 통과시킨다.
+async function handleSaveSupervision(containerId, editingId) {
+  const errorEl = document.getElementById('supervision-form-error');
+  errorEl.textContent = '';
+
+  const title = document.getElementById('sv-title').value.trim();
+  const manager = document.getElementById('sv-manager').value.trim();
+  const start = document.getElementById('sv-start').value;
+  const end = document.getElementById('sv-end').value;
+  const status = document.getElementById('sv-status').value;
+
+  if (!title) { errorEl.textContent = '감독명을 입력해주세요.'; return; }
+  if (!start) { errorEl.textContent = '시작일을 입력해주세요.'; return; }
+  if (!end) { errorEl.textContent = '종료일을 입력해주세요.'; return; }
+  if (end < start) { errorEl.textContent = '종료일은 시작일보다 빠를 수 없습니다.'; return; }
+  if (!['scheduled', 'ongoing', 'done'].includes(status)) { errorEl.textContent = '올바르지 않은 상태입니다.'; return; }
+
+  const fields = { title, manager_name: manager || null, start_date: start, end_date: end, status };
+  const result = editingId
+    ? await updateSupervision(editingId, fields)
+    : await createSupervision(fields);
+
+  if (!result.success) {
+    errorEl.textContent = result.message;
+    return;
+  }
+
+  document.getElementById('supervision-form').style.display = 'none';
+  await renderSupervisionPanel(containerId);
+}
+
+async function handleDeleteSupervision(containerId, id) {
+  const result = await deleteSupervision(id);
+  if (!result.success) {
+    console.error('감독일정 삭제 실패:', result.message);
+    return;
+  }
+  await renderSupervisionPanel(containerId);
 }
 
 // STEP13-5: 관리자 업로드 영역(upload-panel)이 열릴 때 최근 업로드 이력을 조회해 표시한다.
