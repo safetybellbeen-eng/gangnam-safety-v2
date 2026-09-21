@@ -20,3 +20,88 @@
   font-size: 13px;
   min-height: 1em;
 }
+
+/* STEP14. 감독일정 상황판 — 헤더/필터/카드/배지/폼 스타일(대규모 디자인 아님, 기존 톤 유지). */
+#supervision-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+#supervision-panel-header h2 {
+  margin: 0;
+  font-size: 16px;
+}
+#supervision-panel-subtitle {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #777;
+}
+#btn-supervision-close {
+  border: none;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+#supervision-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.sv-filter-btn {
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 14px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.sv-filter-btn.active {
+  background: #eef5ff;
+  border-color: #1a73e8;
+  color: #1a73e8;
+}
+#supervision-filter-bar #btn-sv-new {
+  margin-left: auto;
+  font-size: 12px;
+}
+.supervision-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+}
+.supervision-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sv-badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  color: #fff;
+}
+.sv-badge-scheduled { background: #8a8f98; }
+.sv-badge-ongoing { background: #1a73e8; }
+.sv-badge-done { background: #2e7d32; }
+.supervision-meta {
+  font-size: 12px;
+  color: #666;
+  margin-top: 2px;
+}
+.supervision-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+#supervision-form label {
+  margin-bottom: 6px;
+}

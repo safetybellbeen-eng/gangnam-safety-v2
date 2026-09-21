@@ -175,3 +175,31 @@
   margin: 8px 0;
   font-size: 12px;
 }
+
+/* STEP14. 감독일정 버튼/패널 위치 — btn-admin-panel/btn-upload-panel과 같은 상단 버튼 열 규칙을 따른다. */
+#btn-supervision-panel {
+  position: absolute;
+  z-index: 30;
+  top: 210px;
+  left: 0;
+  background: #fff;
+  padding: 4px 12px;
+}
+/* 감독일정 패널은 사업장 연결이 없는 독립 상황판이라 admin/upload처럼 사이드 도킹하지 않고,
+   지도 위에 뜨는 중앙 모달 형태로 띄운다(요청 사양). 작은 화면에서도 화면 밖으로 벗어나지 않도록
+   width/max-height를 min()으로 제한하고 내부 스크롤을 둔다. */
+#supervision-panel {
+  position: absolute;
+  z-index: 40;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(480px, calc(100vw - 32px));
+  max-height: min(600px, calc(100vh - 80px));
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
