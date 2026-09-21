@@ -468,6 +468,9 @@ const SUPERVISION_STATUS_ORDER = { ongoing: 0, scheduled: 1, done: 2 };
 // 상태 배지 색상 구분용 클래스(components.css의 .sv-badge-* 규칙과 매칭).
 const SUPERVISION_STATUS_CLASS = { scheduled: 'sv-badge-scheduled', ongoing: 'sv-badge-ongoing', done: 'sv-badge-done' };
 const SUPERVISION_FILTERS = ['all', 'scheduled', 'ongoing', 'done'];
+// 시작일/종료일 허용 범위(비정상적인 연도 입력 방지). 'YYYY-MM-DD' 문자열 비교로 충분(항상 zero-padded ISO).
+const SUPERVISION_MIN_DATE = '2000-01-01';
+const SUPERVISION_MAX_DATE = '2100-12-31';
 
 // 감독일정 상황판을 렌더한다. approved 전체가 조회 가능, admin만 등록/수정/삭제 버튼이 보인다
 // (최종 방어는 RLS: INSERT/UPDATE/DELETE 정책 자체가 admin만 허용).
@@ -503,6 +506,13 @@ export async function renderSupervisionPanel(containerId) {
     listWrap.id = 'supervision-list-wrap';
     container.appendChild(listWrap);
   }
+  // 목록 화면으로 진입(최초 오픈/저장 완료/취소)할 때마다 폼은 닫고 필터바+목록은 보이게 되돌린다
+  // (showSupervisionForm이 반대로 숨긴다 — 폼이 열린 동안 목록을 감추기 위함).
+  const formEl = document.getElementById('supervision-form');
+  if (formEl) formEl.style.display = 'none';
+  const filterBarEl = document.getElementById('supervision-filter-bar');
+  if (filterBarEl) filterBarEl.style.display = '';
+  listWrap.style.display = '';
   listWrap.innerHTML = '';
 
   const rows = await loadSupervisions();
@@ -599,6 +609,13 @@ function showSupervisionForm(containerId, existing) {
   errorEl.textContent = '';
   form.style.display = 'block';
 
+  // 폼이 열린 동안에는 기존 목록/필터바를 숨기고 폼만 보여준다(저장/취소 시 renderSupervisionPanel
+  // 또는 취소 핸들러가 다시 되돌린다).
+  const filterBarEl = document.getElementById('supervision-filter-bar');
+  if (filterBarEl) filterBarEl.style.display = 'none';
+  const listWrapEl = document.getElementById('supervision-list-wrap');
+  if (listWrapEl) listWrapEl.style.display = 'none';
+
   document.getElementById('sv-id').value = existing ? existing.id : '';
   document.getElementById('sv-title').value = existing ? existing.title : '';
   document.getElementById('sv-manager').value = existing ? (existing.manager_name || '') : '';
@@ -614,7 +631,14 @@ function showSupervisionForm(containerId, existing) {
   const cancelBtn = document.getElementById('btn-sv-cancel');
   const newCancelBtn = cancelBtn.cloneNode(true);
   cancelBtn.replaceWith(newCancelBtn);
-  newCancelBtn.addEventListener('click', () => { form.style.display = 'none'; });
+  newCancelBtn.addEventListener('click', () => {
+    form.style.display = 'none';
+    // 취소 시 목록을 다시 불러올 필요는 없으므로 숨겨뒀던 필터바/목록만 다시 보여준다.
+    const filterBarEl = document.getElementById('supervision-filter-bar');
+    if (filterBarEl) filterBarEl.style.display = '';
+    const listWrapEl = document.getElementById('supervision-list-wrap');
+    if (listWrapEl) listWrapEl.style.display = '';
+  });
 }
 
 // 등록/수정 저장. 감독명/시작일/종료일 필수, 종료일>=시작일, status 허용값만 통과시킨다.
@@ -631,6 +655,11 @@ async function handleSaveSupervision(containerId, editingId) {
   if (!title) { errorEl.textContent = '감독명을 입력해주세요.'; return; }
   if (!start) { errorEl.textContent = '시작일을 입력해주세요.'; return; }
   if (!end) { errorEl.textContent = '종료일을 입력해주세요.'; return; }
+  // 비정상적인 연도(입력 오류로 인한 극단값 등) 방지 — 'YYYY-MM-DD' 문자열은 사전식 비교로 안전하게 범위 검사 가능.
+  if (start < SUPERVISION_MIN_DATE || start > SUPERVISION_MAX_DATE || end < SUPERVISION_MIN_DATE || end > SUPERVISION_MAX_DATE) {
+    errorEl.textContent = `시작일/종료일은 ${SUPERVISION_MIN_DATE} ~ ${SUPERVISION_MAX_DATE} 범위 내에서 입력해주세요.`;
+    return;
+  }
   if (end < start) { errorEl.textContent = '종료일은 시작일보다 빠를 수 없습니다.'; return; }
   if (!['scheduled', 'ongoing', 'done'].includes(status)) { errorEl.textContent = '올바르지 않은 상태입니다.'; return; }
 
