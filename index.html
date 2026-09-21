@@ -29,6 +29,7 @@
   <section id="view-signup" style="display:none">
     <h1>회원가입</h1>
     <form id="signup-form">
+      <label>이름(소속) <input type="text" id="signup-name" required></label>
       <label>이메일 <input type="email" id="signup-email" required></label>
       <label>비밀번호 <input type="password" id="signup-password" required></label>
       <button type="submit">가입하기</button>
@@ -110,7 +111,10 @@
     </div>
     <div id="site-list-panel">
       <div id="site-search-bar">
-        <input type="text" id="site-search-input" placeholder="사업장명, 업체명, 주소, 동으로 검색">
+        <div id="site-search-input-wrap">
+          <input type="text" id="site-search-input" placeholder="사업장명, 업체명, 주소, 동으로 검색">
+          <button type="button" id="site-search-clear-btn" style="display:none" aria-label="검색어 지우기">×</button>
+        </div>
         <select id="site-dong-select">
           <option value="all">전체</option>
         </select>
@@ -128,7 +132,14 @@
           <option value="company-asc">업체명 가나다순</option>
           <option value="amount-desc">공사금액 높은순</option>
           <option value="amount-asc">공사금액 낮은순</option>
+          <option value="deadline">공사기간 임박순</option>
+          <option value="favorite">즐겨찾기 우선</option>
         </select>
+        <div id="site-toggle-filter-row">
+          <button type="button" id="site-favorite-filter-btn">★ 즐겨찾기</button>
+          <button type="button" id="site-review-filter-btn">확인필요 <span id="site-review-count">0</span></button>
+          <span id="site-count-label"></span>
+        </div>
       </div>
       <div id="site-list"></div>
     </div>
