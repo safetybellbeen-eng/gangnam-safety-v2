@@ -74,6 +74,28 @@
       <div id="upload-history"></div>
       <div id="upload-preview"></div>
     </div>
+    <button type="button" id="btn-supervision-panel" style="display:none">감독일정</button>
+    <div id="supervision-panel" style="display:none">
+      <div id="supervision-form" style="display:none">
+        <input type="hidden" id="sv-id">
+        <label>감독명 <input type="text" id="sv-title"></label>
+        <label>담당자 <input type="text" id="sv-manager"></label>
+        <label>시작일 <input type="date" id="sv-start"></label>
+        <label>종료일 <input type="date" id="sv-end"></label>
+        <label>상태
+          <select id="sv-status">
+            <option value="scheduled">예정</option>
+            <option value="ongoing">진행중</option>
+            <option value="done">완료</option>
+          </select>
+        </label>
+        <button type="button" id="btn-sv-save">저장</button>
+        <button type="button" id="btn-sv-cancel">취소</button>
+        <p id="supervision-form-error"></p>
+      </div>
+      <button type="button" id="btn-sv-new" style="display:none">+ 새 감독일정 등록</button>
+      <div id="supervision-list"></div>
+    </div>
     <div id="site-list-panel">
       <div id="site-search-bar">
         <input type="text" id="site-search-input" placeholder="사업장명, 업체명, 주소, 동으로 검색">
