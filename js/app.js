@@ -120,6 +120,7 @@ async function handleLogout() {
   if (supervisionForm) supervisionForm.style.display = 'none';
   const supervisionBtn = document.getElementById('btn-supervision-panel');
   if (supervisionBtn) supervisionBtn.style.display = 'none';
+  state.supervisionFilter = 'all';
   const searchInput = document.getElementById('site-search-input');
   const sortSelect = document.getElementById('site-sort-select');
   const dongSelect = document.getElementById('site-dong-select');

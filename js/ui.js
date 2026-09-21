@@ -465,6 +465,9 @@ async function handleAdminChange(userId, action, containerId, buttons) {
 const SUPERVISION_STATUS_LABEL = { scheduled: '예정', ongoing: '진행중', done: '완료' };
 // 목록 정렬 우선순위: 진행중 -> 예정 -> 완료.
 const SUPERVISION_STATUS_ORDER = { ongoing: 0, scheduled: 1, done: 2 };
+// 상태 배지 색상 구분용 클래스(components.css의 .sv-badge-* 규칙과 매칭).
+const SUPERVISION_STATUS_CLASS = { scheduled: 'sv-badge-scheduled', ongoing: 'sv-badge-ongoing', done: 'sv-badge-done' };
+const SUPERVISION_FILTERS = ['all', 'scheduled', 'ongoing', 'done'];
 
 // 감독일정 상황판을 렌더한다. approved 전체가 조회 가능, admin만 등록/수정/삭제 버튼이 보인다
 // (최종 방어는 RLS: INSERT/UPDATE/DELETE 정책 자체가 admin만 허용).
@@ -472,7 +475,27 @@ export async function renderSupervisionPanel(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
 
-  // container(supervision-panel) 전체를 비우면 이미 index.html에 있는 supervision-form 마크업까지
+  // 닫기(×) 버튼 — 패널을 열 때마다 재바인딩(cloneNode로 이전 리스너 제거, 중복 방지).
+  const closeBtn = document.getElementById('btn-supervision-close');
+  if (closeBtn) {
+    const freshCloseBtn = closeBtn.cloneNode(true);
+    closeBtn.replaceWith(freshCloseBtn);
+    freshCloseBtn.addEventListener('click', () => { container.style.display = 'none'; });
+  }
+
+  // 상태 필터 버튼 — 클릭 시 state.supervisionFilter만 바꾸고 패널을 다시 그린다(DB/RLS 무관, 프론트 표시만 변경).
+  document.querySelectorAll('.sv-filter-btn').forEach(btn => {
+    const freshBtn = btn.cloneNode(true);
+    btn.replaceWith(freshBtn);
+    freshBtn.classList.toggle('active', freshBtn.dataset.filter === state.supervisionFilter);
+    freshBtn.addEventListener('click', () => {
+      const filter = freshBtn.dataset.filter;
+      state.supervisionFilter = SUPERVISION_FILTERS.includes(filter) ? filter : 'all';
+      renderSupervisionPanel(containerId);
+    });
+  });
+
+  // container(supervision-panel) 전체를 비우면 이미 index.html에 있는 header/filter/form 마크업까지
   // 사라지므로, 여기서는 그 안의 목록/등록버튼 영역만 다시 그린다(폼은 별도 show/hide로만 다룬다).
   let listWrap = document.getElementById('supervision-list-wrap');
   if (!listWrap) {
@@ -510,36 +533,59 @@ export async function renderSupervisionPanel(containerId) {
     return (a.start_date || '') < (b.start_date || '') ? 1 : -1; // 같은 상태 안에서는 최근 시작일 우선
   });
 
-  sorted.forEach(sv => {
+  const filtered = state.supervisionFilter === 'all'
+    ? sorted
+    : sorted.filter(sv => sv.status === state.supervisionFilter);
+
+  if (filtered.length === 0) {
+    const empty = document.createElement('p');
+    empty.textContent = '해당 상태의 감독일정이 없습니다.';
+    listEl.appendChild(empty);
+    return;
+  }
+
+  filtered.forEach(sv => {
     const row = document.createElement('div');
     row.className = 'supervision-row';
 
     const info = document.createElement('div');
     info.className = 'supervision-info';
-    [
-      ['감독명', sv.title],
-      ['담당자', sv.manager_name || '-'],
-      ['기간', `${sv.start_date} ~ ${sv.end_date}`],
-      ['상태', SUPERVISION_STATUS_LABEL[sv.status] || sv.status],
-    ].forEach(([label, value]) => {
-      const line = document.createElement('div');
-      line.textContent = `${label}: ${value}`;
-      info.appendChild(line);
-    });
+
+    const titleRow = document.createElement('div');
+    titleRow.className = 'supervision-title-row';
+    const titleEl = document.createElement('strong');
+    titleEl.textContent = sv.title;
+    const badge = document.createElement('span');
+    badge.className = `sv-badge ${SUPERVISION_STATUS_CLASS[sv.status] || ''}`;
+    badge.textContent = SUPERVISION_STATUS_LABEL[sv.status] || sv.status;
+    titleRow.appendChild(titleEl);
+    titleRow.appendChild(badge);
+    info.appendChild(titleRow);
+
+    const meta = document.createElement('div');
+    meta.className = 'supervision-meta';
+    meta.textContent = `${sv.manager_name || '-'} · ${sv.start_date} ~ ${sv.end_date}`;
+    info.appendChild(meta);
+
     row.appendChild(info);
 
     if (isAdmin()) {
+      const actions = document.createElement('div');
+      actions.className = 'supervision-actions';
+
       const editBtn = document.createElement('button');
       editBtn.type = 'button';
       editBtn.textContent = '수정';
       editBtn.addEventListener('click', () => showSupervisionForm(containerId, sv));
-      row.appendChild(editBtn);
+      actions.appendChild(editBtn);
 
       const deleteBtn = document.createElement('button');
       deleteBtn.type = 'button';
       deleteBtn.textContent = '삭제';
       deleteBtn.addEventListener('click', () => handleDeleteSupervision(containerId, sv.id));
-      row.appendChild(deleteBtn);
+      actions.appendChild(deleteBtn);
+
+      row.appendChild(actions);
     }
 
     listEl.appendChild(row);
