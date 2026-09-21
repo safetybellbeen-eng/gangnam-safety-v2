@@ -198,6 +198,24 @@ export async function runGeocodingForParsedRows(onProgress) {
     row => row._validation !== 'ERROR' && row.address
   );
 
+  // 주소 자체가 없는 행(_validation!=='ERROR'이지만 row.address가 없어 excel.js가 WARNING으로 분류한 행)은
+  // geocoding API 대상(targets)에 넣지 않는다 — 검색할 주소 자체가 없기 때문이다.
+  // 다만 이 행들도 "위치를 알 수 없는 정상 사업장"이므로 UNRESOLVED로 명시 확정해야 위치품질 집계/
+  // canImport에서 누락되지 않는다. 임의 좌표나 대표 위치는 생성하지 않는다(lat/lng는 null 그대로).
+  const noAddressRows = state.uploadParsedRows.filter(
+    row => row._validation !== 'ERROR' && !row.address
+  );
+  noAddressRows.forEach(row => {
+    row.lat = null;
+    row.lng = null;
+    row._geocodeStatus = 'NOT_FOUND'; // 기존 상태값 체계 재사용 — 검색할 주소가 없어 결과를 찾을 수 없음
+    row._geocodeError = null;
+    row._geocodeMethod = null;
+    row._locationQuality = 'UNRESOLVED';
+    row._geocodeSearchedAddress = null;
+    row._matchedAddress = null;
+  });
+
   // 시작 즉시 대상 전체를 PENDING으로 표시한다 (기존 validation 필드는 그대로 둔다).
   targets.forEach(row => {
     row._geocodeStatus = 'PENDING';
