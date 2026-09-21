@@ -2,7 +2,7 @@
 import { sb } from './api.js';
 import { state } from './state.js';
 
-const SITE_COLUMNS = 'id, company_name, site_name, address, lat, lng, dong, amount, status, is_active, location_quality';
+const SITE_COLUMNS = 'id, company_name, site_name, address, lat, lng, dong, amount, status, is_active, location_quality, period_end';
 
 // is_active=true인 사업장을 전부 조회한다. 좌표 유무로 조회 자체를 제한하지 않는다 —
 // 좌표 없는 사업장도 목록에는 표시되어야 하며, 마커 생성 여부만 map.js의 좌표 검증이 담당한다.
@@ -61,6 +61,19 @@ function toSafeAmount(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
+// period_end가 없는 사업장은 Infinity로 취급해 오름차순 정렬 시 항상 맨 뒤로 밀린다(상단에 오지 않도록).
+function toSortableEndTime(v) {
+  if (!v) return Infinity;
+  const t = new Date(v).getTime();
+  return Number.isFinite(t) ? t : Infinity;
+}
+
+// STEP14.5-B. 사업장이 "확인필요"(주소 지오코딩이 불확실/실패) 상태인지 판정한다.
+// location_quality 값 자체는 여기서 절대 수정하지 않고 읽기만 한다.
+export function needsReview(site) {
+  return site.location_quality === 'APPROXIMATE' || site.location_quality === 'UNRESOLVED';
+}
+
 function compareBySort(a, b, sortMode) {
   switch (sortMode) {
     case 'name-asc':
@@ -71,9 +84,22 @@ function compareBySort(a, b, sortMode) {
       return toSafeAmount(b.amount) - toSafeAmount(a.amount);
     case 'amount-asc':
       return toSafeAmount(a.amount) - toSafeAmount(b.amount);
+    case 'deadline': // 공사기간 임박순 — period_end 오름차순, 없는 값은 맨 뒤로.
+      return toSortableEndTime(a.period_end) - toSortableEndTime(b.period_end);
+    case 'favorite': { // 즐겨찾기 우선 — 현재 사용자의 favoriteSiteIds 기준.
+      const fa = state.favoriteSiteIds.has(a.id) ? 0 : 1;
+      const fb = state.favoriteSiteIds.has(b.id) ? 0 : 1;
+      return fa - fb;
+    }
     default:
       return 0; // 'default': Supabase 조회 결과 순서 유지 (sort 비교 없음)
   }
+}
+
+// STEP14.5-B. 확인필요 버튼 배지용 — 다른 필터(검색/동/금액/즐겨찾기)와 무관하게
+// 전체 활성 사업장(state.sites) 중 확인필요 건수를 그대로 센다.
+export function getReviewCount() {
+  return state.sites.filter(needsReview).length;
 }
 
 // state.sites에 실제 존재하는 dong 값만 중복 제거 + 정렬해서 반환한다. select 옵션 채우기용.
@@ -93,7 +119,9 @@ export function getFilteredSortedSites() {
   let result = state.sites
     .filter(site => matchesQuery(site, query))
     .filter(site => matchesDong(site, state.selectedDong))
-    .filter(site => matchesAmount(site, state.amountFilter));
+    .filter(site => matchesAmount(site, state.amountFilter))
+    .filter(site => !state.favoriteOnly || state.favoriteSiteIds.has(site.id))
+    .filter(site => !state.reviewOnly || needsReview(site));
 
   if (state.sortMode === 'default') return result;
 
