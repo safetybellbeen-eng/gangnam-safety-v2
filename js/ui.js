@@ -3,7 +3,7 @@
 // 전부 textContent 또는 createElement 기반 DOM 생성으로만 넣는다.
 import { state } from './state.js';
 import { panToSite, renderMarkers } from './map.js';
-import { getFilteredSortedSites, getDongOptions, loadActiveSites } from './sites.js';
+import { getFilteredSortedSites, getDongOptions, loadActiveSites, getReviewCount } from './sites.js';
 import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
 import { loadUsers, setUserStatus, setUserRole } from './admin.js';
@@ -144,6 +144,12 @@ export function renderSiteList(containerId) {
   container.innerHTML = '';
 
   const visibleSites = getFilteredSortedSites();
+
+  // STEP14.5-B. 현재 표시 건수(검색/필터 적용 결과 기준, 전체 DB 건수 아님) + 확인필요 배지(전체 활성 사업장 기준).
+  const countLabel = document.getElementById('site-count-label');
+  if (countLabel) countLabel.textContent = `${visibleSites.length}건`;
+  const reviewCountEl = document.getElementById('site-review-count');
+  if (reviewCountEl) reviewCountEl.textContent = String(getReviewCount());
 
   if (!visibleSites || visibleSites.length === 0) {
     const empty = document.createElement('p');
@@ -329,14 +335,28 @@ export function bindSearchAndSort(containerId) {
   const sortSelect = document.getElementById('site-sort-select');
   const dongSelect = document.getElementById('site-dong-select');
   const amountSelect = document.getElementById('site-amount-select');
+  const searchClearBtn = document.getElementById('site-search-clear-btn');
+  const favoriteFilterBtn = document.getElementById('site-favorite-filter-btn');
+  const reviewFilterBtn = document.getElementById('site-review-filter-btn');
 
   searchInput.addEventListener('input', () => {
+    if (searchClearBtn) searchClearBtn.style.display = searchInput.value ? 'inline-block' : 'none';
     clearTimeout(searchDebounceTimer);
     searchDebounceTimer = setTimeout(() => {
       state.searchQuery = searchInput.value.trim();
       renderSiteList(containerId);
     }, 200);
   });
+
+  if (searchClearBtn) {
+    searchClearBtn.addEventListener('click', () => {
+      clearTimeout(searchDebounceTimer);
+      searchInput.value = '';
+      state.searchQuery = '';
+      searchClearBtn.style.display = 'none';
+      renderSiteList(containerId); // 검색어만 비우고 동/금액/즐겨찾기/확인필요/정렬은 그대로 유지된다.
+    });
+  }
 
   sortSelect.addEventListener('change', () => {
     state.sortMode = sortSelect.value;
@@ -352,6 +372,23 @@ export function bindSearchAndSort(containerId) {
     state.amountFilter = amountSelect.value;
     renderSiteList(containerId);
   });
+
+  // STEP14.5-B. "즐겨찾기만 보기" / "확인필요만 보기" — 토글형 버튼. 다시 누르면 해제되어 기존 필터 결과로 복귀.
+  if (favoriteFilterBtn) {
+    favoriteFilterBtn.addEventListener('click', () => {
+      state.favoriteOnly = !state.favoriteOnly;
+      favoriteFilterBtn.classList.toggle('active', state.favoriteOnly);
+      renderSiteList(containerId);
+    });
+  }
+
+  if (reviewFilterBtn) {
+    reviewFilterBtn.addEventListener('click', () => {
+      state.reviewOnly = !state.reviewOnly;
+      reviewFilterBtn.classList.toggle('active', state.reviewOnly);
+      renderSiteList(containerId);
+    });
+  }
 }
 
 // 회원관리 패널을 렌더한다. loadUsers()로 채워진 state.adminUsers를 그린다 (관리자 전용).
@@ -678,6 +715,8 @@ async function handleSaveSupervision(containerId, editingId) {
 }
 
 async function handleDeleteSupervision(containerId, id) {
+  // STEP14.5-B. 즉시 DELETE하지 않고 확인 후 삭제 — 취소 시 아무 작업도 하지 않는다.
+  if (!window.confirm('이 감독일정을 삭제하시겠습니까?')) return;
   const result = await deleteSupervision(id);
   if (!result.success) {
     console.error('감독일정 삭제 실패:', result.message);
