@@ -4,14 +4,14 @@ import { state } from './state.js';
 
 // 회원가입: profile 생성은 DB 트리거(handle_gnmap_v2_new_user)가 보장하므로
 // 여기서 별도로 insert하지 않는다 — 프론트 로직 누락으로 profile이 안 생기는 사고를 원천 차단.
-// 회원가입: user metadata에 app='gangnam-safety-v2'를 담아 전달한다.
-// DB 트리거(handle_gnmap_v2_new_user)가 이 metadata를 확인해 V2 가입자만
-// gnmap_v2_profiles를 생성한다 — V1/V2가 같은 auth.users를 공유하므로 필수.
-export async function signUp(email, password) {
+// 회원가입: user metadata에 app='gangnam-safety-v2'와 name을 담아 전달한다.
+// DB 트리거(handle_gnmap_v2_new_user, STEP14.5-B에서 name도 함께 저장하도록 수정됨)가
+// 이 metadata를 확인해 V2 가입자만 gnmap_v2_profiles를 생성한다 — V1/V2가 같은 auth.users를 공유하므로 필수.
+export async function signUp(email, password, name) {
   const { data, error } = await sb.auth.signUp({
     email,
     password,
-    options: { data: { app: 'gangnam-safety-v2' } }
+    options: { data: { app: 'gangnam-safety-v2', name } }
   });
   if (error) throw error;
   return data;
