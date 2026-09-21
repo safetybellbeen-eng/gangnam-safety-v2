@@ -745,6 +745,15 @@ export async function runRoadApproximateRecovery(onProgress) {
 
       if (!result.success) {
         row._roadApproximateStatus = result.reason === 'NOT_FOUND' ? 'NOT_FOUND' : 'ERROR';
+        // ROAD_APPROXIMATE까지 실패하면 이게 최종 cascade의 마지막 단계이므로, 여기서 명시적으로
+        // UNRESOLVED로 확정한다(lat/lng는 null, 허위 provenance를 넣지 않는다).
+        row.lat = null;
+        row.lng = null;
+        row._geocodeStatus = row._roadApproximateStatus;
+        row._locationQuality = 'UNRESOLVED';
+        row._geocodeMethod = null;
+        row._geocodeSearchedAddress = null;
+        row._matchedAddress = null;
         if (row._roadApproximateStatus === 'NOT_FOUND') progress.notFound++;
         else progress.error++;
         progress.done++;
@@ -757,6 +766,14 @@ export async function runRoadApproximateRecovery(onProgress) {
 
       if (!chosen) {
         row._roadApproximateStatus = 'NOT_FOUND';
+        // 동일도로 후보는 있었지만 대표점 선택에 실패한 경우도 마찬가지로 UNRESOLVED로 명시 확정한다.
+        row.lat = null;
+        row.lng = null;
+        row._geocodeStatus = 'NOT_FOUND';
+        row._locationQuality = 'UNRESOLVED';
+        row._geocodeMethod = null;
+        row._geocodeSearchedAddress = null;
+        row._matchedAddress = null;
         progress.notFound++;
         progress.done++;
         if (typeof onProgress === 'function') onProgress({ ...progress });
