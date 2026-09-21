@@ -76,6 +76,20 @@
     </div>
     <button type="button" id="btn-supervision-panel" style="display:none">감독일정</button>
     <div id="supervision-panel" style="display:none">
+      <div id="supervision-panel-header">
+        <div>
+          <h2>감독일정 상황판</h2>
+          <p id="supervision-panel-subtitle">예정 · 진행중 · 완료 일정 관리</p>
+        </div>
+        <button type="button" id="btn-supervision-close" aria-label="닫기">×</button>
+      </div>
+      <div id="supervision-filter-bar">
+        <button type="button" class="sv-filter-btn" data-filter="all">전체</button>
+        <button type="button" class="sv-filter-btn" data-filter="scheduled">예정</button>
+        <button type="button" class="sv-filter-btn" data-filter="ongoing">진행중</button>
+        <button type="button" class="sv-filter-btn" data-filter="done">완료</button>
+        <button type="button" id="btn-sv-new" style="display:none">+ 새 감독일정 등록</button>
+      </div>
       <div id="supervision-form" style="display:none">
         <input type="hidden" id="sv-id">
         <label>감독명 <input type="text" id="sv-title"></label>
@@ -93,8 +107,6 @@
         <button type="button" id="btn-sv-cancel">취소</button>
         <p id="supervision-form-error"></p>
       </div>
-      <button type="button" id="btn-sv-new" style="display:none">+ 새 감독일정 등록</button>
-      <div id="supervision-list"></div>
     </div>
     <div id="site-list-panel">
       <div id="site-search-bar">
