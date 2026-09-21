@@ -1,1 +1,5 @@
-/* map.css — STEP 1 골격. 지도/마커/오버레이 스타일은 STEP 4 이후 채운다. */
+/* map.css — STEP 4. Kakao Maps JS SDK 로드 및 기본 지도 초기화. */
+#map-container {
+  width: 100%;
+  height: 400px;
+}/* map.css — STEP 1 골격. 지도/마커/오버레이 스타일은 STEP 4 이후 채운다. */
