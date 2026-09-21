@@ -131,6 +131,19 @@ async function handleLogout() {
   if (dongSelect) dongSelect.innerHTML = '';
   if (amountSelect) amountSelect.value = 'all';
   if (locationMsg) locationMsg.textContent = '';
+  // STEP14.5-B. 즐겨찾기만보기/확인필요만보기 토글과 검색 지우기(×) 버튼 표시 상태 초기화.
+  state.favoriteOnly = false;
+  state.reviewOnly = false;
+  const favFilterBtn = document.getElementById('site-favorite-filter-btn');
+  if (favFilterBtn) favFilterBtn.classList.remove('active');
+  const reviewFilterBtn = document.getElementById('site-review-filter-btn');
+  if (reviewFilterBtn) reviewFilterBtn.classList.remove('active');
+  const searchClearBtn = document.getElementById('site-search-clear-btn');
+  if (searchClearBtn) searchClearBtn.style.display = 'none';
+  const countLabel = document.getElementById('site-count-label');
+  if (countLabel) countLabel.textContent = '';
+  const signupNameInput = document.getElementById('signup-name');
+  if (signupNameInput) signupNameInput.value = '';
   showView('view-login');
 }
 
@@ -218,10 +231,11 @@ function bindEvents() {
     e.preventDefault();
     const errorEl = document.getElementById('signup-error');
     clearError(errorEl);
+    const name = document.getElementById('signup-name').value.trim();
     const email = document.getElementById('signup-email').value.trim();
     const password = document.getElementById('signup-password').value;
     try {
-      await signUp(email, password);
+      await signUp(email, password, name);
       showView('view-signup-done');
     } catch (err) {
       errorEl.textContent = err.message || '회원가입에 실패했습니다.';
