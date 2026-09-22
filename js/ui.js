@@ -236,13 +236,16 @@ export function renderDetail(site) {
   panel.innerHTML = '';
   panel.style.display = 'block';
 
-  // STEP15-E.1: location_quality 값(geocoding.js가 기록한 EXACT/ESTIMATED/APPROXIMATE/UNRESOLVED)을
-  // 그대로 읽기만 해서 작은 배지로 보여준다 — 값 자체나 geocoding/import 로직은 전혀 건드리지 않는다.
-  // PC에서는 이 배지를 기본적으로 숨기고(css/mobile.css) 모바일에서만 보이게 해 PC 화면에는
-  // 영향이 없다. APPROXIMATE/UNRESOLVED는 기존 needsReview()/site-list-review-badge와 동일하게
-  // "확인필요"로 묶어서 표시한다(의미를 새로 만들지 않음).
+  // STEP15-E.1/E.1-2: location_quality 값(EXACT/ESTIMATED/APPROXIMATE/MANUAL/UNRESOLVED,
+  // supabase/migrations의 check 제약과 동일한 5개)을 그대로 읽기만 해서 작은 배지로 보여준다 —
+  // 값 자체나 geocoding/import 로직은 전혀 건드리지 않는다. PC에서는 이 배지를 기본적으로
+  // 숨기고(css/mobile.css) 모바일에서만 보이게 해 PC 화면에는 영향이 없다. APPROXIMATE/UNRESOLVED는
+  // 기존 needsReview()/site-list-review-badge와 동일하게 "확인필요"로 묶어서 표시한다(의미를 새로
+  // 만들지 않음). MANUAL(관리자가 직접 확인한 위치, gnmap_v2_import_sites RPC가 재import 시에도
+  // 보호하는 값)은 EXACT와 동일하게 "정확" 그룹으로 표시한다.
   const QUALITY_BADGE_MAP = {
     EXACT: { label: '정확', className: 'site-detail-quality-exact' },
+    MANUAL: { label: '정확', className: 'site-detail-quality-exact' },
     ESTIMATED: { label: '추정', className: 'site-detail-quality-estimated' },
     APPROXIMATE: { label: '확인필요', className: 'site-detail-quality-review' },
     UNRESOLVED: { label: '확인필요', className: 'site-detail-quality-review' }

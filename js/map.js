@@ -9,6 +9,44 @@ const DEFAULT_LEVEL = 6;
 let sdkLoadPromise = null;
 let clusterer = null; // STEP14.5-B 2차. 마커 클러스터러 인스턴스(지도당 1개, 재사용).
 
+// STEP15-E.1-2: location_quality별 마커 색상. 상세 패널(#site-detail-panel)의
+// site-detail-quality-* 배지(js/ui.js)와 완전히 같은 색을 재사용해 "핀 색"과 "상세 배지 색"이
+// 어긋나지 않게 한다. MANUAL(관리자 직접 확인)은 EXACT와 동일하게 "정확"(초록)으로 취급한다.
+// UNRESOLVED는 매핑이 없고, 어차피 lat/lng가 없어 renderMarkers()의 좌표 유효성 검사에서
+// 애초에 마커 자체가 생성되지 않는다(기존 원칙 그대로 유지).
+const QUALITY_MARKER_COLOR = {
+  EXACT: '#2e7d32',
+  MANUAL: '#2e7d32',
+  ESTIMATED: '#b7791f',
+  APPROXIMATE: '#c0392b'
+};
+
+// 색상별 kakao.maps.MarkerImage를 1번만 만들어 재사용한다(같은 색을 매 렌더마다 다시 만들지 않음).
+const markerImageCache = new Map();
+
+// 아래쪽이 뾰족한 전형적인 지도 핀 모양 + 내부 흰 원. 그라데이션/그림자 없는 단색 스타일.
+// data URI(SVG)로 만들어 별도 이미지 파일을 관리하지 않고, 색상만 바뀐 버전을 즉시 만들 수 있게 한다.
+function getQualityMarkerImage(locationQuality) {
+  const color = QUALITY_MARKER_COLOR[locationQuality];
+  if (!color) return null; // 매핑 없는 값(UNRESOLVED 등)은 커스텀 이미지를 만들지 않고 호출부에서 기본 마커로 폴백한다.
+
+  if (markerImageCache.has(color)) return markerImageCache.get(color);
+
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="30" height="40" viewBox="0 0 30 40">' +
+    '<path d="M15 0C6.7 0 0 6.6 0 14.8c0 10.6 13.1 23.6 14.2 24.7a1.1 1.1 0 0 0 1.6 0C16.9 38.4 30 25.4 30 14.8 30 6.6 23.3 0 15 0z" fill="' + color + '"/>' +
+    '<circle cx="15" cy="14.8" r="5.4" fill="#fff"/>' +
+    '</svg>';
+  const src = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+  const image = new kakao.maps.MarkerImage(
+    src,
+    new kakao.maps.Size(30, 40),
+    { offset: new kakao.maps.Point(15, 40) } // 핀 뾰족한 끝이 실제 좌표를 가리키도록 anchor를 하단 중앙으로.
+  );
+  markerImageCache.set(color, image);
+  return image;
+}
+
 // SDK <script> 태그를 딱 1번만 생성한다 (중복 로드 방지).
 // autoload=false로 로드한 뒤 kakao.maps.load()로 초기화 시점을 직접 제어한다 —
 // GitHub Pages 등 정적 호스팅에서 SDK 로드 타이밍이 페이지 렌더링과 어긋나는 문제를 방지.
@@ -80,9 +118,13 @@ export function renderMarkers(sites, onMarkerClick) {
 
     if (!isValid) return; // 유효하지 않은 좌표는 마커를 생성하지 않고 skip
 
-    const marker = new kakao.maps.Marker({
-      position: new kakao.maps.LatLng(lat, lng)
-    });
+    // STEP15-E.1-2: location_quality에 매핑된 색이 있으면 커스텀 핀 이미지를 쓰고,
+    // 없으면(이론상 도달하지 않음) 기존 기본 파란 마커로 안전하게 폴백한다.
+    const markerOptions = { position: new kakao.maps.LatLng(lat, lng) };
+    const qualityImage = getQualityMarkerImage(site.location_quality);
+    if (qualityImage) markerOptions.image = qualityImage;
+
+    const marker = new kakao.maps.Marker(markerOptions);
 
     if (typeof onMarkerClick === 'function') {
       kakao.maps.event.addListener(marker, 'click', () => onMarkerClick(site.id));
