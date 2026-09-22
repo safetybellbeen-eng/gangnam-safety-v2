@@ -64,15 +64,16 @@
 
   <section id="view-approved" style="display:none">
     <!-- STEP15-C/E.1/E.1-2: 모바일 전용 공통 헤더. PC에서는 css/mobile.css가 항상 숨김 처리한다.
-         고용노동부 공식 CI 이미지 파일을 이 세션에서 직접 내려받을 수 없어(외부망 다운로드 불가 —
-         보고 참고) 로고 슬롯은 지금은 비워 두고, 이미지가 준비되면 그 슬롯 span 안에
-         이미지 태그 한 줄만 넣으면 되는 구조로 만들어 둔다(:empty일 때는 CSS가 자동으로 공간을 차지하지
-         않는다). "고용노동부"(작게) + "산업안전 순찰지도"(굵게 크게) 2줄 텍스트는 이번 단계에서 실제로
-         적용한다. 우측 벨 버튼은 새 기능이 아니라 기존 "알림" 하단 탭(.mobile-tab-btn[data-tab="alert"])을
-         그대로 클릭 위임한다(js/app.js). -->
+         고용노동부 공식 CI는 태극 문양+"고용노동부" 글자가 한 덩어리인 원본 가로 조합형 이미지를
+         그대로(비율/색상/글자 변경 없이) 사용하고, 외곽 흰 여백만 crop해 assets/icons/moel-ci-full.png로
+         저장했다. 이미지 자체에 "고용노동부" 글자가 포함되어 있어 #mobile-app-header-agency
+         텍스트는 중복이므로 DOM/구조는 그대로 두고 모바일 CSS에서만 숨긴다(css/mobile.css).
+         "산업안전 순찰지도"는 기존 #mobile-app-header-title을 그대로 재사용해 CI 이미지 아래에
+         별도 줄로 표시한다. 우측 벨 버튼은 위치/기능 그대로 유지하며, 새 기능이 아니라 기존 "알림"
+         하단 탭(.mobile-tab-btn[data-tab="alert"])을 그대로 클릭 위임한다(js/app.js). -->
     <div id="mobile-app-header">
       <div id="mobile-app-header-brand">
-        <span id="mobile-app-header-logo-slot" aria-hidden="true"></span>
+        <span id="mobile-app-header-logo-slot" aria-hidden="true"><img src="assets/icons/moel-ci-full.png" alt="고용노동부"></span>
         <span id="mobile-app-header-titles">
           <span id="mobile-app-header-agency">고용노동부</span>
           <span id="mobile-app-header-title">산업안전 순찰지도</span>
