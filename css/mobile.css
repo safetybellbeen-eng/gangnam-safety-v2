@@ -71,8 +71,15 @@
 
   /* #view-approved를 세로 flex 컨테이너로 전환해, 하단 탭 높이를 제외한 나머지 공간을
      지도/리스트/모바일 placeholder가 채우도록 한다. (absolute/fixed 요소는 이 흐름과 무관) */
+  /* STEP15-C.3: showView()(js/app.js)가 매 화면 전환마다 #view-approved에
+     인라인 style.display='block'을 강제로 설정한다. 인라인 스타일은 !important 없는
+     외부 스타일시트보다 항상 우선하므로, 아래 display:flex는 지금까지 실제로는 절대
+     적용되지 않고 있었다(= #view-approved가 계속 display:block이었다는 뜻) — 이번 지도
+     흰 화면의 진짜 근본 원인. #view-approved의 flex-direction/height/overflow 등은
+     인라인으로 건드려지지 않아 원래도 정상 적용되고 있었으므로 display 속성에만
+     !important를 준다(다른 속성까지 남발하지 않음). */
   #view-approved {
-    display: flex;
+    display: flex !important;
     flex-direction: column;
     height: 100vh;
     height: 100dvh;
