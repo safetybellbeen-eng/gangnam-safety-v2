@@ -24,7 +24,8 @@
 #mobile-app-header,
 .site-list-review-badge,
 .site-list-dong,
-.mobile-favorite-empty {
+.mobile-favorite-empty,
+.mobile-panel-close-btn {
   display: none;
 }
 
@@ -906,17 +907,20 @@
     background: #ccc;
   }
 
-  /* STEP15-D: 더보기 탭 — 로그인 사용자 정보 카드 + 메뉴 목록(충분한 터치 영역 확보). */
+  /* STEP15-D/E.6: 더보기 탭 — 로그인 사용자 정보 카드 + 관리/업무/계정 그룹 메뉴.
+     화이트/네이비/정부 블루 톤과 --gnmap-* 토큰을 다른 탭과 동일하게 재사용한다. */
   .mobile-more-profile {
     background: #fff;
-    border: 1px solid #eee;
-    border-radius: 12px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-md);
+    box-shadow: var(--gnmap-shadow-sm);
     padding: 16px;
-    margin-bottom: 16px;
+    margin-bottom: 20px;
   }
   .mobile-more-name {
     font-size: 16px;
     font-weight: bold;
+    color: var(--gnmap-navy);
     margin-bottom: 4px;
   }
   .mobile-more-admin-badge {
@@ -924,32 +928,130 @@
     margin-left: 6px;
     padding: 2px 8px;
     border-radius: 10px;
-    background: #eef5ff;
-    color: #1a73e8;
+    background: var(--gnmap-blue-light);
+    color: var(--gnmap-blue);
     font-size: 11px;
     font-weight: bold;
     vertical-align: middle;
   }
   .mobile-more-email {
     font-size: 13px;
-    color: #666;
+    color: var(--gnmap-text-sub);
   }
+
+  /* STEP15-E.6: 그룹 제목([관리]/[업무]/[계정])은 시각적 분류용 라벨일 뿐, 클릭 대상이 아니다. */
+  .mobile-more-group-title {
+    margin: 0 4px 8px;
+    font-size: 12px;
+    font-weight: bold;
+    color: var(--gnmap-text-sub);
+  }
+  .mobile-more-group-title:not(:first-child) {
+    margin-top: 20px;
+  }
+
+  /* 한 그룹(관리/업무/계정) 안의 행들을 iOS/Android 설정화면처럼 하나의 카드 안에
+     묶고, 행 사이는 얇은 divider(border-bottom)로만 구분한다 — 행마다 카드를
+     따로 띄우지 않는다. */
   .mobile-more-menu {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-md);
+    box-shadow: var(--gnmap-shadow-sm);
+    background: #fff;
+    overflow: hidden;
   }
   .mobile-more-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
     width: 100%;
-    min-height: 48px;
+    min-height: 52px;
     text-align: left;
     padding: 0 16px;
-    border: 1px solid #eee;
-    border-radius: 12px;
+    border: none;
+    border-bottom: 1px solid var(--gnmap-border);
     background: #fff;
     font-size: 14px;
     color: #222;
     cursor: pointer;
+  }
+  .mobile-more-item:last-child {
+    border-bottom: none;
+  }
+  .mobile-more-item-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    color: var(--gnmap-text-sub);
+  }
+  .mobile-more-icon-svg {
+    width: 20px;
+    height: 20px;
+  }
+  .mobile-more-item-label {
+    flex: 1;
+    min-width: 0;
+  }
+  .mobile-more-item-chevron {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    color: #ccc;
+  }
+  .mobile-more-item-chevron .mobile-more-icon-svg {
+    width: 16px;
+    height: 16px;
+  }
+  /* STEP15-E.6: 로그아웃은 나머지 메뉴와 시각적으로만 구분한다(차분한 빨간 계열 텍스트/아이콘).
+     기존 #logout-approved 클릭 위임/로직은 변경하지 않는다. */
+  .mobile-more-item-danger {
+    color: #c0392b;
+  }
+  .mobile-more-item-danger .mobile-more-item-icon {
+    color: #c0392b;
+  }
+
+  /* STEP15-E.6: 더보기 메뉴에서 연 회원관리/엑셀업로드 패널을 닫고 "더보기" 목록으로 돌아가는
+     버튼(admin-panel/upload-panel에는 기존에 닫기 버튼이 없어 새로 추가 — js/ui.js·index.html).
+     sticky로 패널을 스크롤해도 계속 눌리는 위치에 남는다. 클릭 시 해당 패널의 style.display만
+     되돌릴 뿐 새 router/history는 전혀 만들지 않는다(#btn-supervision-close와 동일한 방식). */
+  .mobile-panel-close-btn {
+    position: sticky;
+    top: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    margin: 0 0 8px auto;
+    border: none;
+    border-radius: 50%;
+    background: var(--gnmap-bg-soft);
+    color: #333;
+    font-size: 20px;
+    line-height: 1;
+    z-index: 5;
+  }
+
+  /* 감독일정 패널은 원래부터 #btn-supervision-close가 있었으므로 위치(header의 flex
+     space-between으로 이미 우측 정렬됨)는 그대로 두고, 크기/모양만 다른 탭과 통일한다. */
+  #app[data-mobile-tab="more"] #btn-supervision-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 50%;
+    background: var(--gnmap-bg-soft);
+    color: #333;
+    font-size: 20px;
+    line-height: 1;
   }
 
   /* 하단 탭 바 */
