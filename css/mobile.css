@@ -666,6 +666,174 @@
     display: none;
   }
 
+  /* STEP15-E.5: 알림 탭 시각 디자인. supervision.js의 데이터 조회/CRUD, ui.js의
+     computeSupervisionStatus()/필터/정렬 로직, PC의 감독일정 모달 UI는 전혀 건드리지 않는다.
+     전부 #app[data-mobile-tab="alert"]로 스코프해 PC와 "더보기" 탭(같은 #supervision-panel
+     DOM을 재사용)에는 영향이 없다 — 더보기 탭에서 열면 기존(STEP14) 모습 그대로 보인다.
+     지도/현장/경로/즐겨찾기 탭 DOM은 전혀 건드리지 않는다. */
+
+  /* 헤더: PC 모달의 큰 제목 대신, 경로/더보기 탭(.mobile-view-title/.mobile-view-guide)과
+     같은 톤의 작은 화면 제목으로 축소한다. 문구(h2/subtitle 텍스트)는 그대로 재사용한다. */
+  #app[data-mobile-tab="alert"] #supervision-panel-header {
+    padding: 16px 16px 8px;
+    margin-bottom: 0;
+    border-bottom: none;
+  }
+  #app[data-mobile-tab="alert"] #supervision-panel-header h2 {
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--gnmap-navy);
+  }
+  #app[data-mobile-tab="alert"] #supervision-panel-subtitle {
+    font-size: 13px;
+    color: var(--gnmap-text-sub);
+  }
+
+  /* 상태 필터: 기존 전체/예정/진행중/완료 버튼(.sv-filter-btn, SUPERVISION_FILTERS)과
+     "+ 새 감독일정 등록"(#btn-sv-new, admin에게만 보임)을 다른 탭의 필터 칩과 같은 pill
+     형태로 정돈한다. 새 DB 조회는 없고, 클릭 시 기존 state.supervisionFilter 갱신 로직만
+     그대로 재사용된다. 폭이 부족하면 자연스럽게 다음 줄로 줄바꿈된다(가로 스크롤 강제 없음). */
+  #app[data-mobile-tab="alert"] #supervision-filter-bar {
+    padding: 8px 16px 14px;
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--gnmap-border);
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  #app[data-mobile-tab="alert"] .sv-filter-btn {
+    flex: 0 0 auto;
+    min-height: 32px;
+    padding: 6px 14px;
+    border-radius: 14px;
+    border-color: var(--gnmap-border);
+    background: var(--gnmap-bg-soft);
+    font-size: 12px;
+    color: #333;
+  }
+  #app[data-mobile-tab="alert"] .sv-filter-btn.active {
+    border-color: var(--gnmap-blue);
+    background: var(--gnmap-blue-light);
+    color: var(--gnmap-blue);
+    font-weight: bold;
+  }
+  #app[data-mobile-tab="alert"] #supervision-filter-bar #btn-sv-new {
+    flex: 0 0 auto;
+    min-height: 32px;
+    padding: 6px 14px;
+    border: none;
+    border-radius: 14px;
+    background: var(--gnmap-blue);
+    color: #fff;
+    font-size: 12px;
+    font-weight: bold;
+  }
+
+  /* 감독일정 카드: 현장/즐겨찾기 탭(.site-list-item)과 같은 화이트/라운드/그림자 톤으로
+     통일한다. 필드(제목/담당자·기간/상태)는 supervision.js가 조회한 실제 컬럼값 그대로이며,
+     새 정보를 추가하지 않는다. */
+  #app[data-mobile-tab="alert"] #supervision-list-wrap {
+    padding-bottom: 16px;
+  }
+  #app[data-mobile-tab="alert"] .supervision-row {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 8px;
+    margin: 10px 16px;
+    padding: 14px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-md);
+    box-shadow: var(--gnmap-shadow-sm);
+    background: #fff;
+  }
+  #app[data-mobile-tab="alert"] .supervision-title-row {
+    justify-content: space-between;
+  }
+  #app[data-mobile-tab="alert"] .supervision-title-row strong {
+    font-size: 15px;
+    color: var(--gnmap-navy);
+  }
+  #app[data-mobile-tab="alert"] .sv-badge {
+    flex-shrink: 0;
+    font-size: 11px;
+    padding: 3px 10px;
+  }
+  #app[data-mobile-tab="alert"] .supervision-meta {
+    font-size: 13px;
+    color: var(--gnmap-text-sub);
+  }
+  #app[data-mobile-tab="alert"] .supervision-actions {
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  #app[data-mobile-tab="alert"] .supervision-actions button {
+    min-height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-sm);
+    background: var(--gnmap-bg-soft);
+    font-size: 13px;
+    color: #333;
+  }
+
+  /* 빈 상태: 일정 0건("등록된 감독일정이 없습니다.")/필터 결과 0건("해당 상태의 감독일정이
+     없습니다.") 모두 ui.js가 이미 만드는 <p> 그대로이고, 가짜 일정 예시는 넣지 않는다.
+     여기서는 다른 탭과 같은 톤의 중앙 정렬 안내문으로만 다듬는다. */
+  #app[data-mobile-tab="alert"] #supervision-list-wrap > p,
+  #app[data-mobile-tab="alert"] #supervision-list > p {
+    text-align: center;
+    color: var(--gnmap-text-sub);
+    font-size: 13px;
+    padding: 48px 24px 0;
+  }
+
+  /* 등록/수정 폼: 기존 supervision.js CRUD/검증(js/ui.js handleSaveSupervision)은 그대로 두고
+     입력창/버튼 크기만 모바일 터치 영역에 맞춘다. */
+  #app[data-mobile-tab="alert"] #supervision-form {
+    padding: 16px;
+  }
+  #app[data-mobile-tab="alert"] #supervision-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--gnmap-text-sub);
+  }
+  #app[data-mobile-tab="alert"] #supervision-form input {
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-sm);
+    font-size: 14px;
+    box-sizing: border-box;
+  }
+  #app[data-mobile-tab="alert"] #btn-sv-save {
+    width: 100%;
+    min-height: 44px;
+    border: none;
+    border-radius: var(--gnmap-radius-sm);
+    background: var(--gnmap-blue);
+    color: #fff;
+    font-size: 14px;
+    font-weight: bold;
+    margin-top: 4px;
+  }
+  #app[data-mobile-tab="alert"] #btn-sv-cancel {
+    width: 100%;
+    min-height: 40px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-sm);
+    background: #fff;
+    color: #333;
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  #app[data-mobile-tab="alert"] #supervision-form-error {
+    color: #c0392b;
+    font-size: 12px;
+    margin-top: 6px;
+  }
+
   /* STEP15-D: 더보기 탭에서 여는 회원관리/엑셀업로드/감독일정 패널 — 세 패널 모두 PC에서는
      서로 다른 position:absolute 좌표(top:130px/170px/50% 등, css/layout.css)를 쓰지만,
      모바일에서는 동일하게 전체화면 시트로 덮어쓴다. 여닫는 트리거/렌더 함수는
