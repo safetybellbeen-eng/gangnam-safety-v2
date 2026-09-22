@@ -81,7 +81,8 @@
 .site-list-dong,
 .mobile-favorite-empty,
 .mobile-panel-close-btn,
-.site-detail-close-x {
+.site-detail-close-x,
+.site-detail-copy-btn {
   display: none;
 }
 
@@ -636,9 +637,16 @@
     border-top: 1px solid var(--gnmap-border);
     border-radius: var(--gnmap-radius-lg) var(--gnmap-radius-lg) 0 0;
     box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
-    padding: 14px var(--gnmap-space-4) var(--gnmap-space-4);
+    padding: 10px var(--gnmap-space-4) var(--gnmap-space-4);
     z-index: 70;
     box-sizing: border-box;
+  }
+  /* 사용자 피드백(시안 확정): 지도 탭에서 핀을 눌러 상세를 열면 검색/필터 바(#site-list-panel)를
+     숨기고, #view-approved의 flex-column 구조상 flex:1인 #map-container가 그 빈 공간을 자동으로
+     채워 지도가 넓어지게 한다. DOM 재구성/새 wrapper 없이 기존 flex 레이아웃만 활용한다.
+     data-detail-open은 js/ui.js의 renderDetail()/closeDetail()이 토글한다. */
+  #app[data-mobile-tab="map"][data-detail-open="true"] #site-list-panel {
+    display: none;
   }
   /* 사용자 피드백: 지도 탭에서 핀을 눌렀을 때 상세정보가 화면을 거의 다 덮어 지도가 거의
      안 보이고 가독성도 떨어진다는 지적 — 지도 탭에서 여는 상세만 "미리보기" 높이(약 42vh)로
@@ -684,18 +692,18 @@
     display: none;
   }
 
-  /* STEP16.5-C §5: 사업장명이 Bottom Sheet의 "제목"처럼 보이도록, hero 3줄(사업장명/업체명/주소)은
-     기존 .site-detail-row(flex+구분선)를 쓰지 않고 이 선택자로 override해 label 없는 세로 블록으로
-     만든다. 같은 요소가 여전히 .site-detail-row 클래스도 갖고 있어 PC(layout.css)는 원래 스타일
-     그대로다 — 이 override는 @media(max-width:768px) 안에서만 적용된다. */
+  /* 사용자 피드백(시안 A · 컴팩트형 확정): 사업장명이 Bottom Sheet의 "제목"처럼 보이도록 label
+     없는 세로 블록으로 두되, STEP16.5-C 1차안보다 전체적으로 글자 크기/여백을 한 단계씩 줄여
+     "텍스트가 너무 크다"는 지적을 반영한다. 같은 요소가 여전히 .site-detail-row 클래스도 갖고
+     있어 PC(layout.css)는 원래 스타일 그대로다 — 이 override는 @media(max-width:768px) 안에서만
+     적용된다. */
   .site-detail-hero {
-    margin: 0 0 var(--gnmap-space-3);
+    margin: 0 0 var(--gnmap-space-2);
   }
   .site-detail-row-name,
-  .site-detail-row-company,
-  .site-detail-row-address {
+  .site-detail-row-company {
     display: block;
-    padding: 2px 0;
+    padding: 1px 0;
     border-bottom: none;
   }
   .site-detail-label-name,
@@ -705,70 +713,103 @@
   }
   .site-detail-value-name {
     display: block;
-    font-size: var(--gnmap-fs-title);
-    font-weight: var(--gnmap-fw-bold);
+    font-size: var(--gnmap-fs-card-title);
+    font-weight: var(--gnmap-fw-semibold);
     color: var(--gnmap-navy);
-    line-height: 1.35;
+    line-height: 1.3;
     word-break: keep-all;
   }
   .site-detail-value-company {
     display: block;
-    margin-top: 2px;
-    font-size: var(--gnmap-fs-secondary);
+    margin-top: 1px;
+    font-size: var(--gnmap-fs-caption);
     color: var(--gnmap-text-sub);
+  }
+  /* 사용자 피드백: 주소 옆에 복사 버튼을 나란히 두기 위해 이 행만 flex로 만든다(사업장명/업체명은
+     세로 블록 그대로 유지). 주소 텍스트는 flex:1로 줄바꿈을 허용하고 버튼만 오른쪽에 고정한다. */
+  .site-detail-row-address {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 3px 0 1px;
+    border-bottom: none;
   }
   .site-detail-value-address {
     display: block;
-    margin-top: 4px;
-    font-size: var(--gnmap-fs-secondary);
+    flex: 1;
+    min-width: 0;
+    font-size: var(--gnmap-fs-caption);
     color: var(--gnmap-text-meta);
     line-height: 1.4;
   }
+  /* 사용자 피드백: 주소 텍스트를 바로 복사하는 버튼. site.address 값을 읽기만 하고
+     저장/검색/정렬 로직에는 전혀 관여하지 않는다(js/ui.js). PC에는 노출하지 않는다(상단
+     PC 기본숨김 목록에 포함). */
+  .site-detail-copy-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    min-height: 26px;
+    padding: 2px 8px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-pill);
+    background: var(--gnmap-bg-soft);
+    color: var(--gnmap-text-sub);
+    font-size: 11px;
+    font-weight: var(--gnmap-fw-semibold);
+    cursor: pointer;
+  }
+  .site-detail-copy-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
 
-  /* STEP16.5-C §7: 부가정보(행정동/공사금액)는 layout.css의 .site-detail-row(flex
-     justify-content:space-between)를 그대로 살려 key-왼쪽/value-오른쪽 2-column을 유지하고,
-     색/글씨/여백만 토큰으로 다듬는다. 표는 아니므로 divider는 얇게 1줄만 유지한다. */
+  /* 부가정보(행정동/공사금액)는 layout.css의 .site-detail-row(flex justify-content:space-between)를
+     그대로 살려 key-왼쪽/value-오른쪽 2-column을 유지하고, 색/글씨/여백만 토큰으로 다듬는다.
+     표는 아니므로 divider는 얇게 1줄만 유지한다. */
   .site-detail-meta {
-    margin: var(--gnmap-space-2) 0 var(--gnmap-space-4);
-    padding: var(--gnmap-space-2) 0;
+    margin: var(--gnmap-space-2) 0 var(--gnmap-space-3);
+    padding: var(--gnmap-space-1) 0;
     border-top: 1px solid var(--gnmap-border);
   }
   .site-detail-meta .site-detail-row {
-    padding: 7px 0;
+    padding: 5px 0;
     border-bottom: 1px solid var(--gnmap-border);
   }
   .site-detail-meta .site-detail-row:last-child {
     border-bottom: none;
   }
   .site-detail-meta .site-detail-label {
-    font-size: var(--gnmap-fs-caption);
+    font-size: 11px;
     color: var(--gnmap-text-meta);
   }
   .site-detail-meta .site-detail-value {
-    font-size: var(--gnmap-fs-secondary);
+    font-size: var(--gnmap-fs-caption);
     font-weight: var(--gnmap-fw-semibold);
     color: var(--gnmap-text-primary);
     text-align: right;
   }
 
-  /* STEP16.5-C §9/§11: 액션 버튼 공통 체계. Primary=길찾기/메모저장(정부 blue 배경),
-     Secondary=즐겨찾기(흰 배경+테두리), Danger=메모삭제(옅은 red). 44px 이상 터치 타겟. */
+  /* 액션 버튼 공통 체계. Primary=길찾기/메모저장(정부 blue 배경), Secondary=즐겨찾기/지도보기
+     (흰 배경+테두리), Danger=메모삭제(옅은 red). 컴팩트형에서는 버튼 높이를 44px->40px로 줄여
+     3개(즐겨찾기/길찾기/지도보기)가 한 줄에 여유 있게 들어가게 한다. */
   .site-detail-actions {
     display: flex;
     gap: var(--gnmap-space-2);
-    margin-bottom: var(--gnmap-space-4);
+    margin-bottom: var(--gnmap-space-3);
   }
   .site-detail-action-btn {
     flex: 1;
-    min-height: var(--gnmap-tap-min);
+    min-height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 4px;
     border-radius: var(--gnmap-radius-md);
-    font-size: var(--gnmap-fs-body);
+    font-size: var(--gnmap-fs-caption);
     font-weight: var(--gnmap-fw-semibold);
-    padding: 0 var(--gnmap-space-3);
+    padding: 0 var(--gnmap-space-2);
     cursor: pointer;
   }
   .site-detail-action-btn:disabled {
@@ -791,24 +832,25 @@
     color: var(--gnmap-red);
   }
 
-  /* STEP16.5-C §10/§11: 개인 메모 section — 제목/textarea/저장·삭제를 업무용 카드 톤으로 정돈한다.
-     기존 value/이벤트/저장(saveNote)·삭제(deleteNote) 로직은 전혀 바꾸지 않는다. */
+  /* 개인 메모 section — 제목/textarea/저장·삭제를 업무용 카드 톤으로 정돈한다. 기존
+     value/이벤트/저장(saveNote)·삭제(deleteNote) 로직은 전혀 바꾸지 않는다. 컴팩트형에서는
+     textarea 높이를 110px->84px로 줄인다. */
   .site-detail-section-title {
-    margin: var(--gnmap-space-2) 0 var(--gnmap-space-2);
-    font-size: var(--gnmap-fs-card-title);
+    margin: var(--gnmap-space-1) 0 var(--gnmap-space-1);
+    font-size: var(--gnmap-fs-body);
     font-weight: var(--gnmap-fw-semibold);
     color: var(--gnmap-navy);
   }
   .site-detail-note-textarea {
     width: 100%;
-    min-height: 110px;
+    min-height: 84px;
     box-sizing: border-box;
-    padding: var(--gnmap-space-3);
+    padding: var(--gnmap-space-2) var(--gnmap-space-3);
     border: 1px solid var(--gnmap-border);
     border-radius: var(--gnmap-radius-md);
     background: var(--gnmap-bg-soft);
     color: var(--gnmap-text-primary);
-    font-size: var(--gnmap-fs-body);
+    font-size: var(--gnmap-fs-caption);
     line-height: 1.5;
     resize: vertical;
   }
@@ -822,6 +864,9 @@
     display: flex;
     gap: var(--gnmap-space-2);
     margin-top: var(--gnmap-space-2);
+  }
+  .site-detail-note-actions .site-detail-action-btn {
+    min-height: 36px;
   }
 
   .mobile-view {
