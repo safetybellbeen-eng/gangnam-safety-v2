@@ -119,30 +119,38 @@
           <input type="text" id="site-search-input" placeholder="사업장명, 업체명, 주소, 동으로 검색">
           <button type="button" id="site-search-clear-btn" style="display:none" aria-label="검색어 지우기">×</button>
         </div>
-        <select id="site-dong-select">
-          <option value="all">전체</option>
-        </select>
-        <select id="site-amount-select">
-          <option value="all">전체</option>
-          <option value="under-100m">1억 미만</option>
-          <option value="100m-1b">1억 이상 ~ 10억 미만</option>
-          <option value="1b-5b">10억 이상 ~ 50억 미만</option>
-          <option value="5b-12b">50억 이상 ~ 120억 미만</option>
-          <option value="over-12b">120억 이상</option>
-        </select>
-        <select id="site-sort-select">
-          <option value="default">기본순서</option>
-          <option value="name-asc">사업장명 가나다순</option>
-          <option value="company-asc">업체명 가나다순</option>
-          <option value="amount-desc">공사금액 높은순</option>
-          <option value="amount-asc">공사금액 낮은순</option>
-          <option value="deadline">공사기간 임박순</option>
-          <option value="favorite">즐겨찾기 우선</option>
-        </select>
-        <div id="site-toggle-filter-row">
-          <button type="button" id="site-favorite-filter-btn">★ 즐겨찾기</button>
-          <button type="button" id="site-review-filter-btn">확인필요 <span id="site-review-count">0</span></button>
-          <span id="site-count-label"></span>
+        <!-- STEP15-C.1: 동/금액/정렬 select + 기존 #site-toggle-filter-row를 새 #site-filter-row로
+             감쌌다. #site-filter-row는 PC에서는 css/mobile.css가 display:contents로 처리해
+             박스를 만들지 않으므로(자식들이 그대로 #site-search-bar의 flex-column 항목으로 승격됨)
+             PC 레이아웃/렌더링에 전혀 영향이 없다. 모바일에서만 실제 flex 컨테이너로 바뀌어
+             검색창(1행) 아래 필터들을 한 줄 가로 스크롤(2행)로 묶는다. id/속성/이벤트 바인딩 대상은
+             변경하지 않아 renderDongOptions()/bindSearchAndSort() 등 기존 로직에 영향 없다. -->
+        <div id="site-filter-row">
+          <select id="site-dong-select">
+            <option value="all">전체</option>
+          </select>
+          <select id="site-amount-select">
+            <option value="all">전체</option>
+            <option value="under-100m">1억 미만</option>
+            <option value="100m-1b">1억 이상 ~ 10억 미만</option>
+            <option value="1b-5b">10억 이상 ~ 50억 미만</option>
+            <option value="5b-12b">50억 이상 ~ 120억 미만</option>
+            <option value="over-12b">120억 이상</option>
+          </select>
+          <select id="site-sort-select">
+            <option value="default">기본순서</option>
+            <option value="name-asc">사업장명 가나다순</option>
+            <option value="company-asc">업체명 가나다순</option>
+            <option value="amount-desc">공사금액 높은순</option>
+            <option value="amount-asc">공사금액 낮은순</option>
+            <option value="deadline">공사기간 임박순</option>
+            <option value="favorite">즐겨찾기 우선</option>
+          </select>
+          <div id="site-toggle-filter-row">
+            <button type="button" id="site-favorite-filter-btn">★ 즐겨찾기</button>
+            <button type="button" id="site-review-filter-btn">확인필요 <span id="site-review-count">0</span></button>
+            <span id="site-count-label"></span>
+          </div>
         </div>
       </div>
       <div id="site-list"></div>
