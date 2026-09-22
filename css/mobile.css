@@ -377,14 +377,15 @@
   #site-filter-row::-webkit-scrollbar {
     display: none;
   }
-  /* STEP16.5-B: A(조건 선택: 동/공사금액/정렬)와 B(빠른 toggle: 즐겨찾기/확인필요)를
-     동일한 pill 톤으로 통일하되(높이 34px, radius pill, 글씨 13px), 실제 값/옵션/이벤트는
-     전혀 건드리지 않는다. */
-  #site-dong-select,
+  /* STEP16.5-B/사용자 요청 재정리: 조건 선택(관할/공사금액/정렬)과 빠른 toggle(즐겨찾기/점검/
+     산재표)를 동일한 pill 톤으로 통일한다(높이 34px, radius pill, 글씨 13px). "관할"은 이제
+     <select>가 아니라 <details><summary>이므로 summary를 select/button과 같은 톤으로 맞춘다. */
+  #site-dong-filter-label,
   #site-amount-select,
   #site-sort-select,
   #site-favorite-filter-btn,
-  #site-review-filter-btn {
+  #site-inspection-select,
+  #site-accident-report-select {
     flex: 0 0 auto;
     width: auto;
     box-sizing: border-box;
@@ -399,24 +400,92 @@
     color: var(--gnmap-text-primary);
     -webkit-appearance: none;
     appearance: none;
+    cursor: pointer;
   }
-  /* STEP16.5-B: 즐겨찾기 active는 기존과 동일하게 정부 blue. 확인필요 active는
-     STEP16.5-A에서 정의한 상태색 체계(확인필요/위험=red)와 일치시켜 red 계열로 구분한다
-     — location_quality 등 실제 데이터 의미는 변경하지 않고, 필터 버튼의 강조색만 다듬는다. */
+  /* summary 기본 삼각형 마커 제거 — 다른 pill 필터와 동일하게 보이도록. */
+  #site-dong-filter-label {
+    list-style: none;
+  }
+  #site-dong-filter-label::-webkit-details-marker,
+  #site-dong-filter-label::marker {
+    display: none;
+  }
+  #site-dong-filter {
+    position: relative;
+    flex: 0 0 auto;
+  }
+  /* 관할 필터가 선택되어 있으면(state.selectedDongs.length>0) 다른 조건 select와 동일하게
+     강조색을 준다 — 공사금액/점검/산재표는 값 자체(원시 select.value !== 'all')로 CSS만으론
+     구분이 어려워 이번 라운드에서는 관할만 active 강조를 적용한다(요청 범위: 관할 복수선택). */
+  #site-dong-filter[data-active="true"] #site-dong-filter-label {
+    border-color: var(--gnmap-blue);
+    background: var(--gnmap-blue-light);
+    color: var(--gnmap-blue);
+    font-weight: var(--gnmap-fw-semibold);
+  }
+  /* 사용자 요청: 관할을 펼치면 체크박스 목록이 뜨는 팝오버. 가로 스크롤 필터 줄(A) 레이아웃이
+     깨지지 않도록 절대 위치로 띄운다. */
+  /* 사용자 요청 기능 확인 중 발견: #site-filter-row가 overflow-x:auto라서(가로 스크롤 필터 줄)
+     브라우저가 overflow-y도 auto로 강제 승격시켜(CSS 스펙상 한 축이 auto면 반대 축의 visible도
+     auto로 취급) position:absolute 패널이 그 밑으로 clip되어 아예 안 보였다. viewport 기준
+     position:fixed로 바꾸고, top/left는 열 때 js/ui.js가 버튼의 실제 화면 좌표로 계산해 넣는다
+     (조상 overflow/스크롤에 영향받지 않음). */
+  #site-dong-filter-panel {
+    position: fixed;
+    z-index: 50;
+    min-width: 180px;
+    max-height: 260px;
+    overflow-y: auto;
+    box-sizing: border-box;
+    background: #fff;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-md);
+    box-shadow: var(--gnmap-shadow-md);
+    padding: var(--gnmap-space-2);
+  }
+  #site-dong-filter-clear {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 32px;
+    margin-bottom: var(--gnmap-space-1);
+    padding: 0 var(--gnmap-space-2);
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-sm);
+    background: var(--gnmap-bg-soft);
+    color: var(--gnmap-text-sub);
+    font-size: var(--gnmap-fs-caption);
+    text-align: left;
+    cursor: pointer;
+  }
+  .site-dong-filter-option {
+    display: flex;
+    align-items: center;
+    gap: var(--gnmap-space-2);
+    padding: 6px var(--gnmap-space-1);
+    font-size: var(--gnmap-fs-caption);
+    color: var(--gnmap-text-primary);
+    white-space: nowrap;
+  }
+  .site-dong-filter-option input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+  /* STEP16.5-B: 즐겨찾기 active는 기존과 동일하게 정부 blue. */
   #site-favorite-filter-btn.active {
     border-color: var(--gnmap-blue);
     background: var(--gnmap-blue-light);
     color: var(--gnmap-blue);
     font-weight: var(--gnmap-fw-semibold);
   }
-  #site-review-filter-btn.active {
-    border-color: var(--gnmap-red);
-    background: var(--gnmap-red-bg);
-    color: var(--gnmap-red);
-    font-weight: var(--gnmap-fw-semibold);
+  /* 사용자 요청: 메인 지도 탭에서는 "정렬"을 숨기고, 현장 탭에서만 보이게 한다(select 자체와
+     옵션 목록/이벤트는 그대로 유지 — 지도 탭에서만 CSS로 안 보이게 할 뿐). */
+  #app[data-mobile-tab="map"] #site-sort-select {
+    display: none;
   }
-  /* STEP16.5-B: toggle 그룹(B) 앞에 얇은 구분선을 두어 "조건 선택(A)"과 시각적으로
-     분리한다. DOM 구조는 바꾸지 않고 기존 wrapper에 border-left만 추가한다. */
+  /* 사용자 요청: toggle 그룹(즐겨찾기/점검/산재표) 앞에 얇은 구분선을 두어 "조건 선택"과
+     시각적으로 분리한다. DOM 구조는 바꾸지 않고 기존 wrapper에 border-left만 추가한다. */
   #site-toggle-filter-row {
     flex: 0 0 auto;
     display: flex;
@@ -426,18 +495,6 @@
     padding-left: var(--gnmap-space-2);
     border-left: 1px solid var(--gnmap-border);
     white-space: nowrap;
-  }
-  #site-review-count {
-    font-weight: bold;
-  }
-  /* STEP16.5-B: 결과 건수(C)는 클릭 control처럼 보이지 않도록 배경/테두리 없이
-     순수 텍스트 정보로만 표시한다(기존에도 배경/테두리가 없었으나, 글씨 크기를
-     caption 토큰으로 통일해 가독성만 높인다). */
-  #site-count-label {
-    margin-left: var(--gnmap-space-2);
-    white-space: nowrap;
-    color: var(--gnmap-text-sub);
-    font-size: var(--gnmap-fs-caption);
   }
   #site-list {
     display: none;
