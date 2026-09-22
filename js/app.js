@@ -179,8 +179,10 @@ async function handleLogout() {
   state.sites = [];
   state.searchQuery = '';
   state.sortMode = 'default';
-  state.selectedDong = 'all';
+  state.selectedDongs = [];
   state.amountFilter = 'all';
+  state.siteInspectionFilter = 'all';
+  state.siteAccidentReportFilter = 'all';
   state.favoriteSiteIds = new Set();
   state.favoriteInFlight = new Set();
   state.siteNotes = new Map();
@@ -214,25 +216,28 @@ async function handleLogout() {
   state.supervisionFilter = 'all';
   const searchInput = document.getElementById('site-search-input');
   const sortSelect = document.getElementById('site-sort-select');
-  const dongSelect = document.getElementById('site-dong-select');
+  const dongFilterOptions = document.getElementById('site-dong-filter-options');
+  const dongFilterEl = document.getElementById('site-dong-filter');
   const amountSelect = document.getElementById('site-amount-select');
+  const inspectionSelect = document.getElementById('site-inspection-select');
+  const accidentReportSelect = document.getElementById('site-accident-report-select');
   const locationMsg = document.getElementById('location-message');
   if (searchInput) searchInput.value = '';
   if (sortSelect) sortSelect.value = 'default';
-  if (dongSelect) dongSelect.innerHTML = '';
+  if (dongFilterOptions) dongFilterOptions.innerHTML = ''; // renderDongOptions()가 다음 로그인 때 다시 채운다.
+  if (dongFilterEl) dongFilterEl.open = false;
+  const dongFilterLabel = document.getElementById('site-dong-filter-label');
+  if (dongFilterLabel) dongFilterLabel.textContent = '관할';
   if (amountSelect) amountSelect.value = 'all';
+  if (inspectionSelect) inspectionSelect.value = 'all';
+  if (accidentReportSelect) accidentReportSelect.value = 'all';
   if (locationMsg) locationMsg.textContent = '';
-  // STEP14.5-B. 즐겨찾기만보기/확인필요만보기 토글과 검색 지우기(×) 버튼 표시 상태 초기화.
+  // STEP14.5-B. 즐겨찾기만보기 토글과 검색 지우기(×) 버튼 표시 상태 초기화.
   state.favoriteOnly = false;
-  state.reviewOnly = false;
   const favFilterBtn = document.getElementById('site-favorite-filter-btn');
   if (favFilterBtn) favFilterBtn.classList.remove('active');
-  const reviewFilterBtn = document.getElementById('site-review-filter-btn');
-  if (reviewFilterBtn) reviewFilterBtn.classList.remove('active');
   const searchClearBtn = document.getElementById('site-search-clear-btn');
   if (searchClearBtn) searchClearBtn.style.display = 'none';
-  const countLabel = document.getElementById('site-count-label');
-  if (countLabel) countLabel.textContent = '';
   const signupNameInput = document.getElementById('signup-name');
   if (signupNameInput) signupNameInput.value = '';
   // STEP15-B. 모바일 하단 탭 상태를 초기화한다(재로그인 시 항상 지도 탭부터 시작).

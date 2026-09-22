@@ -3,7 +3,7 @@
 // 전부 textContent 또는 createElement 기반 DOM 생성으로만 넣는다.
 import { state } from './state.js';
 import { panToSite, renderMarkers, centerSiteInVisibleArea } from './map.js';
-import { getFilteredSortedSites, getDongOptions, loadActiveSites, getReviewCount } from './sites.js';
+import { getFilteredSortedSites, getDongOptions, loadActiveSites } from './sites.js';
 import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
 import { loadUsers, setUserStatus, setUserRole } from './admin.js';
@@ -273,11 +273,8 @@ export function renderSiteList(containerId) {
 
   const visibleSites = getFilteredSortedSites();
 
-  // STEP14.5-B. 현재 표시 건수(검색/필터 적용 결과 기준, 전체 DB 건수 아님) + 확인필요 배지(전체 활성 사업장 기준).
-  const countLabel = document.getElementById('site-count-label');
-  if (countLabel) countLabel.textContent = `${visibleSites.length}건`;
-  const reviewCountEl = document.getElementById('site-review-count');
-  if (reviewCountEl) reviewCountEl.textContent = String(getReviewCount());
+  // 사용자 요청: 필터 옆 결과 건수("N건")와 확인필요 카운트 배지를 화면에서 없앴다
+  // (해당 DOM 자체를 index.html에서 제거 — 여기서는 더 이상 채울 대상이 없다).
 
   if (!visibleSites || visibleSites.length === 0) {
     // STEP15-E.4: 모바일 즐겨찾기 탭(state.favoriteOnly가 그 탭 진입 시에만 true가 되도록
@@ -826,43 +823,77 @@ export function renderMobileMoreMenu(containerId) {
 let searchDebounceTimer = null;
 let searchSortEventsbound = false;
 
-// 행정동 select의 옵션을 state.sites 기준으로 채운다. 데이터가 갱신될 때마다 호출 가능하도록
-// 매번 옵션을 새로 생성한다 (중복 누적 없음, "전체"는 항상 최상단 고정).
-export function renderDongOptions() {
-  const select = document.getElementById('site-dong-select');
-  const currentValue = select.value || 'all';
-  select.innerHTML = '';
-
-  const allOption = document.createElement('option');
-  allOption.value = 'all';
-  allOption.textContent = '전체';
-  select.appendChild(allOption);
-
-  getDongOptions().forEach(dong => {
-    const opt = document.createElement('option');
-    opt.value = dong;
-    opt.textContent = dong;
-    select.appendChild(opt);
-  });
-
-  // 이전 선택값이 새 옵션 목록에도 있으면 유지, 없으면 전체로.
-  select.value = [...select.options].some(o => o.value === currentValue) ? currentValue : 'all';
-  state.selectedDong = select.value;
+// 사용자 요청: "관할" 필터 버튼(summary)에 현재 선택 상태를 보여준다.
+// 0개 선택 = "관할"(기본표기, 전체), 1개 = 그 동 이름, 2개 이상 = "OO동 외 N".
+function updateDongFilterLabel() {
+  const labelEl = document.getElementById('site-dong-filter-label');
+  const filterEl = document.getElementById('site-dong-filter');
+  if (!labelEl) return;
+  const selected = state.selectedDongs;
+  if (!selected || selected.length === 0) labelEl.textContent = '관할';
+  else if (selected.length === 1) labelEl.textContent = selected[0];
+  else labelEl.textContent = `${selected[0]} 외 ${selected.length - 1}`;
+  // css/mobile.css의 #site-dong-filter[data-active="true"] 강조 스타일용.
+  if (filterEl) filterEl.dataset.active = String(!!(selected && selected.length > 0));
 }
 
-// 검색 input/정렬 select/행정동 select/금액 select 이벤트를 1회만 바인딩한다 (중복 등록 방지 플래그).
-// 검색은 200ms debounce, 나머지는 즉시 반영. 모두 state 값만 갱신하고 렌더는 renderSiteList가 담당한다.
+// 사용자 요청: "관할" 필터를 복수 선택 checkbox 패널로 구성한다. state.sites가 갱신될 때마다
+// 호출 가능하도록 매번 옵션을 새로 생성한다(중복 누적 없음). 기존 함수명(renderDongOptions)은
+// app.js 호출부와의 호환을 위해 그대로 유지한다.
+export function renderDongOptions() {
+  const optionsContainer = document.getElementById('site-dong-filter-options');
+  if (!optionsContainer) return;
+  optionsContainer.innerHTML = '';
+
+  const dongs = getDongOptions();
+  // 이전 선택값 중 새 목록에도 남아있는 것만 유지한다(사업장 데이터 갱신으로 사라진 동은 자동 해제).
+  state.selectedDongs = (state.selectedDongs || []).filter(d => dongs.includes(d));
+
+  dongs.forEach(dong => {
+    const label = document.createElement('label');
+    label.className = 'site-dong-filter-option';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = dong;
+    checkbox.checked = state.selectedDongs.includes(dong);
+    checkbox.addEventListener('change', () => {
+      if (checkbox.checked) {
+        if (!state.selectedDongs.includes(dong)) state.selectedDongs.push(dong);
+      } else {
+        state.selectedDongs = state.selectedDongs.filter(d => d !== dong);
+      }
+      updateDongFilterLabel();
+      renderSiteList('site-list');
+    });
+
+    const text = document.createElement('span');
+    text.textContent = dong;
+
+    label.appendChild(checkbox);
+    label.appendChild(text);
+    optionsContainer.appendChild(label);
+  });
+
+  updateDongFilterLabel();
+}
+
+// 검색 input/관할(다중선택)/금액/정렬/점검/산재표/즐겨찾기 이벤트를 1회만 바인딩한다
+// (중복 등록 방지 플래그). 검색은 200ms debounce, 나머지는 즉시 반영. 모두 state 값만
+// 갱신하고 렌더는 renderSiteList가 담당한다.
 export function bindSearchAndSort(containerId) {
   if (searchSortEventsbound) return;
   searchSortEventsbound = true;
 
   const searchInput = document.getElementById('site-search-input');
   const sortSelect = document.getElementById('site-sort-select');
-  const dongSelect = document.getElementById('site-dong-select');
+  const dongFilterEl = document.getElementById('site-dong-filter');
+  const dongFilterClearBtn = document.getElementById('site-dong-filter-clear');
   const amountSelect = document.getElementById('site-amount-select');
+  const inspectionSelect = document.getElementById('site-inspection-select');
+  const accidentReportSelect = document.getElementById('site-accident-report-select');
   const searchClearBtn = document.getElementById('site-search-clear-btn');
   const favoriteFilterBtn = document.getElementById('site-favorite-filter-btn');
-  const reviewFilterBtn = document.getElementById('site-review-filter-btn');
 
   searchInput.addEventListener('input', () => {
     if (searchClearBtn) searchClearBtn.style.display = searchInput.value ? 'inline-block' : 'none';
@@ -879,7 +910,7 @@ export function bindSearchAndSort(containerId) {
       searchInput.value = '';
       state.searchQuery = '';
       searchClearBtn.style.display = 'none';
-      renderSiteList(containerId); // 검색어만 비우고 동/금액/즐겨찾기/확인필요/정렬은 그대로 유지된다.
+      renderSiteList(containerId); // 검색어만 비우고 관할/금액/점검/산재표/즐겨찾기/정렬은 그대로 유지된다.
     });
   }
 
@@ -888,29 +919,66 @@ export function bindSearchAndSort(containerId) {
     renderSiteList(containerId);
   });
 
-  dongSelect.addEventListener('change', () => {
-    state.selectedDong = dongSelect.value;
-    renderSiteList(containerId);
-  });
+  // 사용자 요청: "전체" 버튼은 관할 선택을 한 번에 초기화한다(개별 체크박스 이벤트는
+  // renderDongOptions()가 각자 바인딩).
+  if (dongFilterClearBtn) {
+    dongFilterClearBtn.addEventListener('click', () => {
+      state.selectedDongs = [];
+      document.querySelectorAll('#site-dong-filter-options input[type="checkbox"]')
+        .forEach(cb => { cb.checked = false; });
+      updateDongFilterLabel();
+      if (dongFilterEl) dongFilterEl.open = false;
+      renderSiteList(containerId);
+    });
+  }
+
+  // details/summary는 바깥 클릭 시 자동으로 닫히지 않으므로, 패널 바깥을 클릭하면 닫아준다.
+  if (dongFilterEl) {
+    document.addEventListener('click', (e) => {
+      if (dongFilterEl.open && !dongFilterEl.contains(e.target)) {
+        dongFilterEl.open = false;
+      }
+    });
+
+    // 사용자 요청 기능 확인 중 발견: #site-filter-row가 가로 스크롤(overflow-x:auto)이라
+    // CSS 스펙상 overflow-y도 auto로 강제 승격되어, absolute로 띄운 패널이 그 아래로 잘려
+    // 화면에 전혀 보이지 않는 버그가 있었다. css/mobile.css에서 패널을 position:fixed로
+    // 바꾸고(조상 overflow에 영향받지 않음), 열릴 때마다 여기서 버튼의 실제 화면 좌표
+    // (getBoundingClientRect)를 읽어 top/left를 직접 계산해 넣는다.
+    dongFilterEl.addEventListener('toggle', () => {
+      if (!dongFilterEl.open) return;
+      const panel = document.getElementById('site-dong-filter-panel');
+      if (!panel) return;
+      const rect = dongFilterEl.getBoundingClientRect();
+      panel.style.top = `${Math.round(rect.bottom + 6)}px`;
+      panel.style.left = `${Math.round(rect.left)}px`;
+    });
+  }
 
   amountSelect.addEventListener('change', () => {
     state.amountFilter = amountSelect.value;
     renderSiteList(containerId);
   });
 
-  // STEP14.5-B. "즐겨찾기만 보기" / "확인필요만 보기" — 토글형 버튼. 다시 누르면 해제되어 기존 필터 결과로 복귀.
-  if (favoriteFilterBtn) {
-    favoriteFilterBtn.addEventListener('click', () => {
-      state.favoriteOnly = !state.favoriteOnly;
-      favoriteFilterBtn.classList.toggle('active', state.favoriteOnly);
+  if (inspectionSelect) {
+    inspectionSelect.addEventListener('change', () => {
+      state.siteInspectionFilter = inspectionSelect.value;
       renderSiteList(containerId);
     });
   }
 
-  if (reviewFilterBtn) {
-    reviewFilterBtn.addEventListener('click', () => {
-      state.reviewOnly = !state.reviewOnly;
-      reviewFilterBtn.classList.toggle('active', state.reviewOnly);
+  if (accidentReportSelect) {
+    accidentReportSelect.addEventListener('change', () => {
+      state.siteAccidentReportFilter = accidentReportSelect.value;
+      renderSiteList(containerId);
+    });
+  }
+
+  // STEP14.5-B. "즐겨찾기만 보기" — 토글형 버튼. 다시 누르면 해제되어 기존 필터 결과로 복귀.
+  if (favoriteFilterBtn) {
+    favoriteFilterBtn.addEventListener('click', () => {
+      state.favoriteOnly = !state.favoriteOnly;
+      favoriteFilterBtn.classList.toggle('active', state.favoriteOnly);
       renderSiteList(containerId);
     });
   }

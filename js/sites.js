@@ -26,21 +26,20 @@ function matchesQuery(site, query) {
   return fields.some(f => (f || '').toString().toLowerCase().includes(q));
 }
 
-function matchesDong(site, selectedDong) {
-  if (!selectedDong || selectedDong === 'all') return true;
+// 사용자 요청: "관할" 필터를 복수 선택으로 바꾼다. selectedDongs가 빈 배열이면 전체(필터 없음).
+function matchesDongs(site, selectedDongs) {
+  if (!Array.isArray(selectedDongs) || selectedDongs.length === 0) return true;
   if (site.dong === null || site.dong === undefined) return false;
   const siteDong = typeof site.dong === 'string' ? site.dong.trim() : site.dong;
-  const target = typeof selectedDong === 'string' ? selectedDong.trim() : selectedDong;
-  return siteDong === target;
+  return selectedDongs.some(d => (typeof d === 'string' ? d.trim() : d) === siteDong);
 }
 
-// 금액 구간 경계(원 단위). 1억=100000000.
+// 금액 구간 경계(원 단위). 1억=100000000, 50억=5000000000, 120억=12000000000.
+// 사용자 요청: 기존 5구간(1억/10억/50억/120억)을 50억/120억 기준 3구간으로 단순화.
 const AMOUNT_RANGES = {
-  'under-100m': { min: -Infinity, max: 100000000 },       // 1억 미만
-  '100m-1b': { min: 100000000, max: 1000000000 },          // 1억 이상 ~ 10억 미만
-  '1b-5b': { min: 1000000000, max: 5000000000 },            // 10억 이상 ~ 50억 미만
-  '5b-12b': { min: 5000000000, max: 12000000000 },           // 50억 이상 ~ 120억 미만
-  'over-12b': { min: 12000000000, max: Infinity }             // 120억 이상
+  'under-5b': { min: -Infinity, max: 5000000000 },   // 50억 미만
+  '5b-12b': { min: 5000000000, max: 12000000000 },    // 50억 이상 ~ 120억 미만
+  'over-12b': { min: 12000000000, max: Infinity }      // 120억 이상
 };
 
 // amount가 숫자로 변환 불가능하거나 비어있으면 '전체'가 아닌 구간 선택 시 결과에서 제외한다.
@@ -68,10 +67,24 @@ function toSortableEndTime(v) {
   return Number.isFinite(t) ? t : Infinity;
 }
 
-// STEP14.5-B. 사업장이 "확인필요"(주소 지오코딩이 불확실/실패) 상태인지 판정한다.
-// location_quality 값 자체는 여기서 절대 수정하지 않고 읽기만 한다.
-export function needsReview(site) {
-  return site.location_quality === 'APPROXIMATE' || site.location_quality === 'UNRESOLVED';
+// 사용자 요청: "점검"(gnmap_v2_sites.supervision_count) / "산재표"(accident_report_count)
+// 유/무 필터. 값이 1 이상이면 "유", null/0/미확정이면 "무"로 판정한다 — DB 값 자체는 읽기만
+// 하고 절대 수정하지 않는다.
+function hasCount(v) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0;
+}
+
+function matchesInspectionFilter(site, filter) {
+  if (!filter || filter === 'all') return true;
+  const has = hasCount(site.supervision_count);
+  return filter === 'yes' ? has : !has;
+}
+
+function matchesAccidentReportFilter(site, filter) {
+  if (!filter || filter === 'all') return true;
+  const has = hasCount(site.accident_report_count);
+  return filter === 'yes' ? has : !has;
 }
 
 function compareBySort(a, b, sortMode) {
@@ -96,12 +109,6 @@ function compareBySort(a, b, sortMode) {
   }
 }
 
-// STEP14.5-B. 확인필요 버튼 배지용 — 다른 필터(검색/동/금액/즐겨찾기)와 무관하게
-// 전체 활성 사업장(state.sites) 중 확인필요 건수를 그대로 센다.
-export function getReviewCount() {
-  return state.sites.filter(needsReview).length;
-}
-
 // state.sites에 실제 존재하는 dong 값만 중복 제거 + 정렬해서 반환한다. select 옵션 채우기용.
 export function getDongOptions() {
   const dongs = state.sites
@@ -111,17 +118,18 @@ export function getDongOptions() {
   return unique.sort((a, b) => a.localeCompare(b, 'ko'));
 }
 
-// state.sites를 원본 그대로 두고, 복사본에서 검색 → 행정동 필터 → 금액 필터 → 정렬을 순서대로 적용해 반환한다.
-// UI/marker는 이 파생 배열만 받아서 렌더한다.
+// state.sites를 원본 그대로 두고, 복사본에서 검색 → 관할(동) → 금액 → 점검 → 산재표 →
+// 즐겨찾기 → 정렬을 순서대로 적용해 반환한다. UI/marker는 이 파생 배열만 받아서 렌더한다.
 export function getFilteredSortedSites() {
   const query = (state.searchQuery || '').trim();
 
   let result = state.sites
     .filter(site => matchesQuery(site, query))
-    .filter(site => matchesDong(site, state.selectedDong))
+    .filter(site => matchesDongs(site, state.selectedDongs))
     .filter(site => matchesAmount(site, state.amountFilter))
-    .filter(site => !state.favoriteOnly || state.favoriteSiteIds.has(site.id))
-    .filter(site => !state.reviewOnly || needsReview(site));
+    .filter(site => matchesInspectionFilter(site, state.siteInspectionFilter))
+    .filter(site => matchesAccidentReportFilter(site, state.siteAccidentReportFilter))
+    .filter(site => !state.favoriteOnly || state.favoriteSiteIds.has(site.id));
 
   if (state.sortMode === 'default') return result;
 

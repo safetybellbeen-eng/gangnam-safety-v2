@@ -9,8 +9,10 @@ export const state = {
   siteMarkers: new Map(), // siteId -> kakao.maps.Marker (마커 재검색 없이 클릭 시 즉시 매칭)
   searchQuery: '',        // 검색어 (site_name/company_name/address/dong 대상)
   sortMode: 'default',    // 'default' | 'name-asc' | 'company-asc' | 'amount-desc' | 'amount-asc'
-  selectedDong: 'all',     // 'all' 또는 특정 dong 값 (단일 선택)
-  amountFilter: 'all',     // 'all' | 'under-100m' | '100m-1b' | '1b-5b' | '5b-12b' | 'over-12b'
+  selectedDongs: [],       // 사용자 요청: "관할" 필터. 복수 선택된 dong 값 배열. 빈 배열=전체(필터 없음).
+  amountFilter: 'all',     // 'all' | 'under-5b' | '5b-12b' | 'over-12b' (사용자 요청: 50억/120억 기준 3구간)
+  siteInspectionFilter: 'all',    // 사용자 요청: "점검" 필터(gnmap_v2_sites.supervision_count 기준). 'all' | 'yes' | 'no'.
+  siteAccidentReportFilter: 'all', // 사용자 요청: "산재표" 필터(gnmap_v2_sites.accident_report_count 기준). 'all' | 'yes' | 'no'.
   favoriteSiteIds: new Set(), // 현재 로그인 사용자가 즐겨찾기한 site id 집합
   favoriteInFlight: new Set(), // 토글 요청이 진행 중인 site id (rapid click 중복 방지)
   siteNotes: new Map(),   // siteId -> gnmap_v2_site_notes 행 (id/site_id/content/updated_at). 없으면 키가 없음.
@@ -48,6 +50,8 @@ export const state = {
   supervisions: [],                   // STEP14. gnmap_v2_supervisions 목록 (사업장 연결 없음, 캠페인 단위 상황판)
   supervisionFilter: 'all',           // STEP14. 감독일정 패널 상태 필터: 'all' | 'scheduled' | 'ongoing' | 'done' (프론트 표시만, DB/RLS 무관)
   favoriteOnly: false,                // STEP14.5-B. "즐겨찾기만 보기" 토글 — true면 getFilteredSortedSites가 favoriteSiteIds에 있는 사업장만 반환
-  reviewOnly: false,                  // STEP14.5-B. "확인필요만 보기" 토글 — true면 location_quality가 APPROXIMATE/UNRESOLVED인 사업장만 반환
+  // 사용자 요청: 상단 필터에서 "확인필요" 토글/카운트를 제거하면서 reviewOnly도 함께 제거했다
+  // (더 이상 화면 어디에서도 트리거되지 않음). location_quality 값 자체나 목록 카드의
+  // "위치확인필요" 배지(site-list-review-badge)는 이 필터와 무관하게 그대로 유지된다.
   mobileActiveTab: 'map'              // STEP15-B. 모바일 하단 탭 현재 선택값: 'map'|'site'|'route'|'favorite'|'alert'|'more'. PC 화면에서는 사용하지 않음.
 };
