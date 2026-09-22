@@ -122,9 +122,18 @@ async function handleFavoriteToggle(siteId, triggerBtn) {
       btn.classList.toggle('is-favorite', nowFavorite);
     });
 
+  // PC 액션 버튼 행의 기존 즐겨찾기 버튼(모바일에서는 CSS로 숨김).
   const detailFavBtn = document.getElementById('site-detail-favorite-btn');
   if (detailFavBtn && detailFavBtn.dataset.siteId === String(siteId)) {
     detailFavBtn.textContent = nowFavorite ? '★ 즐겨찾기 해제' : '☆ 즐겨찾기 추가';
+  }
+
+  // 사용자 요청: 모바일 상세 패널에서는 사업장명 옆 별표로 즐겨찾기를 토글한다(PC에서는 숨김).
+  const heroFavBtn = document.getElementById('site-detail-name-favorite-btn');
+  if (heroFavBtn && heroFavBtn.dataset.siteId === String(siteId)) {
+    heroFavBtn.textContent = nowFavorite ? '★' : '☆';
+    heroFavBtn.classList.toggle('is-favorite', nowFavorite);
+    heroFavBtn.setAttribute('aria-label', nowFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가');
   }
 }
 
@@ -461,6 +470,24 @@ export function renderDetail(site) {
     row.appendChild(labelEl);
     row.appendChild(valueEl);
 
+    // 사용자 요청: 즐겨찾기 추가/해제를 사업장명 옆 별표 터치로 바로 할 수 있게 한다.
+    // 기존 handleFavoriteToggle을 그대로 재사용하고(새 로직 없음), 이 버튼은 모바일에서만
+    // 보인다(PC는 css/mobile.css 상단 PC-hide 목록에서 기본 숨김 — 기존 액션 버튼 행의
+    // #site-detail-favorite-btn을 그대로 유지해 PC 화면은 바뀌지 않는다).
+    if (key === 'name') {
+      const nameFavBtn = document.createElement('button');
+      nameFavBtn.type = 'button';
+      nameFavBtn.id = 'site-detail-name-favorite-btn';
+      nameFavBtn.className = 'site-detail-name-favorite-btn';
+      nameFavBtn.dataset.siteId = String(site.id);
+      const nowFav = isFavorite(site.id);
+      nameFavBtn.classList.toggle('is-favorite', nowFav);
+      nameFavBtn.textContent = nowFav ? '★' : '☆';
+      nameFavBtn.setAttribute('aria-label', nowFav ? '즐겨찾기 해제' : '즐겨찾기 추가');
+      nameFavBtn.addEventListener('click', () => handleFavoriteToggle(site.id, nameFavBtn));
+      row.appendChild(nameFavBtn);
+    }
+
     // 사용자 피드백: 주소 옆에 텍스트를 바로 복사할 수 있는 버튼을 추가한다. 주소 값(site.address)은
     // 그대로 읽기만 하고 저장/검색/정렬 로직에는 전혀 관여하지 않는 순수 UI 기능이다.
     // 값이 없으면('-') 복사할 내용이 없으므로 버튼을 만들지 않는다.
@@ -571,26 +598,51 @@ export function renderDetail(site) {
   }
   actions.appendChild(directionsBtn);
 
-  // 사용자 피드백: 현장/즐겨찾기 탭에서 상세를 열었을 때, 메인 지도에서 바로 위치를 볼 수 있는
-  // 진입점이 없었다. 새 지도 로직을 만들지 않고, 이미 selectSite()가 renderDetail() 전에 호출해둔
-  // panToSite()(지도 중심 이동은 이미 끝나 있음)를 그대로 활용해 하단 "지도" 탭 버튼을 클릭
-  // 위임하는 것만으로 지도로 이동시킨다. 모바일에서만, 그리고 이미 지도 탭이면(중복) 표시하지 않는다.
-  // PC는 지도가 항상 목록과 함께 보이므로 이 버튼 자체를 추가하지 않는다(PC 화면 미변경).
-  if (isMobileViewport() && state.mobileActiveTab !== 'map') {
-    const mapViewBtn = document.createElement('button');
-    mapViewBtn.type = 'button';
-    mapViewBtn.className = 'site-detail-action-btn site-detail-btn-secondary';
-    mapViewBtn.textContent = '지도보기';
-    mapViewBtn.addEventListener('click', () => {
-      const mapTabBtn = document.querySelector('.mobile-tab-btn[data-tab="map"]');
-      if (mapTabBtn) mapTabBtn.click();
+  // 사용자 요청: 액션 버튼을 "길찾기ㅣ경로추가ㅣ메모" 3개로 재구성한다("지도보기"는 대체되어
+  // 제거). 새 지도/경로 로직은 만들지 않고 기존 하단 "경로" 탭(renderMobileRouteView,
+  // state.selectedSiteId 기준)과 기존 buildKakaoDirectionsUrl만 재사용한다. 모바일에서만
+  // 노출한다(PC는 이 media query 밖이라 기존 즐겨찾기+길찾기 2버튼 그대로 — PC 화면 미변경).
+  if (isMobileViewport()) {
+    // 경로추가: 하단 "경로" 탭 버튼을 클릭 위임한다. activateMobileTab()이 탭 전환 시 열려있던
+    // 상세를 closeDetail()로 자동으로 닫으며 state.selectedSiteId도 함께 비우므로(§ app.js),
+    // 그 직후 selectedSiteId를 다시 채우고 경로 탭 내용을 다시 그려 이 사업장이 그대로 보이게 한다.
+    const routeAddBtn = document.createElement('button');
+    routeAddBtn.type = 'button';
+    routeAddBtn.className = 'site-detail-action-btn site-detail-btn-secondary';
+    routeAddBtn.textContent = '경로추가';
+    routeAddBtn.addEventListener('click', () => {
+      const siteId = site.id;
+      const routeTabBtn = document.querySelector('.mobile-tab-btn[data-tab="route"]');
+      if (routeTabBtn) routeTabBtn.click();
+      state.selectedSiteId = siteId;
+      renderMobileRouteView('mobile-route-content');
     });
-    actions.appendChild(mapViewBtn);
+    actions.appendChild(routeAddBtn);
+
+    // 메모: 메인 지도에서는 메모를 작성/열람하지 않고, "현장" 탭으로 넘어가 그곳에서 작성/열람한다.
+    // closeDetail()이 selectedSiteId를 비운 뒤이므로, 탭 전환 후 selectSite()를 다시 호출해
+    // 같은 사업장의 상세(메모 포함)를 현장 탭에서 다시 연다.
+    const noteBtn = document.createElement('button');
+    noteBtn.type = 'button';
+    noteBtn.className = 'site-detail-action-btn site-detail-btn-secondary';
+    noteBtn.textContent = '메모';
+    noteBtn.addEventListener('click', () => {
+      const siteId = site.id;
+      const siteTabBtn = document.querySelector('.mobile-tab-btn[data-tab="site"]');
+      if (siteTabBtn) siteTabBtn.click();
+      selectSite(siteId);
+    });
+    actions.appendChild(noteBtn);
   }
 
   panel.appendChild(actions);
 
-  renderNoteSection(panel, site.id);
+  // 사용자 요청: 메인 지도(모바일)에서는 메모를 지도 위 상세 패널에서 직접 작성/열람하지 않고
+  // 위 "메모" 버튼으로 현장 탭으로 넘어가서 작성/열람한다. 그 외(PC 전체, 모바일 현장/즐겨찾기
+  // 탭)는 기존과 동일하게 인라인 메모 섹션을 그대로 보여준다(로직 변경 없음).
+  if (!(isMobileViewport() && state.mobileActiveTab === 'map')) {
+    renderNoteSection(panel, site.id);
+  }
 
   // STEP16.5-C §11: 기존 텍스트 "닫기" 버튼/핸들러는 그대로 유지하되(삭제 금지), 모바일에서는
   // 위에서 추가한 X 버튼이 동일 기능을 대신하므로 CSS로 시각적으로만 숨긴다(PC는 그대로 노출).
