@@ -48,9 +48,12 @@ function activateMobileTab(tab) {
     renderSiteList('site-list'); // 검색/동/금액 등 다른 필터 state는 그대로 유지한 채 재렌더만 한다.
   }
 
-  // 지도 탭으로 복귀 시, 숨겨져 있던 동안 틀어졌을 수 있는 지도 크기만 보정한다(재초기화 아님).
-  if (tab === 'map' && state.map && window.kakao && window.kakao.maps) {
-    window.kakao.maps.event.trigger(state.map, 'relayout');
+  // 지도 탭으로 복귀(또는 최초 진입) 시, display:none 상태였던 동안 틀어진 지도 크기를 보정한다(재초기화 아님).
+  // STEP15-C.1: kakao.maps.event.trigger(map,'relayout')는 relayout을 실제로 트리거하지 않는 잘못된
+  // 호출이었다(흰 화면 원인) — Kakao Maps SDK가 제공하는 실제 인스턴스 메서드 map.relayout()으로 수정.
+  if (tab === 'map' && state.map && typeof state.map.relayout === 'function') {
+    state.map.relayout();
+    state.map.setCenter(state.map.getCenter()); // relayout 직후 타일이 흰 화면으로 남는 것을 방지(중심 재설정으로 강제 리드로우)
   }
 }
 
