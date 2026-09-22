@@ -6,7 +6,7 @@ import { initMap, clearMarkers } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
-import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderSupervisionPanel } from './ui.js';
+import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderSupervisionPanel, renderMobileRouteView, renderMobileMoreMenu } from './ui.js';
 import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
 
 const VIEWS = [
@@ -54,6 +54,36 @@ function activateMobileTab(tab) {
   if (tab === 'map' && state.map && typeof state.map.relayout === 'function') {
     state.map.relayout();
     state.map.setCenter(state.map.getCenter()); // relayout 직후 타일이 흰 화면으로 남는 것을 방지(중심 재설정으로 강제 리드로우)
+  }
+
+  // STEP15-D. 경로 탭: 새 로직 없이 기존 선택 상태(state.selectedSiteId/state.sites)와
+  // 기존 길찾기(buildKakaoDirectionsUrl)만 재사용해 다시 그린다.
+  if (tab === 'route') {
+    renderMobileRouteView('mobile-route-content');
+  }
+
+  // STEP15-D. 알림 탭: 전용 알림 데이터가 없으므로 기존 감독일정 상황판을 그대로 재사용한다.
+  // 표시 위치/크기는 css/mobile.css의 #app[data-mobile-tab="alert"] 규칙이 전체화면으로 override한다.
+  if (tab === 'alert') {
+    renderSupervisionPanel('supervision-panel');
+  }
+
+  // STEP15-D. 더보기 탭: 회원관리/엑셀업로드/감독일정/로그아웃 메뉴를 새로 구현하지 않고
+  // renderMobileMoreMenu()가 기존 PC 버튼들을 그대로 클릭 위임하도록 다시 그린다(관리자 여부에
+  // 따라 매번 최신 상태로 다시 그려야 하므로 탭 진입마다 재호출한다 — 네트워크 호출 없음).
+  if (tab === 'more') {
+    renderMobileMoreMenu('mobile-more-content');
+  }
+
+  // STEP15-D. 알림/더보기 탭에서 열었던 관리자/업로드/감독일정 패널은 그 탭을 벗어나면 닫아,
+  // 다른 탭으로 이동했을 때 화면 위에 그대로 떠 있는 채로 남지 않게 한다.
+  // 패널 자체의 데이터/렌더 로직(admin.js/import.js/supervision.js)은 전혀 건드리지 않으며,
+  // 여기서는 기존 열기/닫기 버튼과 동일하게 표시 여부(inline style)만 되돌린다.
+  if ((previousTab === 'alert' || previousTab === 'more') && tab !== previousTab) {
+    ['admin-panel', 'upload-panel', 'supervision-panel'].forEach(id => {
+      const panelEl = document.getElementById(id);
+      if (panelEl) panelEl.style.display = 'none';
+    });
   }
 }
 

@@ -307,6 +307,115 @@ export function closeDetail() {
   updateListActiveState();
 }
 
+// STEP15-D. 모바일 "경로" 탭. 새 경로/경유지 기능을 만들지 않고, renderDetail()이 쓰는 것과
+// 동일한 buildKakaoDirectionsUrl/isValidSiteCoord만 재사용해 현재(마지막) 선택된 사업장
+// 하나에 대한 길찾기만 보여준다. 안내 문구는 index.html에 정적으로 있고, 여기서는 선택 유무에
+// 따른 카드/안내 메시지만 채운다.
+export function renderMobileRouteView(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+
+  const site = state.selectedSiteId !== null
+    ? state.sites.find(s => s.id === state.selectedSiteId)
+    : null;
+
+  if (!site) {
+    const msg = document.createElement('p');
+    msg.className = 'mobile-placeholder';
+    msg.textContent = '현장 탭에서 목적지를 선택해주세요.';
+    container.appendChild(msg);
+    return;
+  }
+
+  const card = document.createElement('div');
+  card.className = 'mobile-route-card';
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'mobile-route-name';
+  nameEl.textContent = site.site_name || site.company_name || '-';
+  card.appendChild(nameEl);
+
+  const addrEl = document.createElement('div');
+  addrEl.className = 'mobile-route-address';
+  addrEl.textContent = displayValue(site.address);
+  card.appendChild(addrEl);
+
+  const directionsBtn = document.createElement('button');
+  directionsBtn.type = 'button';
+  directionsBtn.className = 'mobile-route-directions-btn';
+  directionsBtn.textContent = '카카오맵 길찾기';
+  const hasValidCoord = isValidSiteCoord(site);
+  directionsBtn.disabled = !hasValidCoord;
+  if (hasValidCoord) {
+    directionsBtn.addEventListener('click', () => {
+      const url = buildKakaoDirectionsUrl(site.site_name || site.company_name, site.lat, site.lng);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    });
+  }
+  card.appendChild(directionsBtn);
+
+  container.appendChild(card);
+}
+
+// STEP15-D. 모바일 "더보기" 탭. 회원관리/엑셀업로드/업로드이력/감독일정/로그아웃을 새로 구현하지
+// 않고, 기존 PC 전용 버튼(#btn-admin-panel/#btn-upload-panel/#btn-supervision-panel/
+// #logout-approved)을 그대로 .click()으로 위임한다 — 그 버튼들에 이미 bindEvents()(js/app.js)가
+// 등록해 둔 기존 열기/렌더/권한 검사 로직을 그대로 재사용하고, 여기서는 어떤 데이터 조회나
+// RPC 호출도 직접 하지 않는다. "업로드 이력"도 별도 화면을 새로 만들지 않고 동일한 업로드 패널
+// (이미 상단에 이력을 보여준다)을 그대로 연다.
+export function renderMobileMoreMenu(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+
+  const profile = state.profile;
+  const admin = isAdmin();
+
+  const profileCard = document.createElement('div');
+  profileCard.className = 'mobile-more-profile';
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'mobile-more-name';
+  nameEl.textContent = profile ? displayValue(profile.name) : '-';
+  if (admin) {
+    const badge = document.createElement('span');
+    badge.className = 'mobile-more-admin-badge';
+    badge.textContent = '관리자';
+    nameEl.appendChild(badge);
+  }
+  profileCard.appendChild(nameEl);
+
+  const emailEl = document.createElement('div');
+  emailEl.className = 'mobile-more-email';
+  emailEl.textContent = profile ? displayValue(profile.email) : '-';
+  profileCard.appendChild(emailEl);
+
+  container.appendChild(profileCard);
+
+  const menuList = document.createElement('div');
+  menuList.className = 'mobile-more-menu';
+
+  function addMenuItem(label, onClick) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'mobile-more-item';
+    btn.textContent = label;
+    btn.addEventListener('click', onClick);
+    menuList.appendChild(btn);
+  }
+
+  if (admin) {
+    addMenuItem('회원 관리', () => document.getElementById('btn-admin-panel').click());
+    addMenuItem('엑셀 업로드', () => document.getElementById('btn-upload-panel').click());
+    addMenuItem('업로드 이력', () => document.getElementById('btn-upload-panel').click());
+  }
+  addMenuItem('감독일정', () => document.getElementById('btn-supervision-panel').click());
+  addMenuItem('로그아웃', () => document.getElementById('logout-approved').click());
+
+  container.appendChild(menuList);
+}
+
 let searchDebounceTimer = null;
 let searchSortEventsbound = false;
 
