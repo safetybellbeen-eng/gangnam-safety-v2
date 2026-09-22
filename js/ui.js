@@ -140,6 +140,53 @@ export function selectSite(siteId) {
   renderDetail(site);
 }
 
+// STEP15-E.4: 모바일 즐겨찾기 탭 전용 empty state. 새 DB 조회/즐겨찾기 상태를 만들지 않고
+// 현재 렌더 결과(visibleSites가 0건)만 보고 판단한다. 아이콘은 하단 네비게이션 "즐겨찾기" 탭과
+// 동일한 라인형 별 SVG(index.html의 것과 동일 path)를 재사용해 디자인 언어를 통일한다.
+// "현장 둘러보기" 버튼은 새 탭 전환 로직을 만들지 않고, 기존 하단 네비게이션의 "현장" 버튼을
+// 그대로 클릭 위임해 app.js의 activateMobileTab 바인딩을 재사용한다.
+function buildFavoriteEmptyState(container) {
+  const empty = document.createElement('div');
+  empty.className = 'mobile-favorite-empty';
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('class', 'mobile-favorite-empty-icon');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.6');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS(svgNS, 'path');
+  path.setAttribute('d', 'm12 3 2.5 5.6 6.1.6-4.6 4.1 1.3 6L12 16.3 6.7 19.3l1.3-6-4.6-4.1 6.1-.6L12 3Z');
+  svg.appendChild(path);
+
+  const title = document.createElement('p');
+  title.className = 'mobile-favorite-empty-title';
+  title.textContent = '즐겨찾기한 현장이 없습니다';
+
+  const desc = document.createElement('p');
+  desc.className = 'mobile-favorite-empty-desc';
+  desc.textContent = '자주 확인하는 현장을 즐겨찾기에 추가하면 여기에서 빠르게 확인할 수 있습니다.';
+
+  const goBtn = document.createElement('button');
+  goBtn.type = 'button';
+  goBtn.className = 'mobile-favorite-empty-btn';
+  goBtn.textContent = '현장 둘러보기';
+  goBtn.addEventListener('click', () => {
+    const siteTabBtn = document.querySelector('.mobile-tab-btn[data-tab="site"]');
+    if (siteTabBtn) siteTabBtn.click();
+  });
+
+  empty.appendChild(svg);
+  empty.appendChild(title);
+  empty.appendChild(desc);
+  empty.appendChild(goBtn);
+  container.appendChild(empty);
+}
+
 // 목록 전체를 다시 그린다. 매번 새 DOM을 생성하므로 이전 렌더의 이벤트가 남아 누적되지 않는다.
 // 검색/정렬이 적용된 파생 배열(getFilteredSortedSites)만 받아서 렌더한다 — state.sites 원본은 건드리지 않는다.
 export function renderSiteList(containerId) {
@@ -155,9 +202,16 @@ export function renderSiteList(containerId) {
   if (reviewCountEl) reviewCountEl.textContent = String(getReviewCount());
 
   if (!visibleSites || visibleSites.length === 0) {
-    const empty = document.createElement('p');
-    empty.textContent = '표시할 사업장이 없습니다.';
-    container.appendChild(empty);
+    // STEP15-E.4: 모바일 즐겨찾기 탭(state.favoriteOnly가 그 탭 진입 시에만 true가 되도록
+    // app.js의 activateMobileTab이 관리)에서 0건일 때만 전용 empty state를 보여준다.
+    // PC의 "즐겨찾기만 보기" 필터나 현장 탭의 일반 검색 결과 0건은 기존 문구를 그대로 유지한다.
+    if (state.favoriteOnly && state.mobileActiveTab === 'favorite') {
+      buildFavoriteEmptyState(container);
+    } else {
+      const empty = document.createElement('p');
+      empty.textContent = '표시할 사업장이 없습니다.';
+      container.appendChild(empty);
+    }
   } else {
     visibleSites.forEach(site => {
       const item = document.createElement('div');
