@@ -85,6 +85,7 @@
 .site-detail-copy-btn,
 .site-detail-name-favorite-btn,
 #mobile-login-hero,
+#mobile-login-signup-top,
 #mobile-login-meta-row,
 #mobile-login-divider,
 #mobile-login-guide,
@@ -1661,23 +1662,48 @@
   #mobile-login-hero {
     display: block;
     position: relative;
-    height: 56vh;
+    height: 52vh;
     overflow: hidden;
   }
   #mobile-login-hero-img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    object-position: 50% 20%;
     display: block;
   }
   #mobile-login-hero-scrim {
     position: absolute;
     inset: 0;
-    background: linear-gradient(180deg, rgba(8,20,40,0.10) 0%, rgba(8,20,40,0.02) 30%, rgba(255,255,255,0) 55%, rgba(10,25,50,0.35) 100%);
+    background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.28) 18%, rgba(255,255,255,0.16) 32%, rgba(255,255,255,0.04) 46%, rgba(255,255,255,0) 58%);
+  }
+  #mobile-login-signup-top {
+    position: absolute;
+    top: calc(env(safe-area-inset-top, 0px) + 14px);
+    right: 20px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: none;
+    border: none;
+    padding: 4px;
+    font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gnmap-navy);
+    cursor: pointer;
+    z-index: 2;
+  }
+  #mobile-login-signup-top .mobile-icon-svg-wrap {
+    display: inline-flex;
+  }
+  #mobile-login-signup-top .mobile-icon-svg {
+    width: 15px;
+    height: 15px;
   }
   #mobile-login-brand {
     position: absolute;
-    top: 10%;
+    top: 9%;
     left: 0;
     right: 0;
     display: flex;
@@ -1688,8 +1714,8 @@
     font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
   }
   #mobile-login-emblem {
-    width: 64px;
-    height: 64px;
+    width: 60px;
+    height: 60px;
     filter: drop-shadow(0 4px 10px rgba(15,42,82,0.22));
   }
   #mobile-login-agency {
@@ -1697,33 +1723,38 @@
     font-size: var(--gnmap-fs-secondary);
     font-weight: 700;
     color: var(--gnmap-navy);
+    text-shadow: 0 1px 2px rgba(255,255,255,0.7), 0 1px 10px rgba(255,255,255,0.5);
   }
   #mobile-login-title {
     margin-top: 4px;
-    font-size: 26px;
+    font-size: clamp(26px, 7vw, 34px);
     font-weight: 800;
     color: var(--gnmap-navy);
-    letter-spacing: -0.3px;
+    letter-spacing: -0.5px;
+    white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.7), 0 1px 10px rgba(255,255,255,0.5);
   }
   #mobile-login-tagline {
     margin-top: var(--gnmap-space-3);
     font-size: 15px;
     font-weight: 600;
     color: #1a2233;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.75), 0 1px 10px rgba(255,255,255,0.55);
   }
   #mobile-login-tagline-sub {
     margin-top: 2px;
     font-size: var(--gnmap-fs-secondary);
     color: #4a5568;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.75), 0 1px 10px rgba(255,255,255,0.55);
   }
 
   #mobile-login-card {
     position: relative;
-    margin-top: -32px;
+    margin-top: -36px;
     background: #fff;
-    border-radius: 28px 28px 0 0;
-    box-shadow: 0 -8px 24px rgba(15,42,82,0.08);
-    padding: 28px var(--gnmap-space-5) var(--gnmap-space-6);
+    border-radius: 30px 30px 0 0;
+    box-shadow: 0 -6px 20px rgba(15,42,82,0.10);
+    padding: 22px var(--gnmap-space-5) var(--gnmap-space-5);
   }
   #app #mobile-login-card #login-form {
     gap: var(--gnmap-space-3);
@@ -1817,7 +1848,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-top: var(--gnmap-space-4);
+    margin-top: var(--gnmap-space-3);
     font-size: 13px;
     color: #5b6472;
   }
@@ -1852,7 +1883,7 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    margin: var(--gnmap-space-5) 0 var(--gnmap-space-3);
+    margin: var(--gnmap-space-4) 0 10px;
     color: #b7bec9;
     font-size: 12px;
   }
@@ -1899,8 +1930,8 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    margin-top: var(--gnmap-space-3);
-    padding: var(--gnmap-space-4) var(--gnmap-space-4) calc(var(--gnmap-space-5) + env(safe-area-inset-bottom, 0px));
+    margin-top: 8px;
+    padding: 10px var(--gnmap-space-4) calc(12px + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid #eef0f4;
     color: #9aa2af;
     font-size: 11.5px;
