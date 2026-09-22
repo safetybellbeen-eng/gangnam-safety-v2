@@ -627,6 +627,27 @@ const SUPERVISION_FILTERS = ['all', 'scheduled', 'ongoing', 'done'];
 const SUPERVISION_MIN_DATE = '2000-01-01';
 const SUPERVISION_MAX_DATE = '2100-12-31';
 
+// 오늘 날짜를 로컬 타임존 기준 'YYYY-MM-DD'로 반환한다(new Date().toISOString()은 UTC라
+// 자정 근처에 하루가 밀릴 수 있어 사용하지 않는다).
+function todayDateString() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+// 감독명/시작일/종료일만으로 상태(예정/진행중/완료)를 오늘 날짜 기준으로 계산한다.
+// 사용자가 상태를 직접 고르지 않으므로 등록/수정 시 저장할 값과, 목록에 보여줄 값 모두
+// 이 함수 하나로만 결정한다 — 두 곳의 판정 기준이 어긋나는 일이 없도록 한다.
+// 'YYYY-MM-DD' 문자열은 사전식 비교가 곧 날짜 비교와 같다(항상 zero-padded ISO 형식이므로).
+function computeSupervisionStatus(startDate, endDate) {
+  const today = todayDateString();
+  if (today < startDate) return 'scheduled';
+  if (today > endDate) return 'done';
+  return 'ongoing';
+}
+
 // 감독일정 상황판을 렌더한다. approved 전체가 조회 가능, admin만 등록/수정/삭제 버튼이 보인다
 // (최종 방어는 RLS: INSERT/UPDATE/DELETE 정책 자체가 admin만 허용).
 export async function renderSupervisionPanel(containerId) {
@@ -692,15 +713,20 @@ export async function renderSupervisionPanel(containerId) {
     return;
   }
 
+  // DB에 저장된 sv.status는 그 값을 저장한 시점의 스냅샷일 뿐이므로(예: 예전에 등록해두고
+  // 아무도 다시 열어보지 않은 일정), 정렬/필터/배지 전부 오늘 날짜 기준으로 매번 다시 계산한
+  // computeSupervisionStatus() 결과만 사용한다 — DB 값을 신뢰하지 않는다.
   const sorted = [...rows].sort((a, b) => {
-    const orderDiff = SUPERVISION_STATUS_ORDER[a.status] - SUPERVISION_STATUS_ORDER[b.status];
+    const statusA = computeSupervisionStatus(a.start_date, a.end_date);
+    const statusB = computeSupervisionStatus(b.start_date, b.end_date);
+    const orderDiff = SUPERVISION_STATUS_ORDER[statusA] - SUPERVISION_STATUS_ORDER[statusB];
     if (orderDiff !== 0) return orderDiff;
     return (a.start_date || '') < (b.start_date || '') ? 1 : -1; // 같은 상태 안에서는 최근 시작일 우선
   });
 
   const filtered = state.supervisionFilter === 'all'
     ? sorted
-    : sorted.filter(sv => sv.status === state.supervisionFilter);
+    : sorted.filter(sv => computeSupervisionStatus(sv.start_date, sv.end_date) === state.supervisionFilter);
 
   if (filtered.length === 0) {
     const empty = document.createElement('p');
@@ -720,9 +746,10 @@ export async function renderSupervisionPanel(containerId) {
     titleRow.className = 'supervision-title-row';
     const titleEl = document.createElement('strong');
     titleEl.textContent = sv.title;
+    const liveStatus = computeSupervisionStatus(sv.start_date, sv.end_date);
     const badge = document.createElement('span');
-    badge.className = `sv-badge ${SUPERVISION_STATUS_CLASS[sv.status] || ''}`;
-    badge.textContent = SUPERVISION_STATUS_LABEL[sv.status] || sv.status;
+    badge.className = `sv-badge ${SUPERVISION_STATUS_CLASS[liveStatus] || ''}`;
+    badge.textContent = SUPERVISION_STATUS_LABEL[liveStatus] || liveStatus;
     titleRow.appendChild(titleEl);
     titleRow.appendChild(badge);
     info.appendChild(titleRow);
@@ -776,7 +803,8 @@ function showSupervisionForm(containerId, existing) {
   document.getElementById('sv-manager').value = existing ? (existing.manager_name || '') : '';
   document.getElementById('sv-start').value = existing ? existing.start_date : '';
   document.getElementById('sv-end').value = existing ? existing.end_date : '';
-  document.getElementById('sv-status').value = existing ? existing.status : 'scheduled';
+  // 상태는 더 이상 폼에서 직접 고르지 않는다 — handleSaveSupervision()이 저장 시점에
+  // computeSupervisionStatus()로 자동 계산한다.
 
   const saveBtn = document.getElementById('btn-sv-save');
   const newSaveBtn = saveBtn.cloneNode(true); // 이전 클릭 리스너 제거(중복 바인딩 방지)
@@ -796,7 +824,8 @@ function showSupervisionForm(containerId, existing) {
   });
 }
 
-// 등록/수정 저장. 감독명/시작일/종료일 필수, 종료일>=시작일, status 허용값만 통과시킨다.
+// 등록/수정 저장. 감독명/시작일/종료일 필수, 종료일>=시작일. 상태는 사용자가 고르지 않고
+// 오늘 날짜 기준으로 computeSupervisionStatus()가 자동 계산해서 저장한다.
 async function handleSaveSupervision(containerId, editingId) {
   const errorEl = document.getElementById('supervision-form-error');
   errorEl.textContent = '';
@@ -805,7 +834,6 @@ async function handleSaveSupervision(containerId, editingId) {
   const manager = document.getElementById('sv-manager').value.trim();
   const start = document.getElementById('sv-start').value;
   const end = document.getElementById('sv-end').value;
-  const status = document.getElementById('sv-status').value;
 
   if (!title) { errorEl.textContent = '감독명을 입력해주세요.'; return; }
   if (!start) { errorEl.textContent = '시작일을 입력해주세요.'; return; }
@@ -816,8 +844,8 @@ async function handleSaveSupervision(containerId, editingId) {
     return;
   }
   if (end < start) { errorEl.textContent = '종료일은 시작일보다 빠를 수 없습니다.'; return; }
-  if (!['scheduled', 'ongoing', 'done'].includes(status)) { errorEl.textContent = '올바르지 않은 상태입니다.'; return; }
 
+  const status = computeSupervisionStatus(start, end);
   const fields = { title, manager_name: manager || null, start_date: start, end_date: end, status };
   const result = editingId
     ? await updateSupervision(editingId, fields)
