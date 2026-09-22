@@ -300,6 +300,13 @@ function bindEvents() {
     btn.addEventListener('click', () => activateMobileTab(btn.dataset.tab));
   });
 
+  // STEP15-E.1. 모바일 헤더 벨 버튼 — 새 로직 없이 기존 "알림" 하단 탭과 완전히 동일하게
+  // activateMobileTab('alert')만 호출한다(하단 탭 버튼을 눌렀을 때와 동작이 100% 같다).
+  const mobileHeaderAlertBtn = document.getElementById('mobile-header-alert-btn');
+  if (mobileHeaderAlertBtn) {
+    mobileHeaderAlertBtn.addEventListener('click', () => activateMobileTab('alert'));
+  }
+
   document.getElementById('upload-file-input').addEventListener('change', async (e) => {
     if (!isAdmin()) return;
     const file = e.target.files[0];
