@@ -7,10 +7,12 @@ const GANGNAM_CENTER = { lat: 37.4979, lng: 127.0276 }; // 강남구 중심 좌�
 const DEFAULT_LEVEL = 6;
 
 let sdkLoadPromise = null;
+let clusterer = null; // STEP14.5-B 2차. 마커 클러스터러 인스턴스(지도당 1개, 재사용).
 
 // SDK <script> 태그를 딱 1번만 생성한다 (중복 로드 방지).
 // autoload=false로 로드한 뒤 kakao.maps.load()로 초기화 시점을 직접 제어한다 —
 // GitHub Pages 등 정적 호스팅에서 SDK 로드 타이밍이 페이지 렌더링과 어긋나는 문제를 방지.
+// STEP14.5-B 2차: 마커 클러스터링을 위해 clusterer 라이브러리만 추가 로드한다.
 function loadKakaoSdk() {
   if (sdkLoadPromise) return sdkLoadPromise;
 
@@ -20,7 +22,7 @@ function loadKakaoSdk() {
       return;
     }
     const script = document.createElement('script');
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${CONFIG.KAKAO_JS_KEY}&autoload=false`;
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${CONFIG.KAKAO_JS_KEY}&libraries=clusterer&autoload=false`;
     script.onload = () => {
       window.kakao.maps.load(() => resolve(window.kakao));
     };
@@ -46,16 +48,27 @@ export async function initMap(containerId) {
     level: DEFAULT_LEVEL
   });
 
+  // STEP14.5-B 2차: 지도 인스턴스당 클러스터러 1개만 생성해 재사용한다(마커 재렌더 때마다 재생성하지 않음).
+  clusterer = new kakao.maps.MarkerClusterer({
+    map: state.map,
+    averageCenter: true,
+    minLevel: DEFAULT_LEVEL
+  });
+
   return state.map;
 }
 
 // 사업장 배열로 마커를 그린다. 기존 마커는 전부 정리한 뒤 새로 생성한다 (중복 방지, 재호출 가능).
 // 각 마커 생성 시 클릭 리스너를 1회만 등록한다 — clearMarkers가 기존 마커를 먼저 지우므로
 // 재호출해도 리스너가 누적되지 않는다. onMarkerClick은 ui.js의 selectSite를 주입받는다.
+// STEP14.5-B 2차: 마커를 지도에 직접 붙이지 않고 클러스터러에 addMarkers로 붙인다.
+// 클릭 리스너/state.markers/state.siteMarkers 등 기존 동작은 그대로 유지한다.
 export function renderMarkers(sites, onMarkerClick) {
   clearMarkers();
 
   if (!state.map || !sites || sites.length === 0) return;
+
+  const validMarkers = [];
 
   sites.forEach(site => {
     const lat = Number(site.lat);
@@ -68,8 +81,7 @@ export function renderMarkers(sites, onMarkerClick) {
     if (!isValid) return; // 유효하지 않은 좌표는 마커를 생성하지 않고 skip
 
     const marker = new kakao.maps.Marker({
-      position: new kakao.maps.LatLng(lat, lng),
-      map: state.map
+      position: new kakao.maps.LatLng(lat, lng)
     });
 
     if (typeof onMarkerClick === 'function') {
@@ -78,10 +90,21 @@ export function renderMarkers(sites, onMarkerClick) {
 
     state.markers.push(marker);
     state.siteMarkers.set(site.id, marker);
+    validMarkers.push(marker);
   });
+
+  if (clusterer) {
+    clusterer.addMarkers(validMarkers);
+  } else {
+    // clusterer가 아직 없는 예외 상황(이론상 initMap 이후에는 항상 존재) 대비 폴백.
+    validMarkers.forEach(marker => marker.setMap(state.map));
+  }
 }
 
 export function clearMarkers() {
+  if (clusterer) {
+    clusterer.clear();
+  }
   state.markers.forEach(marker => marker.setMap(null));
   state.markers = [];
   state.siteMarkers.clear();
