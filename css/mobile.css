@@ -83,7 +83,13 @@
 .mobile-panel-close-btn,
 .site-detail-close-x,
 .site-detail-copy-btn,
-.site-detail-name-favorite-btn {
+.site-detail-name-favorite-btn,
+#mobile-login-hero,
+#mobile-login-meta-row,
+#mobile-login-divider,
+#mobile-login-guide,
+#mobile-login-footer,
+#mobile-login-password-toggle {
   display: none;
 }
 
@@ -255,15 +261,15 @@
 
   /* #view-approved를 세로 flex 컨테이너로 전환해, 하단 탭 높이를 제외한 나머지 공간을
      지도/리스트/모바일 placeholder가 채우도록 한다. (absolute/fixed 요소는 이 흐름과 무관) */
-  /* STEP15-C.3: showView()(js/app.js)가 매 화면 전환마다 #view-approved에
-     인라인 style.display='block'을 강제로 설정한다. 인라인 스타일은 !important 없는
-     외부 스타일시트보다 항상 우선하므로, 아래 display:flex는 지금까지 실제로는 절대
-     적용되지 않고 있었다(= #view-approved가 계속 display:block이었다는 뜻) — 이번 지도
-     흰 화면의 진짜 근본 원인. #view-approved의 flex-direction/height/overflow 등은
-     인라인으로 건드려지지 않아 원래도 정상 적용되고 있었으므로 display 속성에만
-     !important를 준다(다른 속성까지 남발하지 않음). */
+  /* STEP15-C.3(구): showView()가 활성 뷰에 인라인 style.display='block'을 강제해서
+     아래 display:flex가 적용되지 못했던 문제를 !important로 덮어썼었다. 그런데 !important는
+     비활성 상태(인라인 'none')까지도 이겨버려서, 로그인 등 다른 화면이 떠 있을 때도
+     #view-approved가 항상 화면 하단에 빈 채로 flex 표시되어 그 화면 높이만큼 빈 스크롤
+     영역이 남는 부작용이 있었다(로그인 화면 개편 중 발견). 근본 원인(showView()가 활성 뷰에
+     불필요하게 'block'을 강제하던 것)을 js/app.js에서 고쳐 !important 없이도 정상 동작하므로
+     제거한다 — display 속성 자체의 의도(모바일에서 flex column)는 그대로 유지. */
   #view-approved {
-    display: flex !important;
+    display: flex;
     flex-direction: column;
     height: 100vh;
     height: 100dvh;
@@ -862,10 +868,17 @@
   /* 사용자 피드백: 별표를 align-items:center로 두면 제목이 2줄로 줄바꿈될 때 별표가 전체
      블록(두 줄) 높이의 정중앙, 즉 줄과 줄 사이에 걸쳐 떠서 "제목과 분리되어 보인다"는
      지적 — flex-start로 바꿔 항상 첫 줄과 같은 높이에서 시작하도록 고정한다. */
+  /* 사용자 피드백: 상위 공유 클래스 .site-detail-row가 justify-content:space-between이라
+     별표(첫 자식)는 좌측에, 현장명(둘째 자식)은 우측 끝으로 밀려나 별표와 떨어져 보였다.
+     flex-start로 바꿔 별표 바로 옆에 현장명이 좌측 정렬로 붙게 한다. */
   .site-detail-row-name {
     display: flex;
     align-items: flex-start;
+    justify-content: flex-start;
     gap: 4px;
+  }
+  .site-detail-row-name .site-detail-value-name {
+    text-align: left;
   }
   .site-detail-name-favorite-btn {
     display: inline-flex;
@@ -1625,5 +1638,276 @@
   .mobile-tab-icon {
     width: 22px;
     height: 22px;
+  }
+
+  /* 사용자 확정 로그인 시안: 현장 사진 히어로 + CI/타이틀 + 흰색 카드(아이디/비밀번호) +
+     간편 바로가기(회원가입/이용안내) + 푸터. #view-login은 로그인 전 화면이라
+     #app[data-mobile-tab] 상태와 무관하게 항상 아래 스타일이 적용된다(다른 모바일 화면과
+     달리 지도/현장 탭 구분이 없음). PC는 위 PC-hide 목록 + 아래 개별 규칙으로 기존
+     폼(h1/label 텍스트/버튼)만 그대로 남는다. */
+  #view-login {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    min-height: 100dvh;
+    min-height: 100vh;
+    background: #fff;
+  }
+  /* PC 전용 원래 제목("강남구 사업장 안전지도 V2")은 모바일 히어로의 브랜드 블록으로
+     대체된다(#view-approved h1을 숨기는 것과 동일한 기존 패턴). */
+  #view-login > h1 {
+    display: none;
+  }
+  #mobile-login-hero {
+    display: block;
+    position: relative;
+    height: 56vh;
+    overflow: hidden;
+  }
+  #mobile-login-hero-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  #mobile-login-hero-scrim {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(8,20,40,0.10) 0%, rgba(8,20,40,0.02) 30%, rgba(255,255,255,0) 55%, rgba(10,25,50,0.35) 100%);
+  }
+  #mobile-login-brand {
+    position: absolute;
+    top: 10%;
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 0 var(--gnmap-space-5);
+    font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+  }
+  #mobile-login-emblem {
+    width: 64px;
+    height: 64px;
+    filter: drop-shadow(0 4px 10px rgba(15,42,82,0.22));
+  }
+  #mobile-login-agency {
+    margin-top: 6px;
+    font-size: var(--gnmap-fs-secondary);
+    font-weight: 700;
+    color: var(--gnmap-navy);
+  }
+  #mobile-login-title {
+    margin-top: 4px;
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--gnmap-navy);
+    letter-spacing: -0.3px;
+  }
+  #mobile-login-tagline {
+    margin-top: var(--gnmap-space-3);
+    font-size: 15px;
+    font-weight: 600;
+    color: #1a2233;
+  }
+  #mobile-login-tagline-sub {
+    margin-top: 2px;
+    font-size: var(--gnmap-fs-secondary);
+    color: #4a5568;
+  }
+
+  #mobile-login-card {
+    position: relative;
+    margin-top: -32px;
+    background: #fff;
+    border-radius: 28px 28px 0 0;
+    box-shadow: 0 -8px 24px rgba(15,42,82,0.08);
+    padding: 28px var(--gnmap-space-5) var(--gnmap-space-6);
+  }
+  #app #mobile-login-card #login-form {
+    gap: var(--gnmap-space-3);
+  }
+  #mobile-login-card .mobile-login-field {
+    position: relative;
+    flex-direction: row;
+    align-items: center;
+    gap: 0;
+  }
+  #mobile-login-card .mobile-login-field .mobile-icon-svg-wrap {
+    display: flex;
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #8a93a3;
+    pointer-events: none;
+  }
+  #mobile-login-card .mobile-login-field .mobile-icon-svg {
+    width: 19px;
+    height: 19px;
+  }
+  #mobile-login-card .mobile-login-field-label-text {
+    display: none;
+  }
+  #mobile-login-card .mobile-login-field input {
+    width: 100%;
+    height: 54px;
+    border-radius: 16px;
+    border: 1px solid #e6e9ef;
+    background: #f6f7f9;
+    padding: 0 16px 0 48px;
+    font-size: 15px;
+    color: #1a2233;
+  }
+  #mobile-login-card .mobile-login-field input::placeholder {
+    color: #a3abb8;
+  }
+  #mobile-login-card .mobile-login-field input:focus {
+    outline: none;
+    border-color: var(--gnmap-blue);
+    background: #fff;
+  }
+  #mobile-login-card .mobile-login-field input#login-password {
+    padding-right: 44px;
+  }
+  #mobile-login-password-toggle {
+    display: flex;
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    padding: 6px;
+    color: #a3abb8;
+    cursor: pointer;
+  }
+  #mobile-login-password-toggle.active {
+    color: var(--gnmap-blue);
+  }
+  #mobile-login-password-toggle .mobile-icon-svg-wrap {
+    display: inline-flex;
+  }
+  #mobile-login-password-toggle .mobile-icon-svg {
+    width: 18px;
+    height: 18px;
+  }
+  #app #mobile-login-card #login-form button[type="submit"] {
+    width: 100%;
+    height: 54px;
+    margin-top: 4px;
+    border: none;
+    border-radius: 16px;
+    background: var(--gnmap-navy);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 8px 18px rgba(15,42,82,0.2);
+  }
+  #app #mobile-login-card #login-form button[type="submit"]:active {
+    background: #0f2247;
+  }
+  #mobile-login-card .form-error {
+    margin: 4px 2px 0;
+  }
+
+  #mobile-login-meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: var(--gnmap-space-4);
+    font-size: 13px;
+    color: #5b6472;
+  }
+  #mobile-login-remember-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #5b6472;
+  }
+  #mobile-login-remember-label input[type="checkbox"] {
+    width: 17px;
+    height: 17px;
+    accent-color: var(--gnmap-blue);
+  }
+  #mobile-login-forgot {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    color: var(--gnmap-navy);
+    font-weight: 600;
+  }
+  #mobile-login-forgot .mobile-icon-svg-wrap {
+    display: inline-flex;
+  }
+  #mobile-login-forgot .mobile-icon-svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  #mobile-login-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: var(--gnmap-space-5) 0 var(--gnmap-space-3);
+    color: #b7bec9;
+    font-size: 12px;
+  }
+  #mobile-login-divider::before,
+  #mobile-login-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: #eceff3;
+  }
+
+  #mobile-login-quick-row {
+    display: flex;
+    gap: var(--gnmap-space-3);
+  }
+  #app #mobile-login-quick-row #show-signup,
+  #mobile-login-guide {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 50px;
+    border-radius: 16px;
+    border: 1px solid #e6e9ef;
+    background: #f6f7f9;
+    color: var(--gnmap-navy);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  #app #mobile-login-quick-row #show-signup .mobile-icon-svg-wrap,
+  #mobile-login-guide .mobile-icon-svg-wrap {
+    display: inline-flex;
+  }
+  #app #mobile-login-quick-row #show-signup .mobile-icon-svg,
+  #mobile-login-guide .mobile-icon-svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  #mobile-login-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: var(--gnmap-space-3);
+    padding: var(--gnmap-space-4) var(--gnmap-space-4) calc(var(--gnmap-space-5) + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid #eef0f4;
+    color: #9aa2af;
+    font-size: 11.5px;
+  }
+  #mobile-login-footer img {
+    width: 16px;
+    height: 16px;
+    opacity: 0.7;
   }
 }
