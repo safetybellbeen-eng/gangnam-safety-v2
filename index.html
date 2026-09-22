@@ -162,14 +162,27 @@
     <!-- STEP15-B: 모바일(≤768px) 전용 하단 탭 골격. PC에서는 css/mobile.css가 항상 숨김 처리한다.
          지도/현장/즐겨찾기는 기존 DOM(map-container/site-list-panel)을 그대로 재사용하고,
          경로/알림/더보기는 이번 STEP에서는 최소 placeholder만 둔다(실제 연결은 STEP15-D 이후). -->
+    <!-- STEP15-D: 경로 탭. 다중 경유지 등 새 경로 기능은 만들지 않고, 기존 사업장 상세의
+         "길찾기"(buildKakaoDirectionsUrl)만 재사용해 현재 선택된 사업장 하나에 대해 보여준다.
+         안내 문구는 정적 텍스트, 선택 사업장 유무에 따른 실제 내용은 #mobile-route-content에
+         renderMobileRouteView()(js/ui.js)가 채운다. -->
     <div id="mobile-view-route" class="mobile-view">
-      <p class="mobile-placeholder">경로 화면은 준비 중입니다. 사업장 상세의 "길찾기" 버튼으로 카카오맵 길찾기를 이용해주세요.<br>다중 경유지 등 경로 탭 고도화는 후속 단계에서 연결 예정입니다.</p>
+      <h2 class="mobile-view-title">경로</h2>
+      <p class="mobile-view-guide">현장에서 사업장을 선택하면 카카오맵 길찾기를 이용할 수 있습니다.</p>
+      <div id="mobile-route-content"></div>
     </div>
+    <!-- STEP15-D: 알림 탭. 별도 알림 DB가 없으므로 기존 gnmap_v2_supervisions 감독일정 패널
+         (#supervision-panel, renderSupervisionPanel())을 그대로 재사용한다 — 탭을 선택하면
+         js/app.js의 activateMobileTab()이 이 패널을 채우고, css/mobile.css가 이 탭에서만
+         전체화면으로 보이도록 위치를 override한다. 이 placeholder는 그 전환 사이 잠깐만 보인다. -->
     <div id="mobile-view-alert" class="mobile-view">
-      <p class="mobile-placeholder">알림 기능은 후속 단계에서 연결 예정입니다.</p>
+      <p class="mobile-placeholder">감독일정을 불러오는 중입니다...</p>
     </div>
+    <!-- STEP15-D: 더보기 탭. 회원관리/엑셀업로드/감독일정/로그아웃은 새로 구현하지 않고
+         기존 PC 버튼(#btn-admin-panel 등)을 그대로 클릭 위임해 기존 로직만 재사용한다.
+         renderMobileMoreMenu()(js/ui.js)가 #mobile-more-content를 채운다. -->
     <div id="mobile-view-more" class="mobile-view">
-      <p class="mobile-placeholder">회원 관리 · 엑셀 업로드 · 감독일정 · 계정 메뉴는 후속 단계에서 연결 예정입니다.</p>
+      <div id="mobile-more-content"></div>
     </div>
     <nav id="mobile-bottom-nav">
       <button type="button" class="mobile-tab-btn" data-tab="map">지도</button>
