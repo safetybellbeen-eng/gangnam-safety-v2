@@ -640,6 +640,15 @@
     z-index: 70;
     box-sizing: border-box;
   }
+  /* 사용자 피드백: 지도 탭에서 핀을 눌렀을 때 상세정보가 화면을 거의 다 덮어 지도가 거의
+     안 보이고 가독성도 떨어진다는 지적 — 지도 탭에서 여는 상세만 "미리보기" 높이(약 42vh)로
+     줄여 지도가 함께 보이게 한다. 내용/기능은 그대로이며 내부 스크롤(overflow-y:auto,
+     layout.css 기존 규칙)로 나머지(개인 메모 등)를 볼 수 있다. 현장/즐겨찾기 탭에서 여는
+     상세는 기존 74vh(전체 정보 확인용)를 그대로 유지한다. */
+  #app[data-mobile-tab="map"] #site-detail-panel {
+    max-height: 42dvh;
+    max-height: 42vh;
+  }
   #site-detail-panel::before {
     content: "";
     display: block;
