@@ -364,6 +364,18 @@ export function renderDetail(site) {
   panel.innerHTML = '';
   panel.style.display = 'block';
 
+  // 사용자 피드백: 지도 탭에서 상세를 열면 검색/필터 바(#site-list-panel)를 숨기고 그만큼
+  // 지도를 넓게 쓴다(css/mobile.css의 #app[data-mobile-tab="map"][data-detail-open="true"] 규칙).
+  // 지도 재초기화는 하지 않고, 컨테이너 크기가 바뀐 뒤 기존에도 쓰던 relayout()으로 크기만
+  // 다시 인식시키고, 이미 selectSite()가 구해둔 좌표로 panToSite()를 다시 호출해 커진 지도
+  // 안에서도 핀이 중앙에 오도록 맞춘다.
+  const appEl = document.getElementById('app');
+  if (appEl) appEl.setAttribute('data-detail-open', 'true');
+  if (state.mobileActiveTab === 'map' && state.map && typeof state.map.relayout === 'function') {
+    state.map.relayout();
+    panToSite(site);
+  }
+
   // STEP16.5-C: 모바일 전용 X 닫기 버튼(44px 터치 타겟). closeDetail()을 기존 "닫기" 버튼과
   // 완전히 동일하게 직접 호출한다(새 로직 없음). PC에서는 css/mobile.css @media 밖이라
   // 아무 규칙도 매치되지 않아 기본적으로 보이지 않는다(레이아웃에 영향 없음).
@@ -431,6 +443,50 @@ export function renderDetail(site) {
 
     row.appendChild(labelEl);
     row.appendChild(valueEl);
+
+    // 사용자 피드백: 주소 옆에 텍스트를 바로 복사할 수 있는 버튼을 추가한다. 주소 값(site.address)은
+    // 그대로 읽기만 하고 저장/검색/정렬 로직에는 전혀 관여하지 않는 순수 UI 기능이다.
+    // 값이 없으면('-') 복사할 내용이 없으므로 버튼을 만들지 않는다.
+    if (key === 'address' && displayValue(value) !== '-') {
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'site-detail-copy-btn';
+      copyBtn.setAttribute('aria-label', '주소 복사');
+      copyBtn.textContent = '복사';
+      copyBtn.addEventListener('click', async () => {
+        const text = String(value);
+        const original = copyBtn.textContent;
+        const showResult = (ok) => {
+          copyBtn.textContent = ok ? '복사됨' : '실패';
+          copyBtn.disabled = true;
+          setTimeout(() => {
+            copyBtn.textContent = original;
+            copyBtn.disabled = false;
+          }, 1400);
+        };
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+          } else {
+            // Clipboard API를 쓸 수 없는 환경(구형 브라우저/비보안 컨텍스트)을 위한 최소 대체 수단.
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+          }
+          showResult(true);
+        } catch (err) {
+          console.error('주소 복사 실패:', err);
+          showResult(false);
+        }
+      });
+      row.appendChild(copyBtn);
+    }
+
     hero.appendChild(row);
   });
   panel.appendChild(hero);
@@ -531,6 +587,14 @@ export function closeDetail() {
   panel.innerHTML = '';
   state.selectedSiteId = null;
   updateListActiveState();
+
+  // 상세를 열 때 숨겼던 검색/필터 바를 다시 보이게 하고(§ renderDetail 참고), 지도 탭이라면
+  // 다시 줄어든 지도 크기를 relayout()으로 반영한다(재초기화 없음).
+  const appEl = document.getElementById('app');
+  if (appEl) appEl.removeAttribute('data-detail-open');
+  if (state.mobileActiveTab === 'map' && state.map && typeof state.map.relayout === 'function') {
+    state.map.relayout();
+  }
 }
 
 // STEP15-D. 모바일 "경로" 탭. 새 경로/경유지 기능을 만들지 않고, renderDetail()이 쓰는 것과
