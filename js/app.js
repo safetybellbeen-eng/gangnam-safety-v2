@@ -94,6 +94,13 @@ function routeByProfile() {
       // 감독일정 상황판은 approved 전체가 볼 수 있다(등록/수정/삭제만 admin — renderSupervisionPanel 내부에서 분기).
       document.getElementById('btn-supervision-panel').style.display = 'inline-block';
       showView('view-approved');
+      // STEP15-C.2: initMap()보다 먼저 data-mobile-tab을 적용해, 모바일에서 Kakao 지도가
+      // display:none인 #map-container(크기 0) 위에 생성되지 않도록 한다(흰 화면의 실제 원인 — 아래 보고 참고).
+      // PC에서는 이 속성이 어떤 CSS에도 영향을 주지 않으므로 PC 동작은 그대로다.
+      {
+        const appElForInitialTab = document.getElementById('app');
+        if (appElForInitialTab) appElForInitialTab.dataset.mobileTab = state.mobileActiveTab || 'map';
+      }
       // approved 상태에서만 지도를 초기화한다. pending/rejected/disabled는 여기 도달하지 않는다.
       // 지도 초기화가 끝난 뒤에만 사업장을 조회해 마커/목록을 그린다. 조회 실패해도 지도는 유지된다.
       initMap('map-container')
