@@ -437,49 +437,106 @@
      auto로 취급) position:absolute 패널이 그 밑으로 clip되어 아예 안 보였다. viewport 기준
      position:fixed로 바꾸고, top/left는 열 때 js/ui.js가 버튼의 실제 화면 좌표로 계산해 넣는다
      (조상 overflow/스크롤에 영향받지 않음). */
+  /* 사용자 피드백(촌스럽다는 지적): 네이티브 라디오/체크박스 원 모양 + 기본 포커스 사각
+     테두리가 그대로 드러나 옵션이 하나의 "입력창"처럼 보였다. 아래에서 입력 자체는
+     시각적으로 숨기고(접근성/클릭 가능 영역은 label이 그대로 유지), 깔끔한 메뉴 리스트
+     형태(둥근 리스트 아이템 + hover + 선택 시 파란 배경/체크마크)로 4개 필터(관할/공사금액/
+     점검/산재표) 전부 동일하게 통일한다. */
   .site-select-filter-panel {
     position: fixed;
     z-index: 50;
-    min-width: 160px;
-    max-height: 260px;
+    min-width: 168px;
+    max-width: 240px;
+    max-height: 280px;
     overflow-y: auto;
     box-sizing: border-box;
     background: #fff;
     border: 1px solid var(--gnmap-border);
-    border-radius: var(--gnmap-radius-md);
-    box-shadow: var(--gnmap-shadow-md);
-    padding: var(--gnmap-space-2);
+    border-radius: 14px;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16);
+    padding: 6px;
   }
   .site-select-filter-clear {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     width: 100%;
     box-sizing: border-box;
-    min-height: 32px;
-    margin-bottom: var(--gnmap-space-1);
-    padding: 0 var(--gnmap-space-2);
-    border: 1px solid var(--gnmap-border);
-    border-radius: var(--gnmap-radius-sm);
-    background: var(--gnmap-bg-soft);
-    color: var(--gnmap-text-sub);
-    font-size: var(--gnmap-fs-caption);
+    min-height: 40px;
+    padding: 0 10px;
+    margin: 0 0 2px;
+    border: none;
+    border-radius: 9px;
+    background: none;
+    font: inherit;
+    font-size: var(--gnmap-fs-secondary);
+    color: var(--gnmap-text-primary);
     text-align: left;
     cursor: pointer;
   }
   .site-select-filter-option {
+    position: relative;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: var(--gnmap-space-2);
-    padding: 6px var(--gnmap-space-1);
-    font-size: var(--gnmap-fs-caption);
+    min-height: 40px;
+    padding: 0 10px;
+    border-radius: 9px;
+    font-size: var(--gnmap-fs-secondary);
     color: var(--gnmap-text-primary);
-    white-space: nowrap;
+    white-space: normal;
+    line-height: 1.3;
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
   }
+  /* components.css의 "#app label { flex-direction: column }"(ID 선택자라 우선순위가 더 높음,
+     관리자 패널 폼 라벨용)이 이 옵션 행에도 걸려 가로 배치가 세로로 깨지는 문제가 있었다.
+     같은/더 높은 우선순위(ID 포함)로 명시적으로 row를 되돌린다. */
+  #app .site-select-filter-clear,
+  #app .site-select-filter-option {
+    flex-direction: row;
+    gap: var(--gnmap-space-2);
+    font-size: var(--gnmap-fs-secondary);
+  }
+  .site-select-filter-clear:hover,
+  .site-select-filter-option:hover {
+    background: var(--gnmap-bg-soft);
+  }
+  /* 입력 요소 자체(원/사각 테두리)는 화면에서 숨기되, label 전체가 여전히 탭 가능한 영역이라
+     기능/접근성은 그대로 유지된다. */
   .site-select-filter-option input[type="checkbox"],
   .site-select-filter-option input[type="radio"] {
-    width: 16px;
-    height: 16px;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .site-select-filter-check {
+    display: none;
     flex-shrink: 0;
+    font-size: 15px;
+    font-weight: var(--gnmap-fw-bold);
+    color: var(--gnmap-blue);
+  }
+  /* 선택된 옵션만 파란 배경 + 굵은 글씨 + 체크마크로 강조한다(4개 필터 공통 — 관할의
+     "전체" 버튼은 :checked가 없는 <button>이라 .is-checked 클래스로 동일하게 흉내낸다). */
+  .site-select-filter-option:has(input:checked),
+  .site-select-filter-clear.is-checked {
+    background: var(--gnmap-blue-light);
+    color: var(--gnmap-blue);
+    font-weight: var(--gnmap-fw-semibold);
+  }
+  .site-select-filter-option:has(input:checked) .site-select-filter-check,
+  .site-select-filter-clear.is-checked .site-select-filter-check {
+    display: block;
+  }
+  .site-select-filter-option:has(input:focus-visible) {
+    outline: 2px solid var(--gnmap-blue);
+    outline-offset: -2px;
   }
   /* STEP16.5-B: 즐겨찾기 active는 기존과 동일하게 정부 blue. */
   #site-favorite-filter-btn.active {
