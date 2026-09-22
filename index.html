@@ -105,6 +105,11 @@
     <div id="admin-panel" style="display:none"></div>
     <button type="button" id="btn-upload-panel" style="display:none">엑셀 업로드</button>
     <div id="upload-panel" style="display:none">
+      <!-- STEP15-E.6: admin-panel과 달리 upload-panel 내부는 renderUploadHistoryPanel/
+           handleExcelFileSelect가 upload-history/upload-preview만 부분적으로 다시 그리고
+           패널 전체를 지우지 않으므로, 닫기 버튼을 정적으로 둔다. PC에서는 css/mobile.css의
+           기본값(.mobile-panel-close-btn)이 항상 숨기므로 PC 화면은 그대로다. -->
+      <button type="button" id="btn-upload-close" class="mobile-panel-close-btn" aria-label="닫기">×</button>
       <input type="file" id="upload-file-input" accept=".xlsx,.xls">
       <div id="upload-history"></div>
       <div id="upload-preview"></div>
