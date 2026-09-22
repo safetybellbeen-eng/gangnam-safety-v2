@@ -22,8 +22,17 @@
 #mobile-bottom-nav,
 .mobile-view,
 #mobile-app-header,
-.site-list-review-badge {
+.site-list-review-badge,
+.site-list-dong {
   display: none;
+}
+
+/* STEP15-E.2: 동/위치확인필요를 묶는 순수 wrapper. #site-filter-row와 동일한 원리로
+   PC에서는 display:contents로 박스를 만들지 않아, 그 안의 .site-list-review-badge(자체
+   기본 숨김)/.site-list-dong(자체 기본 숨김)만 각자의 규칙대로 숨겨진 채 PC 레이아웃에는
+   아무 요소도 추가되지 않은 것과 동일하게 렌더링된다. */
+.site-list-meta {
+  display: contents;
 }
 
 /* STEP15-E.1: 장식용 아이콘(검색/현재위치/상세 품질 배지)은 PC 공유 DOM에 추가된 것이라
@@ -391,24 +400,70 @@
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
   }
 
-  /* STEP15-C: 현장/즐겨찾기 카드형 목록. 기존 .site-list-item 등 DOM/클래스는 그대로 두고
-     모바일에서만 카드 스타일을 입힌다(PC 리스트 스타일은 components.css/layout.css 그대로 유지). */
+  /* STEP15-C/E.2: 현장/즐겨찾기 카드형 목록. 기존 .site-list-item 등 DOM/클래스는 그대로 두고
+     모바일에서만 카드 스타일을 입힌다(PC 리스트 스타일은 components.css/layout.css 그대로 유지).
+     STEP15-E.2: 카드 사이 여백을 넓히고(margin 8px→10px 12px), 지도 탭과 같은 라운드/그림자 톤으로 맞춘다. */
   .site-list-item {
-    margin: 8px 12px;
-    padding: 12px;
-    border: 1px solid #eee;
-    border-radius: 10px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    margin: 10px 12px;
+    padding: 14px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-md);
+    box-shadow: var(--gnmap-shadow-sm);
     background: #fff;
+  }
+  .site-list-item.active {
+    border-color: var(--gnmap-blue);
+  }
+  /* STEP15-E.2: 정보 우선순위 — 사업장명(굵게, 가장 크게) > 업체명/주소(한 단계 작은 글씨) > 보조정보. */
+  .site-list-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--gnmap-navy);
+  }
+  .site-list-company,
+  .site-list-address {
+    font-size: 13px;
+    color: var(--gnmap-text-sub);
+    margin-top: 2px;
+  }
+  /* STEP15-E.2: 즐겨찾기 별 — 텍스트(★/☆)는 그대로, 터치 영역을 넓히고 채워진 별만
+     정부 블루로 강조한다(화이트/네이비/블루 팔레트 유지, 새 색상 추가 없음). */
+  .favorite-toggle-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: #ccc;
+  }
+  .favorite-toggle-btn.is-favorite {
+    color: var(--gnmap-blue);
+  }
+  /* STEP15-E.2: 동/위치확인필요 보조정보 줄. */
+  .site-list-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .site-list-dong {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--gnmap-bg-soft);
+    color: var(--gnmap-text-sub);
+    font-size: 11px;
   }
   .site-list-review-badge {
     display: inline-block;
-    margin-top: 4px;
     padding: 2px 8px;
     border-radius: 10px;
     background: #fff5f5;
     color: #c0392b;
     font-size: 11px;
+    font-weight: bold;
   }
 
   /* STEP15-E.1: 상세 패널(bottom sheet) 상단의 위치정확도 배지. 값은 renderDetail()(js/ui.js)이
