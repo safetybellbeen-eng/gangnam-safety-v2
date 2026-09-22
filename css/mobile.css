@@ -9,6 +9,14 @@
   display: none;
 }
 
+/* STEP15-C.1: #site-filter-row는 모바일 2행 필터 구성을 위해 새로 추가한 순수 wrapper다.
+   PC에서는 박스를 만들지 않아(display:contents) 자식(동/금액/정렬 select + 기존
+   #site-toggle-filter-row)이 그대로 #site-search-bar의 flex-column 항목으로 승격되므로
+   PC 레이아웃은 이 wrapper가 없던 것과 완전히 동일하게 렌더링된다. */
+#site-filter-row {
+  display: contents;
+}
+
 @media (max-width: 768px) {
 
   html, body {
@@ -51,11 +59,14 @@
     display: none;
   }
 
-  /* 관리자 전용 PC 절대배치 버튼/패널 — 모바일 노출(더보기 연결)은 STEP15-D 이후. */
+  /* 관리자 전용 PC 절대배치 버튼/패널 — 모바일 노출(더보기 연결)은 STEP15-D 이후.
+     STEP15-C.1: app.js가 isAdmin() 등에 따라 이 요소들에 인라인 style.display를 직접 설정하므로
+     (관리자 계정에서는 'inline-block'), 인라인 스타일보다 우선해야 하는 이 규칙에 !important가 필요하다.
+     그 외 모바일 규칙은 인라인 스타일과 충돌하지 않으므로 !important를 쓰지 않는다. */
   #btn-admin-panel, #admin-panel,
   #btn-upload-panel, #upload-panel,
   #btn-supervision-panel, #supervision-panel {
-    display: none;
+    display: none !important;
   }
 
   /* #view-approved를 세로 flex 컨테이너로 전환해, 하단 탭 높이를 제외한 나머지 공간을
@@ -83,22 +94,27 @@
     flex-shrink: 0;
     box-sizing: border-box;
   }
-  /* STEP15-C: 검색/필터를 세로로 길게 나열하지 않고, 검색창(고정폭) + 필터 칩들을
-     한 줄 가로 스크롤 바로 압축한다. 검색/필터 state와 getFilteredSortedSites() 로직은
-     전혀 건드리지 않고, 기존 <select>/버튼(DOM) 그대로 CSS로만 재구성한다. */
+  /* STEP15-C.1: 1행 = 검색창(거의 전체 폭), 2행 = 동/금액/정렬/즐겨찾기/확인필요/건수를
+     한 줄 가로 스크롤로 압축한다. 검색/필터 state와 getFilteredSortedSites() 로직은
+     전혀 건드리지 않고, 기존 <select>/버튼(DOM)과 #site-filter-row wrapper만으로 재구성한다. */
   #site-search-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 12px;
+  }
+  #site-search-input-wrap {
+    width: 100%;
+  }
+  /* PC에서 display:contents였던 #site-filter-row가 모바일에서만 실제 2행 스크롤 컨테이너가 된다. */
+  #site-filter-row {
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: center;
     gap: 6px;
-    padding: 8px 12px;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-  }
-  #site-search-input-wrap {
-    flex: 0 0 auto;
-    width: 55vw;
   }
   #site-dong-select,
   #site-amount-select,
@@ -116,7 +132,10 @@
   }
   #site-toggle-filter-row {
     flex: 0 0 auto;
+    display: flex;
     flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
     white-space: nowrap;
   }
   #site-count-label {
