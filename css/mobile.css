@@ -4,19 +4,74 @@
 
 /* STEP15-E.1: 모바일 디자인 공통 토큰. :root에 등록만 될 뿐, PC의 어떤 선택자도
    이 변수들을 참조하지 않으므로(전부 media query 안에서만 사용) PC 화면에는 영향이 없다.
-   앞으로 다른 모바일 화면(경로/알림/더보기 등)에도 이 값들을 그대로 재사용한다. */
+   앞으로 다른 모바일 화면(경로/알림/더보기 등)에도 이 값들을 그대로 재사용한다.
+
+   STEP16.5-A: 화면마다 제각각이던 값들을 하나의 기준으로 묶기 위해 텍스트/상태 색상,
+   spacing scale, typography scale, pill radius, 접근성(터치 영역/포커스 링) 토큰을
+   추가한다. 기존 10개 토큰의 이름/의미는 그대로 유지하고(하위 호환), --gnmap-text-sub
+   값만 살짝 더 진하게 조정한다(§5 "회색 글씨를 지나치게 연하게 만들지 않는다" — 이 토큰을
+   쓰는 모든 보조 텍스트에 자동으로 반영되어야 하는 전역 대비 개선이라 값 자체를 바꾼다).
+   이번 STEP은 여기(:root)와 공통 헤더/하단 네비게이션/전역 접근성에만 실제로 적용하고,
+   화면별(현장/즐겨찾기/경로/알림/더보기/관리자/업로드) 카드·버튼·배지 각각에는 이 토큰을
+   적용하지 않는다 — STEP16.5-B에서 화면별로 적용한다(완료 보고 14번 참고). */
 :root {
   --gnmap-navy: #16326b;
   --gnmap-blue: #1a73e8;
   --gnmap-blue-light: #eef5ff;
   --gnmap-bg-soft: #f5f7fa;
   --gnmap-border: #e2e5ea;
-  --gnmap-text-sub: #666;
+  --gnmap-text-sub: #545e6b;
   --gnmap-radius-lg: 18px;
   --gnmap-radius-md: 14px;
   --gnmap-radius-sm: 10px;
   --gnmap-shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.08);
   --gnmap-shadow-md: 0 4px 16px rgba(15, 23, 42, 0.12);
+
+  /* STEP16.5-A: 텍스트 색상 체계 — primary(거의 navy에 가까운 진한 텍스트)/
+     secondary(위 --gnmap-text-sub)/meta(캡션류, text-sub보다 한 단계만 연하되
+     여전히 충분히 읽히는 회색). */
+  --gnmap-text-primary: #14213d;
+  --gnmap-text-meta: #6b7280;
+
+  /* STEP16.5-A: location_quality/감독일정 상태 등에서 "의미가 있을 때만" 쓰는 상태색.
+     기존 화면들이 이미 쓰고 있던 실제 hex 값(초록/주황/빨강)을 그대로 토큰화한 것으로,
+     의미(정확=초록/중간=주황/확인필요=빨강)는 전혀 바꾸지 않는다. */
+  --gnmap-green: #2e7d32;
+  --gnmap-green-bg: #eafaf0;
+  --gnmap-amber: #b7791f;
+  --gnmap-amber-bg: #fff8e6;
+  --gnmap-red: #c0392b;
+  --gnmap-red-bg: #fff5f5;
+  --gnmap-gray: #6b7280;
+  --gnmap-gray-bg: #f1f2f4;
+
+  /* STEP16.5-A: spacing scale. 화면 좌우 기본 여백은 --gnmap-space-4(16px) 기준. */
+  --gnmap-space-1: 4px;
+  --gnmap-space-2: 8px;
+  --gnmap-space-3: 12px;
+  --gnmap-space-4: 16px;
+  --gnmap-space-5: 20px;
+  --gnmap-space-6: 24px;
+  --gnmap-space-7: 32px;
+
+  /* STEP16.5-A: typography scale(§4 기준표를 토큰화). 사업장명 등 핵심 정보는
+     card-title, 보조 정보는 secondary/caption을 쓰도록 STEP16.5-B에서 화면별로 맞춘다. */
+  --gnmap-fs-title: 18px;
+  --gnmap-fs-card-title: 16px;
+  --gnmap-fs-body: 14px;
+  --gnmap-fs-secondary: 13px;
+  --gnmap-fs-caption: 12px;
+  --gnmap-fw-bold: 700;
+  --gnmap-fw-semibold: 600;
+
+  /* STEP16.5-A: 필터 칩/배지처럼 완전히 둥근 pill 모양에 쓰는 반지름 하나로 통일
+     (기존 화면들이 14px/20px 등을 제각각 썼던 것 정리용 — 이번 STEP에서 기존 칩에
+     즉시 적용하지는 않고, 공통 헤더/네비게이션과 STEP16.5-B를 위한 기준만 정의). */
+  --gnmap-radius-pill: 999px;
+
+  /* STEP16.5-A: 접근성 — 최소 터치 영역과 키보드 포커스 링. */
+  --gnmap-tap-min: 44px;
+  --gnmap-focus-ring: 0 0 0 3px rgba(26, 115, 232, 0.35);
 }
 
 #mobile-bottom-nav,
@@ -64,6 +119,16 @@
     overflow-x: hidden;
   }
 
+  /* STEP16.5-A: 접근성 공통 레이어. 키보드/스위치 등으로 포커스 이동 시(마우스 클릭 시에는
+     표시되지 않는 :focus-visible) 모바일 화면 전체에서 일관된 포커스 링을 보여준다.
+     색으로만 의미를 전달하지 않도록 링 자체의 형태(외곽선)로도 구분되며, 기존 요소의
+     레이아웃/기능/이벤트는 전혀 바꾸지 않는다. */
+  #app :focus-visible {
+    outline: none;
+    box-shadow: var(--gnmap-focus-ring);
+    border-radius: var(--gnmap-radius-sm);
+  }
+
   #app,
   #view-approved {
     max-width: 100%;
@@ -82,12 +147,16 @@
      STEP15-E.1: 좌측 브랜드 영역 + 우측 벨 버튼을 양 끝 정렬하는 구조로 확장(구조는 그대로,
      spacing/색만 다듬음). #mobile-app-header-logo-slot은 지금은 빈 슬롯이며, 나중에 공식 CI
      이미지를 <img>로 채우기만 하면 되도록 자리만 잡아둔다. */
+  /* STEP16.5-A: standalone PWA/Safari 양쪽에서 노치·상태바 영역과 헤더가 겹치지 않도록
+     상단 safe-area를 padding에 더한다(index.html의 viewport-fit=cover와 짝을 이룸).
+     safe-area가 0인 일반 브라우저에서는 기존 14px 그대로 유지되어 높이가 커지지 않는다.
+     좌우 padding/배경/구분선은 기존 값 유지(높이를 과도하게 늘리지 않기 위함). */
   #mobile-app-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-shrink: 0;
-    padding: 14px 16px;
+    padding: calc(14px + env(safe-area-inset-top, 0px)) var(--gnmap-space-4) 14px;
     background: #fff;
     border-bottom: 1px solid var(--gnmap-border);
     box-sizing: border-box;
@@ -135,13 +204,16 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  /* STEP16.5-A: 터치 타겟을 접근성 기준 tap-min(44px)에 맞춘다. 아이콘 크기(22px)와
+     클릭 동작/위치는 그대로 두고, 버튼 자체의 여백만 넓힌다. */
   #mobile-header-alert-btn {
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: var(--gnmap-tap-min);
+    height: var(--gnmap-tap-min);
+    margin-right: -4px;
     border: none;
     background: none;
     padding: 0;
@@ -253,6 +325,7 @@
     outline: none;
     border-color: var(--gnmap-blue);
     background: #fff;
+    box-shadow: var(--gnmap-focus-ring);
   }
   #site-search-clear-btn {
     position: absolute;
@@ -1054,7 +1127,9 @@
     line-height: 1;
   }
 
-  /* 하단 탭 바 */
+  /* 하단 탭 바. STEP16.5-A: border-top/inactive 색을 디자인 토큰으로 통일하고
+     (기존 #ddd/#888은 임의 하드코딩 색이었음), label 글자 크기를 10px→11px로 살짝
+     키워 가독성을 높인다. 구조(6개 탭, flex:1, safe-area-bottom)와 순서/기능은 그대로다. */
   #mobile-bottom-nav {
     display: flex;
     position: fixed;
@@ -1063,7 +1138,7 @@
     bottom: 0;
     z-index: 80;
     background: #fff;
-    border-top: 1px solid #ddd;
+    border-top: 1px solid var(--gnmap-border);
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   .mobile-tab-btn {
@@ -1071,12 +1146,14 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 2px;
+    min-height: var(--gnmap-tap-min);
     border: none;
     background: none;
     padding: 6px 0 4px;
-    font-size: 10px;
-    color: #888;
+    font-size: 11px;
+    color: var(--gnmap-gray);
     cursor: pointer;
   }
   .mobile-tab-btn.active {
