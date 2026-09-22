@@ -81,15 +81,19 @@
     border-bottom: 1px solid var(--gnmap-border);
     box-sizing: border-box;
   }
+  /* STEP15-E.1-2 후속: "[CI 이미지]" 위 줄 + "산업안전 순찰지도" 아래 줄이 되도록
+     brand 영역을 가로(행)에서 세로(열)로 바꾼다. 벨 버튼은 #mobile-app-header의
+     justify-content:space-between이 그대로 우측에 고정해 위치/기능이 바뀌지 않는다. */
   #mobile-app-header-brand {
     display: flex;
-    align-items: center;
-    gap: 8px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
     min-width: 0;
   }
-  /* STEP15-E.1-2: 공식 CI 이미지가 들어올 자리. 지금은 비어 있어(:empty) 폭을 차지하지 않다가,
-     <img>가 추가되는 순간 자동으로 보이면서 gap만큼만 여백이 생긴다 — 이 규칙은 그대로 두고
-     이미지 태그 한 줄만 넣으면 된다. */
+  /* STEP15-E.1-2 후속: 공식 CI(태극 문양+"고용노동부" 글자 포함 원본 가로 조합형 이미지,
+     assets/icons/moel-ci-full.png)를 비율 왜곡 없이 표시한다. 높이만 고정하고 width:auto로
+     원본 가로세로 비율을 그대로 유지한다(이미지 자체를 늘리거나 찌그러뜨리지 않음). */
   #mobile-app-header-logo-slot {
     display: inline-block;
   }
@@ -98,22 +102,21 @@
   }
   #mobile-app-header-logo-slot img {
     display: block;
-    width: 30px;
-    height: 30px;
-    object-fit: contain;
+    height: 24px;
+    width: auto;
   }
   #mobile-app-header-titles {
     display: flex;
     flex-direction: column;
     min-width: 0;
   }
+  /* STEP15-E.1-2 후속: CI 이미지 자체에 "고용노동부" 글자가 이미 포함되어 있어 중복이므로
+     숨긴다. DOM은 그대로 두어(요소 삭제 아님) 되돌리기 쉽게 한다. */
   #mobile-app-header-agency {
-    font-size: 11px;
-    color: var(--gnmap-text-sub);
-    line-height: 1.3;
+    display: none;
   }
   #mobile-app-header-title {
-    font-size: 17px;
+    font-size: 18px;
     font-weight: bold;
     color: var(--gnmap-navy);
     line-height: 1.3;
