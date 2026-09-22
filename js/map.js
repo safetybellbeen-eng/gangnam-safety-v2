@@ -167,3 +167,41 @@ export function panToSite(site) {
   if (!isValid) return;
   state.map.panTo(new kakao.maps.LatLng(lat, lng));
 }
+
+// 사용자 피드백: 지도 탭에서 상세 시트가 하단 일부를 가릴 때, 핀이 "실제로 보이는" 지도
+// 영역(하단 hiddenBottomPx만큼 가려진 나머지 부분) 한가운데에 오도록 지도 중심을 맞춘다.
+// panBy()의 좌/우 부호 규약에 기대지 않기 위해, 지도의 투영좌표(카카오맵 MapProjection —
+// 값이 커질수록 남쪽/아래)를 직접 계산한다: 목표 좌표를 그대로 중심으로 두면(panToSite와
+// 동일) 화면 정중앙(가려진 영역까지 포함한 전체 컨테이너 중앙)에 오므로, 중심을 목표 좌표보다
+// hiddenBottomPx/2 만큼 "남쪽(투영좌표 y 증가 방향)"으로 옮기면 목표 좌표는 상대적으로
+// 그만큼 "북쪽(화면 위)"에 렌더링되어 정확히 보이는 영역의 세로 중앙에 위치하게 된다.
+// getProjection/panBy를 지원하지 않는 환경(테스트 스텁 등)에서는 기존 panToSite로 대체한다.
+export function centerSiteInVisibleArea(site, hiddenBottomPx) {
+  if (!state.map || !site) return;
+  const lat = Number(site.lat);
+  const lng = Number(site.lng);
+  const isValid =
+    Number.isFinite(lat) && Number.isFinite(lng) &&
+    lat >= -90 && lat <= 90 &&
+    lng >= -180 && lng <= 180;
+  if (!isValid) return;
+
+  const target = new kakao.maps.LatLng(lat, lng);
+  const offsetPx = Number(hiddenBottomPx) / 2;
+
+  if (!Number.isFinite(offsetPx) || offsetPx <= 0 || typeof state.map.getProjection !== 'function') {
+    state.map.panTo(target);
+    return;
+  }
+
+  try {
+    const proj = state.map.getProjection();
+    const point = proj.pointFromCoords(target);
+    const shifted = new kakao.maps.Point(point.x, point.y + offsetPx);
+    const newCenter = proj.coordsFromPoint(shifted);
+    state.map.panTo(newCenter);
+  } catch (err) {
+    console.error('보이는 영역 중앙 정렬 실패, 기본 중앙 이동으로 대체:', err);
+    state.map.panTo(target);
+  }
+}

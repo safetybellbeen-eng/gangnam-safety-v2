@@ -2,7 +2,7 @@
 // XSS 방지: DB 값(site_name/company_name/address 등)은 innerHTML 문자열 조립에 쓰지 않고
 // 전부 textContent 또는 createElement 기반 DOM 생성으로만 넣는다.
 import { state } from './state.js';
-import { panToSite, renderMarkers } from './map.js';
+import { panToSite, renderMarkers, centerSiteInVisibleArea } from './map.js';
 import { getFilteredSortedSites, getDongOptions, loadActiveSites, getReviewCount } from './sites.js';
 import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
@@ -55,6 +55,31 @@ function formatAmountKRW(raw) {
 // 기존과 동일한 raw 값(displayValue)을 그대로 보여줘 PC 화면을 전혀 바꾸지 않는다.
 function isMobileViewport() {
   return typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 768px)').matches;
+}
+
+// 사용자 요청: 상세화면 2x2 표(공사금액/공사기간/지도점검/산재표)용 "표시 전용" 포매터.
+// DB 값(period_start/period_end/supervision_count/accident_report_count)은 그대로 읽기만
+// 하고 검색/정렬/저장 로직에는 전혀 관여하지 않는다. 날짜는 Supabase date 컬럼이 주는
+// "YYYY-MM-DD" 형식을 "YYYY.MM.DD"로만 바꿔 보여준다(값 자체는 원본 그대로 사용).
+function formatDateKR(d) {
+  if (d === null || d === undefined || d === '') return '';
+  const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[1]}.${m[2]}.${m[3]}` : String(d);
+}
+
+function formatPeriodKR(start, end) {
+  const s = formatDateKR(start);
+  const e = formatDateKR(end);
+  if (!s && !e) return '-';
+  if (s && e) return `${s} ~ ${e}`;
+  return s ? `${s} ~` : `~ ${e}`;
+}
+
+function formatCount(raw, unit) {
+  if (raw === null || raw === undefined || raw === '') return '-';
+  const num = Number(raw);
+  if (!Number.isFinite(num)) return '-';
+  return `${num.toLocaleString('ko-KR')}${unit}`;
 }
 
 // 카카오맵 공식 웹 링크 형식(REST API 아님, REST Key 불필요)으로 길찾기 페이지 URL을 만든다.
@@ -367,13 +392,13 @@ export function renderDetail(site) {
   // 사용자 피드백: 지도 탭에서 상세를 열면 검색/필터 바(#site-list-panel)를 숨기고 그만큼
   // 지도를 넓게 쓴다(css/mobile.css의 #app[data-mobile-tab="map"][data-detail-open="true"] 규칙).
   // 지도 재초기화는 하지 않고, 컨테이너 크기가 바뀐 뒤 기존에도 쓰던 relayout()으로 크기만
-  // 다시 인식시키고, 이미 selectSite()가 구해둔 좌표로 panToSite()를 다시 호출해 커진 지도
-  // 안에서도 핀이 중앙에 오도록 맞춘다.
+  // 다시 인식시킨다. 핀을 "보이는" 지도 영역(하단 시트에 가려지지 않는 부분) 가운데로
+  // 맞추는 정밀 재중심화는 시트 내용을 다 그린 뒤 실제 높이를 알 수 있을 때(§ 맨 아래)
+  // 한 번만 수행한다 — 여기서는 컨테이너 크기 재인식만 한다.
   const appEl = document.getElementById('app');
   if (appEl) appEl.setAttribute('data-detail-open', 'true');
   if (state.mobileActiveTab === 'map' && state.map && typeof state.map.relayout === 'function') {
     state.map.relayout();
-    panToSite(site);
   }
 
   // STEP16.5-C: 모바일 전용 X 닫기 버튼(44px 터치 타겟). closeDetail()을 기존 "닫기" 버튼과
@@ -409,13 +434,8 @@ export function renderDetail(site) {
     panel.appendChild(qualityBadge);
   }
 
-  // STEP12-C: APPROXIMATE(동일 도로 대표 위치)인 사업장은 정확한 위치가 아님을 명확히 알린다.
-  if (site.location_quality === 'APPROXIMATE') {
-    const warningEl = document.createElement('p');
-    warningEl.className = 'site-detail-approximate-warning';
-    warningEl.textContent = '⚠ 위치 확인요망: 정확한 사업장 위치를 확인하지 못해 동일 도로상의 대표 위치에 표시했습니다.';
-    panel.appendChild(warningEl);
-  }
+  // 사용자 요청: "확인필요" 배지로 이미 의미가 전달되므로 별도 경고 문구는 넣지 않는다
+  // (기존 STEP12-C의 "⚠ 위치 확인요망..." 문구 제거, 배지 자체는 그대로 유지).
 
   // STEP16.5-C: 사업장명/업체명/주소를 "hero" 정보로, 행정동/공사금액을 "부가정보"로 분리한다.
   // 두 그룹 모두 여전히 기존 .site-detail-row/.site-detail-label/.site-detail-value 클래스를
@@ -491,17 +511,24 @@ export function renderDetail(site) {
   });
   panel.appendChild(hero);
 
+  // 사용자 요청: 행정동은 상세화면에서 뺴고, 공사금액/공사기간/지도점검(횟수)/산재표(제출)
+  // 4개를 2x2 표로 보여준다. DOM에 쓰는 순서(공사금액→공사기간→지도점검→산재표) 그대로
+  // grid auto-flow에 태우면 1행 "공사금액|공사기간", 2행 "지도점검|산재표"가 된다
+  // (css/mobile.css .site-detail-meta { display:grid; grid-template-columns:1fr 1fr }).
+  // DB 원본 값(amount/period_start/period_end/supervision_count/accident_report_count)은
+  // 그대로 저장/검색/정렬에 쓰이고, 여기서는 "화면 표시용" 문자열만 만든다.
   const meta = document.createElement('div');
   meta.className = 'site-detail-meta';
 
   const metaRows = [
-    ['행정동', site.dong, 'dong', false],
-    // STEP16.5-C §8: 공사금액은 DB 원시 숫자를 그대로 저장/검색/정렬하되, "화면 표시"만
-    // 모바일(768px 이하)에서 formatAmountKRW()로 억/만 단위 읽기 쉬운 문자열로 바꾼다.
-    // PC(>768px)는 isMobileViewport()가 false를 반환해 기존 displayValue(raw) 그대로 노출된다.
-    ['공사금액', site.amount, 'amount', true]
+    // STEP16.5-C §8: 공사금액은 모바일(768px 이하)에서만 formatAmountKRW()로 억/만 단위로
+    // 바꿔 보여준다. PC(>768px)는 isMobileViewport()가 false라 기존 displayValue(raw) 그대로.
+    ['공사금액', 'amount', () => (isMobileViewport() ? formatAmountKRW(site.amount) : displayValue(site.amount))],
+    ['공사기간', 'period', () => formatPeriodKR(site.period_start, site.period_end)],
+    ['지도점검', 'supervision', () => formatCount(site.supervision_count, '회')],
+    ['산재표', 'accident', () => formatCount(site.accident_report_count, '건')]
   ];
-  metaRows.forEach(([label, value, key, useAmountFormat]) => {
+  metaRows.forEach(([label, key, getText]) => {
     const row = document.createElement('div');
     row.className = `site-detail-row site-detail-row-${key}`;
 
@@ -511,9 +538,7 @@ export function renderDetail(site) {
 
     const valueEl = document.createElement('span');
     valueEl.className = `site-detail-value site-detail-value-${key}`;
-    valueEl.textContent = (useAmountFormat && isMobileViewport())
-      ? formatAmountKRW(value)
-      : displayValue(value);
+    valueEl.textContent = getText();
 
     row.appendChild(labelEl);
     row.appendChild(valueEl);
@@ -579,6 +604,15 @@ export function renderDetail(site) {
   closeBtn.textContent = '닫기';
   closeBtn.addEventListener('click', closeDetail);
   panel.appendChild(closeBtn);
+
+  // 사용자 피드백: 시트 내용을 다 그려서 실제 높이(panel.getBoundingClientRect().height)를
+  // 알 수 있는 지금 시점에, 핀이 "가려지지 않고 보이는" 지도 영역 한가운데에 오도록
+  // centerSiteInVisibleArea()로 정밀 재중심화한다(지도 탭일 때만 — 다른 탭은 시트가 지도를
+  // 가리지 않으므로 기존 selectSite()의 panToSite()로 충분).
+  if (state.mobileActiveTab === 'map' && state.map) {
+    const hiddenBottomPx = panel.getBoundingClientRect().height;
+    centerSiteInVisibleArea(site, hiddenBottomPx);
+  }
 }
 
 export function closeDetail() {
