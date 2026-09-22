@@ -48,5 +48,6 @@ export const state = {
   supervisions: [],                   // STEP14. gnmap_v2_supervisions 목록 (사업장 연결 없음, 캠페인 단위 상황판)
   supervisionFilter: 'all',           // STEP14. 감독일정 패널 상태 필터: 'all' | 'scheduled' | 'ongoing' | 'done' (프론트 표시만, DB/RLS 무관)
   favoriteOnly: false,                // STEP14.5-B. "즐겨찾기만 보기" 토글 — true면 getFilteredSortedSites가 favoriteSiteIds에 있는 사업장만 반환
-  reviewOnly: false                   // STEP14.5-B. "확인필요만 보기" 토글 — true면 location_quality가 APPROXIMATE/UNRESOLVED인 사업장만 반환
+  reviewOnly: false,                  // STEP14.5-B. "확인필요만 보기" 토글 — true면 location_quality가 APPROXIMATE/UNRESOLVED인 사업장만 반환
+  mobileActiveTab: 'map'              // STEP15-B. 모바일 하단 탭 현재 선택값: 'map'|'site'|'route'|'favorite'|'alert'|'more'. PC 화면에서는 사용하지 않음.
 };
