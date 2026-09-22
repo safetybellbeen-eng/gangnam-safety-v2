@@ -208,6 +208,30 @@
               </div>
             </div>
           </details>
+          <!-- 사용자 요청: 필터 순서를 "관할ㅣ공사금액ㅣ점검ㅣ산재표 / 즐겨찾기"로 바꾼다.
+               점검/산재표를 메인 필터 줄로 올리고, 즐겨찾기만 구분선(#site-toggle-filter-row의
+               border-left) 뒤 별도 그룹으로 남긴다. id/이벤트 바인딩 대상은 전혀 바뀌지 않으므로
+               (js/ui.js가 id로 조회) 위치만 옮겨도 기존 로직에 영향이 없다. -->
+          <details id="site-inspection-filter" class="site-select-filter">
+            <summary id="site-inspection-filter-label" class="site-select-filter-label">점검</summary>
+            <div id="site-inspection-filter-panel" class="site-select-filter-panel">
+              <div class="site-select-filter-options">
+                <label class="site-select-filter-option"><input type="radio" name="site-inspection-filter-radio" value="all" checked><span>전체</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+                <label class="site-select-filter-option"><input type="radio" name="site-inspection-filter-radio" value="yes"><span>점검 유</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+                <label class="site-select-filter-option"><input type="radio" name="site-inspection-filter-radio" value="no"><span>점검 무</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+              </div>
+            </div>
+          </details>
+          <details id="site-accident-report-filter" class="site-select-filter">
+            <summary id="site-accident-report-filter-label" class="site-select-filter-label">산재표</summary>
+            <div id="site-accident-report-filter-panel" class="site-select-filter-panel">
+              <div class="site-select-filter-options">
+                <label class="site-select-filter-option"><input type="radio" name="site-accident-report-filter-radio" value="all" checked><span>전체</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+                <label class="site-select-filter-option"><input type="radio" name="site-accident-report-filter-radio" value="yes"><span>산재표 유</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+                <label class="site-select-filter-option"><input type="radio" name="site-accident-report-filter-radio" value="no"><span>산재표 무</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+              </div>
+            </div>
+          </details>
           <!-- 사용자 요청: "기본순서"는 메인 지도 탭에서는 숨기고(css/mobile.css) 현장 탭에서만
                보이게 한다. select 자체와 옵션 목록은 그대로 유지한다. -->
           <select id="site-sort-select">
@@ -221,28 +245,6 @@
           </select>
           <div id="site-toggle-filter-row">
             <button type="button" id="site-favorite-filter-btn">★ 즐겨찾기</button>
-            <!-- 사용자 요청: "점검"/"산재표"를 유/무로 거를 수 있는 필터 추가(공사금액과 동일한
-                 기본표기 방식 — 미선택 시 필터명을 그대로 라벨로 보여준다). -->
-            <details id="site-inspection-filter" class="site-select-filter">
-              <summary id="site-inspection-filter-label" class="site-select-filter-label">점검</summary>
-              <div id="site-inspection-filter-panel" class="site-select-filter-panel">
-                <div class="site-select-filter-options">
-                  <label class="site-select-filter-option"><input type="radio" name="site-inspection-filter-radio" value="all" checked><span>전체</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
-                  <label class="site-select-filter-option"><input type="radio" name="site-inspection-filter-radio" value="yes"><span>점검 유</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
-                  <label class="site-select-filter-option"><input type="radio" name="site-inspection-filter-radio" value="no"><span>점검 무</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
-                </div>
-              </div>
-            </details>
-            <details id="site-accident-report-filter" class="site-select-filter">
-              <summary id="site-accident-report-filter-label" class="site-select-filter-label">산재표</summary>
-              <div id="site-accident-report-filter-panel" class="site-select-filter-panel">
-                <div class="site-select-filter-options">
-                  <label class="site-select-filter-option"><input type="radio" name="site-accident-report-filter-radio" value="all" checked><span>전체</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
-                  <label class="site-select-filter-option"><input type="radio" name="site-accident-report-filter-radio" value="yes"><span>산재표 유</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
-                  <label class="site-select-filter-option"><input type="radio" name="site-accident-report-filter-radio" value="no"><span>산재표 무</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
-                </div>
-              </div>
-            </details>
           </div>
         </div>
       </div>
