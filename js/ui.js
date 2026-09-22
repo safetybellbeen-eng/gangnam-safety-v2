@@ -2,7 +2,7 @@
 // XSS 방지: DB 값(site_name/company_name/address 등)은 innerHTML 문자열 조립에 쓰지 않고
 // 전부 textContent 또는 createElement 기반 DOM 생성으로만 넣는다.
 import { state } from './state.js';
-import { panToSite, renderMarkers, centerSiteInVisibleArea } from './map.js';
+import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight } from './map.js';
 import { getFilteredSortedSites, getDongOptions, loadActiveSites } from './sites.js';
 import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
@@ -220,7 +220,12 @@ export function selectSite(siteId) {
   const site = state.sites.find(s => s.id === siteId);
   if (!site) return;
 
+  const previousSiteId = state.selectedSiteId;
   state.selectedSiteId = siteId;
+  if (previousSiteId !== null && previousSiteId !== siteId) {
+    clearMarkerHighlight(previousSiteId);
+  }
+  highlightSelectedMarker();
   panToSite(site);
   updateListActiveState();
   scrollListItemIntoView(siteId);
@@ -371,9 +376,13 @@ export function renderSiteList(containerId) {
   // 검색/정렬 결과에 맞춰 marker도 다시 그린다.
   renderMarkers(visibleSites, selectSite);
 
-  // 선택된 사업장이 현재 결과에서 사라졌으면 상세를 닫는다.
+  // 선택된 사업장이 현재 결과에서 사라졌으면 상세를 닫는다. 단, 사용자 피드백(4): 지도 탭에서
+  // 연 상세는 다른 탭(예: 즐겨찾기 탭 진입 시 favoriteOnly 임시 적용)에서 목록이 일시적으로
+  // 필터링되어 사라진 것뿐이라면 닫지 않는다 — 지도 탭으로 돌아오면 다시 보여야 하기 때문.
   if (state.selectedSiteId !== null && !visibleSites.some(s => s.id === state.selectedSiteId)) {
-    closeDetail();
+    const detailPanel = document.getElementById('site-detail-panel');
+    const preservedMapDetail = detailPanel && detailPanel.dataset.detailOrigin === 'map' && state.mobileActiveTab !== 'map';
+    if (!preservedMapDetail) closeDetail();
   }
 }
 
@@ -403,6 +412,9 @@ export function renderDetail(site) {
   // 한 번만 수행한다 — 여기서는 컨테이너 크기 재인식만 한다.
   const appEl = document.getElementById('app');
   if (appEl) appEl.setAttribute('data-detail-open', 'true');
+  // 사용자 피드백(4): 지도 탭에서 연 상세는 다른 탭을 다녀와도 닫지 않고 유지한다.
+  // js/app.js의 activateMobileTab()이 이 값을 보고 지도 탭 기원 상세만 close를 건너뛴다.
+  panel.dataset.detailOrigin = state.mobileActiveTab;
   if (state.mobileActiveTab === 'map' && state.map && typeof state.map.relayout === 'function') {
     state.map.relayout();
   }
@@ -670,7 +682,9 @@ export function closeDetail() {
   const panel = document.getElementById('site-detail-panel');
   panel.style.display = 'none';
   panel.innerHTML = '';
+  if (state.selectedSiteId !== null) clearMarkerHighlight(state.selectedSiteId);
   state.selectedSiteId = null;
+  delete panel.dataset.detailOrigin;
   updateListActiveState();
 
   // 상세를 열 때 숨겼던 검색/필터 바를 다시 보이게 하고(§ renderDetail 참고), 지도 탭이라면

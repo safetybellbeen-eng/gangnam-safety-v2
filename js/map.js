@@ -50,6 +50,53 @@ function getQualityMarkerImage(locationQuality) {
   return image;
 }
 
+// 사용자 요청: 현재 선택되어 상세정보가 열려 있는 핀을 다른 핀과 구분되게 표시한다.
+// location_quality별 색(정확/중간/확인필요) 의미는 그대로 유지하면서, 크기를 키우고
+// 파란 테두리(정부 blue)를 둘러 "지금 이 핀을 보고 있다"는 것을 한눈에 알 수 있게 한다.
+// 닫으면(closeDetail) getQualityMarkerImage()로 원래 크기/모양으로 되돌린다.
+const selectedMarkerImageCache = new Map();
+function getSelectedMarkerImage(locationQuality) {
+  const color = QUALITY_MARKER_COLOR[locationQuality] || QUALITY_MARKER_COLOR.EXACT;
+  if (selectedMarkerImageCache.has(color)) return selectedMarkerImageCache.get(color);
+
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="38" viewBox="0 0 28 38">' +
+    '<path d="M14 2.5C8.2 2.5 3.5 6.9 3.5 12.3c0 7.9 10.5 23.7 10.5 23.7s10.5-15.8 10.5-23.7C24.5 6.9 19.8 2.5 14 2.5z" fill="' + color + '" stroke="#1a73e8" stroke-width="2.5"/>' +
+    '<circle cx="14" cy="12.3" r="4.2" fill="#fff"/>' +
+    '</svg>';
+  const src = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+  const image = new kakao.maps.MarkerImage(
+    src,
+    new kakao.maps.Size(28, 38),
+    { offset: new kakao.maps.Point(14, 38) } // 뾰족한 끝이 좌표를 가리키도록(기본 핀과 동일한 원칙, 커진 크기에 맞춰 재계산).
+  );
+  selectedMarkerImageCache.set(color, image);
+  return image;
+}
+
+// state.selectedSiteId에 해당하는 마커를 "선택됨" 이미지로 바꾼다. 마커가 아직 없거나
+// (좌표 없음 등) 찾을 수 없으면 조용히 무시한다. renderMarkers()가 목록을 다시 그릴 때마다
+// (검색/필터 변경 등) 호출해, 마커가 새로 만들어져도 선택 강조가 유지되게 한다.
+export function highlightSelectedMarker() {
+  const siteId = state.selectedSiteId;
+  if (siteId === null || siteId === undefined) return;
+  const marker = state.siteMarkers.get(siteId);
+  if (!marker || typeof marker.setImage !== 'function') return;
+  const site = state.sites.find(s => s.id === siteId);
+  marker.setImage(getSelectedMarkerImage(site ? site.location_quality : null));
+}
+
+// 특정 사업장의 마커를 원래(기본) 이미지로 되돌린다. 상세를 닫거나 다른 핀을 선택했을 때
+// 이전 선택 마커의 강조를 해제하는 데 쓴다.
+export function clearMarkerHighlight(siteId) {
+  if (siteId === null || siteId === undefined) return;
+  const marker = state.siteMarkers.get(siteId);
+  if (!marker || typeof marker.setImage !== 'function') return;
+  const site = state.sites.find(s => s.id === siteId);
+  const image = getQualityMarkerImage(site ? site.location_quality : null);
+  if (image) marker.setImage(image);
+}
+
 // SDK <script> 태그를 딱 1번만 생성한다 (중복 로드 방지).
 // autoload=false로 로드한 뒤 kakao.maps.load()로 초기화 시점을 직접 제어한다 —
 // GitHub Pages 등 정적 호스팅에서 SDK 로드 타이밍이 페이지 렌더링과 어긋나는 문제를 방지.
@@ -144,6 +191,10 @@ export function renderMarkers(sites, onMarkerClick) {
     // clusterer가 아직 없는 예외 상황(이론상 initMap 이후에는 항상 존재) 대비 폴백.
     validMarkers.forEach(marker => marker.setMap(state.map));
   }
+
+  // 검색/필터가 바뀌어 마커가 전부 새로 만들어져도(위 clearMarkers()+새 Marker), 현재
+  // 선택된 사업장(state.selectedSiteId)이 새 목록에도 있으면 선택 강조를 다시 입힌다.
+  highlightSelectedMarker();
 }
 
 export function clearMarkers() {

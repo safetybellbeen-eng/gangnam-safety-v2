@@ -34,9 +34,16 @@ function activateMobileTab(tab) {
   // 사용자 피드백: 사업장 상세(#site-detail-panel)가 열린 채로 하단 탭을 이동하면 이전 탭에서
   // 열었던 상세가 새 탭 화면 위에 계속 떠 있는 채로 남아 있었다. 다른 탭으로 이동할 때는
   // 기존 closeDetail()(state.selectedSiteId 초기화 포함)을 그대로 호출해 자동으로 닫는다.
+  // 단, 사용자 피드백(4): 지도 탭에서 연 상세는 닫지 않고 유지한다 — 다른 탭을 들렀다가
+  // 지도 탭으로 돌아오면(닫기를 누르지 않은 이상) 이전에 보던 상세가 그대로 다시 보이게 한다.
+  // panel은 DOM/state 그대로 두고, css/mobile.css의 [data-detail-origin="map"] 규칙이
+  // 지도 탭이 아닐 때만 시각적으로 숨긴다.
   if (tab !== previousTab) {
     const detailPanel = document.getElementById('site-detail-panel');
-    if (detailPanel && detailPanel.style.display !== 'none') {
+    // origin이 'map'이면 지금 어느 탭을 오가는 중이든(지도→다른 탭, 다른 탭→지도 포함)
+    // 사용자가 X/닫기 버튼으로 직접 닫기 전까지는 계속 유지한다.
+    const keepMapDetail = detailPanel && detailPanel.dataset.detailOrigin === 'map';
+    if (detailPanel && detailPanel.style.display !== 'none' && !keepMapDetail) {
       closeDetail();
     }
   }
