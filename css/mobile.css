@@ -765,30 +765,36 @@
     cursor: default;
   }
 
-  /* 부가정보(행정동/공사금액)는 layout.css의 .site-detail-row(flex justify-content:space-between)를
-     그대로 살려 key-왼쪽/value-오른쪽 2-column을 유지하고, 색/글씨/여백만 토큰으로 다듬는다.
-     표는 아니므로 divider는 얇게 1줄만 유지한다. */
+  /* 사용자 요청: 부가정보(공사금액/공사기간/지도점검/산재표) 4개를 2x2 표로 보여준다.
+     js/ui.js가 이 순서(공사금액→공사기간→지도점검→산재표)로 .site-detail-row 4개를 DOM에
+     넣으므로, grid auto-flow(row 기준, 기본값)가 그대로 1행 "공사금액|공사기간",
+     2행 "지도점검|산재표"로 배치한다. PC는 이 media query 밖 layout.css의
+     .site-detail-row(flex, key-왼쪽/value-오른쪽 한 줄)를 그대로 써서 4줄 리스트로 보인다
+     (구조는 유지, 표시되는 행 개수만 2→4로 늘어남 — PC 레이아웃 자체는 무변경). */
   .site-detail-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gnmap-space-2);
     margin: var(--gnmap-space-2) 0 var(--gnmap-space-3);
-    padding: var(--gnmap-space-1) 0;
-    border-top: 1px solid var(--gnmap-border);
   }
   .site-detail-meta .site-detail-row {
-    padding: 5px 0;
-    border-bottom: 1px solid var(--gnmap-border);
-  }
-  .site-detail-meta .site-detail-row:last-child {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--gnmap-space-2);
     border-bottom: none;
+    border-radius: var(--gnmap-radius-sm);
+    background: var(--gnmap-bg-soft);
   }
   .site-detail-meta .site-detail-label {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--gnmap-text-meta);
   }
   .site-detail-meta .site-detail-value {
     font-size: var(--gnmap-fs-caption);
     font-weight: var(--gnmap-fw-semibold);
     color: var(--gnmap-text-primary);
-    text-align: right;
+    text-align: left;
   }
 
   /* 액션 버튼 공통 체계. Primary=길찾기/메모저장(정부 blue 배경), Secondary=즐겨찾기/지도보기
