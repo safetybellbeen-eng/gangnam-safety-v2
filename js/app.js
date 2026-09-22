@@ -354,6 +354,19 @@ function bindEvents() {
   });
 }
 
+// STEP16. Service Worker 등록. 상대경로('./sw.js')를 써서 GitHub Pages의 /gangnam-safety-v2/
+// 하위 경로에서도 절대경로(루트 기준) 가정 없이 그대로 동작하게 한다. window 'load' 이후에
+// 등록해 초기 로딩(지도/데이터 조회 등)과 경쟁하지 않도록 하고, 등록 자체가 실패해도(구형
+// 브라우저, 권한 문제 등) catch로 흡수해 console.warn만 남긴다 — 로그인/지도 등 앱의 핵심
+// 기능은 Service Worker 등록 성공 여부와 무관하게 항상 정상 동작해야 한다.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch((err) => {
+      console.warn('Service Worker 등록 실패(앱 기능에는 영향 없음):', err);
+    });
+  });
+}
+
 async function bootstrap() {
   bindEvents();
   await loadCurrentProfile();
