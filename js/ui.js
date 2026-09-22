@@ -52,7 +52,10 @@ async function handleFavoriteToggle(siteId, triggerBtn) {
 
   const nowFavorite = isFavorite(siteId);
   document.querySelectorAll(`.site-list-item[data-site-id="${siteId}"] .favorite-toggle-btn`)
-    .forEach(btn => { btn.textContent = nowFavorite ? '★' : '☆'; });
+    .forEach(btn => {
+      btn.textContent = nowFavorite ? '★' : '☆';
+      btn.classList.toggle('is-favorite', nowFavorite);
+    });
 
   const detailFavBtn = document.getElementById('site-detail-favorite-btn');
   if (detailFavBtn && detailFavBtn.dataset.siteId === String(siteId)) {
@@ -167,6 +170,9 @@ export function renderSiteList(containerId) {
       const favBtn = document.createElement('button');
       favBtn.type = 'button';
       favBtn.className = 'favorite-toggle-btn';
+      // STEP15-E.2: 텍스트(★/☆)는 그대로 두고, 모바일 카드 디자인에서 채워진/빈 별 색을
+      // 구분해 보여주기 위한 CSS 훅으로 클래스만 추가한다(즐겨찾기 로직/데이터는 미변경).
+      if (isFavorite(site.id)) favBtn.classList.add('is-favorite');
       favBtn.textContent = isFavorite(site.id) ? '★' : '☆';
       favBtn.addEventListener('click', (e) => {
         e.stopPropagation(); // 목록 항목 선택 이벤트로 전파되지 않도록 분리
@@ -192,14 +198,29 @@ export function renderSiteList(containerId) {
       item.appendChild(company);
       item.appendChild(address);
 
+      // STEP15-E.2: 동/위치확인필요를 "보조정보" 한 줄로 묶는다. 둘 다 없으면 빈 줄을 만들지 않는다.
+      // dong은 site.dong 값을 그대로 표시만 하고(별도 가공 없음), PC에서는 css/mobile.css가
+      // 이 wrapper 자체를 기본적으로 숨겨 화면에 영향이 없다(기존 site-list-review-badge와 동일 원칙).
+      const meta = document.createElement('div');
+      meta.className = 'site-list-meta';
+
+      if (site.dong) {
+        const dongEl = document.createElement('span');
+        dongEl.className = 'site-list-dong';
+        dongEl.textContent = site.dong;
+        meta.appendChild(dongEl);
+      }
+
       // STEP15-C: location_quality가 APPROXIMATE/UNRESOLVED면 위치 확인이 필요함을 알린다.
       // DB 값은 읽기만 하며 절대 변경하지 않는다. PC에서는 css/mobile.css가 기본적으로 숨겨 화면에 영향 없다.
       if (site.location_quality === 'APPROXIMATE' || site.location_quality === 'UNRESOLVED') {
         const reviewBadge = document.createElement('span');
         reviewBadge.className = 'site-list-review-badge';
         reviewBadge.textContent = '위치확인필요';
-        item.appendChild(reviewBadge);
+        meta.appendChild(reviewBadge);
       }
+
+      if (meta.childNodes.length > 0) item.appendChild(meta);
 
       item.addEventListener('click', () => selectSite(site.id));
 
