@@ -186,7 +186,12 @@
           <details id="site-dong-filter" class="site-select-filter">
             <summary id="site-dong-filter-label" class="site-select-filter-label">관할</summary>
             <div id="site-dong-filter-panel" class="site-select-filter-panel">
-              <button type="button" id="site-dong-filter-clear" class="site-select-filter-clear">전체</button>
+              <!-- 사용자 피드백(촌스럽다는 지적): "전체" 초기화 버튼도 아래 체크박스 옵션과
+                   완전히 같은 행 스타일(.site-select-filter-option)로 통일하고, 체크 여부는
+                   .site-select-filter-check(✓)로 표시한다. -->
+              <button type="button" id="site-dong-filter-clear" class="site-select-filter-option site-select-filter-clear">
+                <span>전체</span><span class="site-select-filter-check" aria-hidden="true">✓</span>
+              </button>
               <div id="site-dong-filter-options" class="site-select-filter-options"></div>
             </div>
           </details>
@@ -196,10 +201,10 @@
             <summary id="site-amount-filter-label" class="site-select-filter-label">공사금액</summary>
             <div id="site-amount-filter-panel" class="site-select-filter-panel">
               <div class="site-select-filter-options">
-                <label class="site-select-filter-option"><input type="radio" name="site-amount-filter-radio" value="all" checked><span>전체</span></label>
-                <label class="site-select-filter-option"><input type="radio" name="site-amount-filter-radio" value="under-5b"><span>50억 미만</span></label>
-                <label class="site-select-filter-option"><input type="radio" name="site-amount-filter-radio" value="5b-12b"><span>50억 이상 ~ 120억 미만</span></label>
-                <label class="site-select-filter-option"><input type="radio" name="site-amount-filter-radio" value="over-12b"><span>120억 이상</span></label>
+                <label class="site-select-filter-option"><input type="radio" name="site-amount-filter-radio" value="all" checked><span>전체</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+                <label class="site-select-filter-option"><input type="radio" name="site-amount-filter-radio" value="under-5b"><span>50억 미만</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+                <label class="site-select-filter-option"><input type="radio" name="site-amount-filter-radio" value="5b-12b"><span>50억 이상 ~ 120억 미만</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+                <label class="site-select-filter-option"><input type="radio" name="site-amount-filter-radio" value="over-12b"><span>120억 이상</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
               </div>
             </div>
           </details>
@@ -222,9 +227,9 @@
               <summary id="site-inspection-filter-label" class="site-select-filter-label">점검</summary>
               <div id="site-inspection-filter-panel" class="site-select-filter-panel">
                 <div class="site-select-filter-options">
-                  <label class="site-select-filter-option"><input type="radio" name="site-inspection-filter-radio" value="all" checked><span>전체</span></label>
-                  <label class="site-select-filter-option"><input type="radio" name="site-inspection-filter-radio" value="yes"><span>점검 유</span></label>
-                  <label class="site-select-filter-option"><input type="radio" name="site-inspection-filter-radio" value="no"><span>점검 무</span></label>
+                  <label class="site-select-filter-option"><input type="radio" name="site-inspection-filter-radio" value="all" checked><span>전체</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+                  <label class="site-select-filter-option"><input type="radio" name="site-inspection-filter-radio" value="yes"><span>점검 유</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+                  <label class="site-select-filter-option"><input type="radio" name="site-inspection-filter-radio" value="no"><span>점검 무</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
                 </div>
               </div>
             </details>
@@ -232,9 +237,9 @@
               <summary id="site-accident-report-filter-label" class="site-select-filter-label">산재표</summary>
               <div id="site-accident-report-filter-panel" class="site-select-filter-panel">
                 <div class="site-select-filter-options">
-                  <label class="site-select-filter-option"><input type="radio" name="site-accident-report-filter-radio" value="all" checked><span>전체</span></label>
-                  <label class="site-select-filter-option"><input type="radio" name="site-accident-report-filter-radio" value="yes"><span>산재표 유</span></label>
-                  <label class="site-select-filter-option"><input type="radio" name="site-accident-report-filter-radio" value="no"><span>산재표 무</span></label>
+                  <label class="site-select-filter-option"><input type="radio" name="site-accident-report-filter-radio" value="all" checked><span>전체</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+                  <label class="site-select-filter-option"><input type="radio" name="site-accident-report-filter-radio" value="yes"><span>산재표 유</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+                  <label class="site-select-filter-option"><input type="radio" name="site-accident-report-filter-radio" value="no"><span>산재표 무</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
                 </div>
               </div>
             </details>
