@@ -1,1 +1,185 @@
-/* mobile.css — STEP 1 골격. 모바일 대응은 STEP 15에서 채운다. */
+/* mobile.css — STEP15-B. 모바일(≤768px) 전용 하단 탭 골격 + 지도/현장/즐겨찾기 3개 탭 실기능 연결.
+   base.css/layout.css/components.css/map.css는 건드리지 않고, 이 파일에서만 override한다.
+   media query 밖 규칙은 "PC에서는 항상 숨김"을 보장하기 위한 기본값이다. */
+
+#mobile-bottom-nav,
+.mobile-view {
+  display: none;
+}
+
+@media (max-width: 768px) {
+
+  html, body {
+    overflow-x: hidden;
+  }
+
+  #app,
+  #view-approved {
+    max-width: 100%;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* PC 전용 상단 안내 요소는 모바일 탭 구조와 겹치므로 우선 숨긴다.
+     JS 로직/기능 자체는 변경하지 않으며 PC 화면에는 영향 없다.
+     현재위치 등은 후속 STEP에서 모바일 상단바로 재구성 예정(이번 STEP 범위 아님). */
+  #view-approved h1,
+  #approved-role-badge,
+  #btn-current-location,
+  #location-message {
+    display: none;
+  }
+
+  /* 로그아웃만은 모바일에서도 항상 접근 가능하도록 작게 고정 배치한다. */
+  #logout-approved {
+    position: fixed;
+    top: 8px;
+    right: 8px;
+    z-index: 60;
+    font-size: 12px;
+    padding: 4px 8px;
+  }
+
+  /* 관리자 전용 PC 절대배치 버튼/패널 — 모바일 노출(더보기 연결)은 STEP15-D 이후. */
+  #btn-admin-panel, #admin-panel,
+  #btn-upload-panel, #upload-panel,
+  #btn-supervision-panel, #supervision-panel {
+    display: none;
+  }
+
+  /* #view-approved를 세로 flex 컨테이너로 전환해, 하단 탭 높이를 제외한 나머지 공간을
+     지도/리스트/모바일 placeholder가 채우도록 한다. (absolute/fixed 요소는 이 흐름과 무관) */
+  #view-approved {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  /* 사업장 리스트 패널: PC의 좌측 고정 패널 대신,
+     기본은 검색/필터 바만 노출되는 상단바로 재사용한다(지도 탭에서 검색 가능하도록). */
+  #site-list-panel {
+    position: static;
+    z-index: auto;
+    top: auto;
+    left: auto;
+    width: 100%;
+    height: auto;
+    border-right: none;
+    flex-shrink: 0;
+    box-sizing: border-box;
+  }
+  #site-dong-select,
+  #site-amount-select,
+  #site-sort-select {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  #site-list {
+    display: none;
+  }
+
+  /* 지도 컨테이너: 기존 Kakao Map 인스턴스/marker/cluster를 그대로 재사용하고,
+     여기서는 탭에 따른 표시 여부만 CSS로 제어한다(재초기화 없음). */
+  #map-container {
+    display: none;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+    height: auto;
+  }
+
+  /* 상세 패널: 이번 STEP은 완성된 bottom sheet(STEP15-C)가 아니라,
+     화면 하단과 겹치지 않는 최소 오버레이 배치만 한다.
+     표시/숨김은 기존 selectSite/closeDetail의 inline style을 그대로 사용(JS 미변경). */
+  #site-detail-panel {
+    position: fixed;
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    width: 100%;
+    max-height: 60vh;
+    border-left: none;
+    border-top: 1px solid #ddd;
+    z-index: 70;
+    box-sizing: border-box;
+  }
+
+  .mobile-view {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+  .mobile-placeholder {
+    color: #888;
+    font-size: 13px;
+    text-align: center;
+    margin-top: 40px;
+    line-height: 1.6;
+  }
+
+  /* 탭별 표시 전환 — #app[data-mobile-tab]은 js/app.js의 activateMobileTab()이 설정한다. */
+  #app[data-mobile-tab="map"] #map-container {
+    display: block;
+  }
+
+  #app[data-mobile-tab="site"] #site-list-panel,
+  #app[data-mobile-tab="favorite"] #site-list-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+  #app[data-mobile-tab="site"] #site-list,
+  #app[data-mobile-tab="favorite"] #site-list {
+    display: block;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  #app[data-mobile-tab="route"] #site-list-panel,
+  #app[data-mobile-tab="alert"] #site-list-panel,
+  #app[data-mobile-tab="more"] #site-list-panel {
+    display: none;
+  }
+
+  #app[data-mobile-tab="route"] #mobile-view-route,
+  #app[data-mobile-tab="alert"] #mobile-view-alert,
+  #app[data-mobile-tab="more"] #mobile-view-more {
+    display: block;
+  }
+
+  /* 하단 탭 바 */
+  #mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 80;
+    background: #fff;
+    border-top: 1px solid #ddd;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .mobile-tab-btn {
+    flex: 1;
+    border: none;
+    background: none;
+    padding: 8px 0 6px;
+    font-size: 11px;
+    color: #888;
+    cursor: pointer;
+  }
+  .mobile-tab-btn.active {
+    color: #1a73e8;
+    font-weight: bold;
+  }
+}
