@@ -192,6 +192,15 @@ export function renderSiteList(containerId) {
       item.appendChild(company);
       item.appendChild(address);
 
+      // STEP15-C: location_quality가 APPROXIMATE/UNRESOLVED면 위치 확인이 필요함을 알린다.
+      // DB 값은 읽기만 하며 절대 변경하지 않는다. PC에서는 css/mobile.css가 기본적으로 숨겨 화면에 영향 없다.
+      if (site.location_quality === 'APPROXIMATE' || site.location_quality === 'UNRESOLVED') {
+        const reviewBadge = document.createElement('span');
+        reviewBadge.className = 'site-list-review-badge';
+        reviewBadge.textContent = '위치확인필요';
+        item.appendChild(reviewBadge);
+      }
+
       item.addEventListener('click', () => selectSite(site.id));
 
       container.appendChild(item);
