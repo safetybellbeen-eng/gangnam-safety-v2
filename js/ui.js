@@ -468,12 +468,12 @@ export function renderDetail(site) {
     valueEl.textContent = displayValue(value);
 
     row.appendChild(labelEl);
-    row.appendChild(valueEl);
 
-    // 사용자 요청: 즐겨찾기 추가/해제를 사업장명 옆 별표 터치로 바로 할 수 있게 한다.
-    // 기존 handleFavoriteToggle을 그대로 재사용하고(새 로직 없음), 이 버튼은 모바일에서만
-    // 보인다(PC는 css/mobile.css 상단 PC-hide 목록에서 기본 숨김 — 기존 액션 버튼 행의
-    // #site-detail-favorite-btn을 그대로 유지해 PC 화면은 바뀌지 않는다).
+    // 사용자 요청: 즐겨찾기 별표를 사업장명 "좌측"에 둔다. valueEl(사업장명 텍스트)보다 먼저
+    // 추가해 flex 행(.site-detail-row-name)에서 왼쪽에 오도록 한다. 기존 handleFavoriteToggle을
+    // 그대로 재사용하고(새 로직 없음), 이 버튼은 모바일에서만 보인다(PC는 css/mobile.css 상단
+    // PC-hide 목록에서 기본 숨김 — 기존 액션 버튼 행의 #site-detail-favorite-btn을 그대로
+    // 유지해 PC 화면은 바뀌지 않는다).
     if (key === 'name') {
       const nameFavBtn = document.createElement('button');
       nameFavBtn.type = 'button';
@@ -487,6 +487,8 @@ export function renderDetail(site) {
       nameFavBtn.addEventListener('click', () => handleFavoriteToggle(site.id, nameFavBtn));
       row.appendChild(nameFavBtn);
     }
+
+    row.appendChild(valueEl);
 
     // 사용자 피드백: 주소 옆에 텍스트를 바로 복사할 수 있는 버튼을 추가한다. 주소 값(site.address)은
     // 그대로 읽기만 하고 저장/검색/정렬 로직에는 전혀 관여하지 않는 순수 UI 기능이다.
@@ -885,8 +887,60 @@ function updateDongFilterLabel() {
   if (!selected || selected.length === 0) labelEl.textContent = '관할';
   else if (selected.length === 1) labelEl.textContent = selected[0];
   else labelEl.textContent = `${selected[0]} 외 ${selected.length - 1}`;
-  // css/mobile.css의 #site-dong-filter[data-active="true"] 강조 스타일용.
+  // css/mobile.css의 .site-select-filter[data-active="true"] 강조 스타일용.
   if (filterEl) filterEl.dataset.active = String(!!(selected && selected.length > 0));
+}
+
+// 사용자 요청: 공사금액/점검/산재표를 관할과 동일한 <details> 커스텀 드롭다운(단일선택 radio)
+// UI로 통일한다. 패널 열기 시 화면 좌표 계산/바깥 클릭 시 닫기/활성 강조는 관할의 방식과
+// 완전히 동일하며, 이 함수 하나로 세 필터에 공통 적용해 중복 코드 없이 항상 같은 동작을 보장한다.
+// detailsId: <details> id (예: 'site-amount-filter'), stateKey: state의 해당 필터 키,
+// labels: { value: 라벨텍스트 } 맵('all' 포함 — 미선택 시 필터명 그대로 표시).
+function bindRadioFilterDetails(detailsId, stateKey, containerId, labels) {
+  const detailsEl = document.getElementById(detailsId);
+  if (!detailsEl) return;
+  const labelEl = document.getElementById(`${detailsId}-label`);
+  const panel = document.getElementById(`${detailsId}-panel`);
+  if (!labelEl) return;
+
+  function updateLabel() {
+    const value = state[stateKey] || 'all';
+    labelEl.textContent = labels[value] || labels.all;
+    detailsEl.dataset.active = String(value !== 'all');
+  }
+
+  detailsEl.querySelectorAll('input[type="radio"]').forEach(radio => {
+    radio.checked = radio.value === (state[stateKey] || 'all');
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      state[stateKey] = radio.value;
+      updateLabel();
+      detailsEl.open = false;
+      renderSiteList(containerId);
+    });
+  });
+
+  // details/summary는 바깥 클릭 시 자동으로 닫히지 않으므로, 패널 바깥을 클릭하면 닫아준다
+  // (관할과 동일한 방식).
+  document.addEventListener('click', (e) => {
+    if (detailsEl.open && !detailsEl.contains(e.target)) {
+      detailsEl.open = false;
+    }
+  });
+
+  // #site-filter-row의 overflow-x:auto가 overflow-y도 auto로 강제 승격시켜 position:absolute
+  // 패널이 잘리는 문제(관할에서 처음 발견)가 여기서도 동일하게 발생하므로, 같은 방식으로
+  // position:fixed 패널의 좌표를 열 때마다 버튼의 실제 화면 위치로 계산해 넣는다.
+  if (panel) {
+    detailsEl.addEventListener('toggle', () => {
+      if (!detailsEl.open) return;
+      const rect = detailsEl.getBoundingClientRect();
+      panel.style.top = `${Math.round(rect.bottom + 6)}px`;
+      panel.style.left = `${Math.round(rect.left)}px`;
+    });
+  }
+
+  updateLabel();
 }
 
 // 사용자 요청: "관할" 필터를 복수 선택 checkbox 패널로 구성한다. state.sites가 갱신될 때마다
@@ -941,9 +995,6 @@ export function bindSearchAndSort(containerId) {
   const sortSelect = document.getElementById('site-sort-select');
   const dongFilterEl = document.getElementById('site-dong-filter');
   const dongFilterClearBtn = document.getElementById('site-dong-filter-clear');
-  const amountSelect = document.getElementById('site-amount-select');
-  const inspectionSelect = document.getElementById('site-inspection-select');
-  const accidentReportSelect = document.getElementById('site-accident-report-select');
   const searchClearBtn = document.getElementById('site-search-clear-btn');
   const favoriteFilterBtn = document.getElementById('site-favorite-filter-btn');
 
@@ -1007,24 +1058,24 @@ export function bindSearchAndSort(containerId) {
     });
   }
 
-  amountSelect.addEventListener('change', () => {
-    state.amountFilter = amountSelect.value;
-    renderSiteList(containerId);
+  // 사용자 요청: 공사금액/점검/산재표를 관할과 동일한 details+radio 팝오버 UI로 통일(위
+  // bindRadioFilterDetails 참고). 라벨 텍스트는 각 필터명 그대로 기본표기한다.
+  bindRadioFilterDetails('site-amount-filter', 'amountFilter', containerId, {
+    all: '공사금액',
+    'under-5b': '50억 미만',
+    '5b-12b': '50억 이상 ~ 120억 미만',
+    'over-12b': '120억 이상',
   });
-
-  if (inspectionSelect) {
-    inspectionSelect.addEventListener('change', () => {
-      state.siteInspectionFilter = inspectionSelect.value;
-      renderSiteList(containerId);
-    });
-  }
-
-  if (accidentReportSelect) {
-    accidentReportSelect.addEventListener('change', () => {
-      state.siteAccidentReportFilter = accidentReportSelect.value;
-      renderSiteList(containerId);
-    });
-  }
+  bindRadioFilterDetails('site-inspection-filter', 'siteInspectionFilter', containerId, {
+    all: '점검',
+    yes: '점검 유',
+    no: '점검 무',
+  });
+  bindRadioFilterDetails('site-accident-report-filter', 'siteAccidentReportFilter', containerId, {
+    all: '산재표',
+    yes: '산재표 유',
+    no: '산재표 무',
+  });
 
   // STEP14.5-B. "즐겨찾기만 보기" — 토글형 버튼. 다시 누르면 해제되어 기존 필터 결과로 복귀.
   if (favoriteFilterBtn) {

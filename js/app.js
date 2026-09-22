@@ -218,9 +218,6 @@ async function handleLogout() {
   const sortSelect = document.getElementById('site-sort-select');
   const dongFilterOptions = document.getElementById('site-dong-filter-options');
   const dongFilterEl = document.getElementById('site-dong-filter');
-  const amountSelect = document.getElementById('site-amount-select');
-  const inspectionSelect = document.getElementById('site-inspection-select');
-  const accidentReportSelect = document.getElementById('site-accident-report-select');
   const locationMsg = document.getElementById('location-message');
   if (searchInput) searchInput.value = '';
   if (sortSelect) sortSelect.value = 'default';
@@ -228,9 +225,24 @@ async function handleLogout() {
   if (dongFilterEl) dongFilterEl.open = false;
   const dongFilterLabel = document.getElementById('site-dong-filter-label');
   if (dongFilterLabel) dongFilterLabel.textContent = '관할';
-  if (amountSelect) amountSelect.value = 'all';
-  if (inspectionSelect) inspectionSelect.value = 'all';
-  if (accidentReportSelect) accidentReportSelect.value = 'all';
+  // 사용자 요청: 공사금액/점검/산재표도 관할과 동일한 details+radio 팝오버가 되었으므로,
+  // <select>.value 초기화 대신 각 details의 "전체" radio를 다시 체크하고 라벨/강조 표시를
+  // 되돌린다(bindSearchAndSort()가 이미 로그인 시 1회만 바인딩되어 있어, 여기서는 시각적
+  // 상태만 리셋하면 다음 렌더 시 state 값과 다시 일치한다).
+  [
+    ['site-amount-filter', '공사금액'],
+    ['site-inspection-filter', '점검'],
+    ['site-accident-report-filter', '산재표'],
+  ].forEach(([detailsId, defaultLabel]) => {
+    const detailsEl = document.getElementById(detailsId);
+    if (!detailsEl) return;
+    detailsEl.open = false;
+    detailsEl.dataset.active = 'false';
+    const allRadio = detailsEl.querySelector('input[type="radio"][value="all"]');
+    if (allRadio) allRadio.checked = true;
+    const labelEl = document.getElementById(`${detailsId}-label`);
+    if (labelEl) labelEl.textContent = defaultLabel;
+  });
   if (locationMsg) locationMsg.textContent = '';
   // STEP14.5-B. 즐겨찾기만보기 토글과 검색 지우기(×) 버튼 표시 상태 초기화.
   state.favoriteOnly = false;
