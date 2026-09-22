@@ -23,7 +23,8 @@
 .mobile-view,
 #mobile-app-header,
 .site-list-review-badge,
-.site-list-dong {
+.site-list-dong,
+.mobile-favorite-empty {
   display: none;
 }
 
@@ -595,6 +596,44 @@
   #app[data-mobile-tab="alert"] #site-list-panel,
   #app[data-mobile-tab="more"] #site-list-panel {
     display: none;
+  }
+
+  /* STEP15-E.4: 즐겨찾기 탭에 즐겨찾기한 현장이 0건일 때 renderSiteList()가 대신 그리는
+     empty state. 현장/즐겨찾기 카드(.site-list-item)와 같은 화이트/네이비/블루 톤을 쓴다. */
+  .mobile-favorite-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 48px 24px 24px;
+  }
+  .mobile-favorite-empty-icon {
+    width: 40px;
+    height: 40px;
+    color: #ccc;
+    margin-bottom: 16px;
+  }
+  .mobile-favorite-empty-title {
+    font-size: 15px;
+    font-weight: bold;
+    color: var(--gnmap-navy);
+    margin: 0 0 8px;
+  }
+  .mobile-favorite-empty-desc {
+    font-size: 13px;
+    color: var(--gnmap-text-sub);
+    line-height: 1.5;
+    margin: 0 0 20px;
+  }
+  .mobile-favorite-empty-btn {
+    min-height: 44px;
+    padding: 0 20px;
+    border: none;
+    border-radius: var(--gnmap-radius-sm);
+    background: var(--gnmap-blue);
+    color: #fff;
+    font-size: 14px;
+    font-weight: bold;
   }
 
   #app[data-mobile-tab="route"] #mobile-view-route,
