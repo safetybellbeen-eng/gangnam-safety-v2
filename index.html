@@ -63,13 +63,37 @@
   </section>
 
   <section id="view-approved" style="display:none">
-    <!-- STEP15-C: 모바일 전용 공통 헤더. PC에서는 css/mobile.css가 항상 숨김 처리한다(텍스트만 사용, 별도 CI 이미지 없음). -->
+    <!-- STEP15-C/E.1: 모바일 전용 공통 헤더. PC에서는 css/mobile.css가 항상 숨김 처리한다.
+         공식 CI 이미지가 없으므로 로고를 임의로 만들지 않고 텍스트만 쓴다 — #mobile-app-header-brand가
+         비어 있는 로고 슬롯 역할을 해서, 나중에 공식 CI 이미지를 <img>로 넣기만 하면 되는 구조다.
+         우측 벨 버튼은 새 기능이 아니라 기존 "알림" 하단 탭(.mobile-tab-btn[data-tab="alert"])을
+         그대로 클릭 위임한다(js/app.js). -->
     <div id="mobile-app-header">
-      <span id="mobile-app-header-title">산업안전 순찰지도</span>
+      <div id="mobile-app-header-brand">
+        <span id="mobile-app-header-logo-slot" aria-hidden="true"></span>
+        <span id="mobile-app-header-title">산업안전 순찰지도</span>
+      </div>
+      <button type="button" id="mobile-header-alert-btn" aria-label="알림">
+        <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M18 16v-5a6 6 0 1 0-12 0v5l-1.5 2.5h15L18 16Z"/>
+          <path d="M9.5 20a2.5 2.5 0 0 0 5 0"/>
+        </svg>
+      </button>
     </div>
     <h1>인증 완료</h1>
     <p id="approved-role-badge"></p>
-    <button type="button" id="btn-current-location">현재 위치</button>
+    <!-- STEP15-E.1: 아이콘은 <span class="mobile-icon-svg-wrap">로 감싸 PC에서는 기본적으로
+         숨기고(css/mobile.css) 모바일에서만 보이게 한다. 버튼 id/텍스트/기존 클릭 핸들러(js/app.js의
+         requestCurrentLocation 호출부)는 그대로 유지한다. -->
+    <button type="button" id="btn-current-location">
+      <span class="mobile-icon-svg-wrap" aria-hidden="true">
+        <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/>
+        </svg>
+      </span>
+      <span>현재 위치</span>
+    </button>
     <span id="location-message"></span>
     <button type="button" id="btn-admin-panel" style="display:none">회원 관리</button>
     <div id="admin-panel" style="display:none"></div>
@@ -113,6 +137,14 @@
     <div id="site-list-panel">
       <div id="site-search-bar">
         <div id="site-search-input-wrap">
+          <!-- STEP15-E.1: 검색 아이콘. 기존 #site-search-input/state/이벤트는 전혀 건드리지 않고
+               장식용 아이콘만 추가한다. PC에서는 기본적으로 숨김(css/mobile.css). -->
+          <span class="mobile-icon-svg-wrap mobile-search-icon" aria-hidden="true">
+            <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="6.5"/>
+              <path d="m20 20-3.8-3.8"/>
+            </svg>
+          </span>
           <input type="text" id="site-search-input" placeholder="사업장명, 업체명, 주소, 동으로 검색">
           <button type="button" id="site-search-clear-btn" style="display:none" aria-label="검색어 지우기">×</button>
         </div>
@@ -182,12 +214,51 @@
       <div id="mobile-more-content"></div>
     </div>
     <nav id="mobile-bottom-nav">
-      <button type="button" class="mobile-tab-btn" data-tab="map">지도</button>
-      <button type="button" class="mobile-tab-btn" data-tab="site">현장</button>
-      <button type="button" class="mobile-tab-btn" data-tab="route">경로</button>
-      <button type="button" class="mobile-tab-btn" data-tab="favorite">즐겨찾기</button>
-      <button type="button" class="mobile-tab-btn" data-tab="alert">알림</button>
-      <button type="button" class="mobile-tab-btn" data-tab="more">더보기</button>
+      <!-- STEP15-E.1: Unicode 이모지(::before) 대신 inline SVG(외부 아이콘 라이브러리 없음)로 교체.
+           data-tab 값/기능/클릭 바인딩(js/app.js)은 전혀 바꾸지 않는다. -->
+      <button type="button" class="mobile-tab-btn" data-tab="map">
+        <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 21s7-7.2 7-12a7 7 0 1 0-14 0c0 4.8 7 12 7 12Z"/>
+          <circle cx="12" cy="9" r="2.2"/>
+        </svg>
+        <span>지도</span>
+      </button>
+      <button type="button" class="mobile-tab-btn" data-tab="site">
+        <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="4" y="3" width="16" height="18" rx="1.5"/>
+          <path d="M8 7h2M14 7h2M8 11h2M14 11h2M8 15h2M14 15h2"/>
+        </svg>
+        <span>현장</span>
+      </button>
+      <button type="button" class="mobile-tab-btn" data-tab="route">
+        <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="6" cy="6" r="2"/>
+          <circle cx="18" cy="18" r="2"/>
+          <path d="M6 8v2a4 4 0 0 0 4 4h4a4 4 0 0 1 4 4v0"/>
+        </svg>
+        <span>경로</span>
+      </button>
+      <button type="button" class="mobile-tab-btn" data-tab="favorite">
+        <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="m12 3 2.5 5.6 6.1.6-4.6 4.1 1.3 6L12 16.3 6.7 19.3l1.3-6-4.6-4.1 6.1-.6L12 3Z"/>
+        </svg>
+        <span>즐겨찾기</span>
+      </button>
+      <button type="button" class="mobile-tab-btn" data-tab="alert">
+        <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M18 16v-5a6 6 0 1 0-12 0v5l-1.5 2.5h15L18 16Z"/>
+          <path d="M9.5 20a2.5 2.5 0 0 0 5 0"/>
+        </svg>
+        <span>알림</span>
+      </button>
+      <button type="button" class="mobile-tab-btn" data-tab="more">
+        <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
+          <circle cx="5" cy="12" r="1.7"/>
+          <circle cx="12" cy="12" r="1.7"/>
+          <circle cx="19" cy="12" r="1.7"/>
+        </svg>
+        <span>더보기</span>
+      </button>
     </nav>
   </section>
 </div>
