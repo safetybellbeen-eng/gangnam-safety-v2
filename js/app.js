@@ -14,6 +14,46 @@ const VIEWS = [
   'view-pending', 'view-rejected', 'view-disabled', 'view-approved'
 ];
 
+// STEP15-B. 모바일 "즐겨찾기" 탭에 들어가기 직전의 state.favoriteOnly 값을 임시 보관한다.
+// (탭을 벗어나면 사용자가 PC/모바일 공용 즐겨찾기 토글로 실제 선택해둔 값으로 복원 — 다른 필터는 건드리지 않는다.)
+let mobileFavoriteOnlyBackup = null;
+
+// STEP15-B. 모바일 하단 탭 전환. 기존 DOM/데이터 조회는 재사용하고 표시 여부(CSS)만 바꾼다.
+// 지도 인스턴스/marker/cluster는 여기서 절대 재생성하지 않는다.
+function activateMobileTab(tab) {
+  const previousTab = state.mobileActiveTab;
+  state.mobileActiveTab = tab;
+
+  const appEl = document.getElementById('app');
+  if (appEl) appEl.dataset.mobileTab = tab;
+
+  document.querySelectorAll('.mobile-tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+
+  // "즐겨찾기" 탭 진입/이탈 시에만 기존 favoriteOnly 토글을 임시로 켜고 되돌린다.
+  let favoriteOnlyChanged = false;
+  if (tab === 'favorite' && previousTab !== 'favorite') {
+    if (mobileFavoriteOnlyBackup === null) mobileFavoriteOnlyBackup = state.favoriteOnly;
+    state.favoriteOnly = true;
+    favoriteOnlyChanged = true;
+  } else if (previousTab === 'favorite' && tab !== 'favorite' && mobileFavoriteOnlyBackup !== null) {
+    state.favoriteOnly = mobileFavoriteOnlyBackup;
+    mobileFavoriteOnlyBackup = null;
+    favoriteOnlyChanged = true;
+  }
+  if (favoriteOnlyChanged) {
+    const favBtn = document.getElementById('site-favorite-filter-btn');
+    if (favBtn) favBtn.classList.toggle('active', state.favoriteOnly);
+    renderSiteList('site-list'); // 검색/동/금액 등 다른 필터 state는 그대로 유지한 채 재렌더만 한다.
+  }
+
+  // 지도 탭으로 복귀 시, 숨겨져 있던 동안 틀어졌을 수 있는 지도 크기만 보정한다(재초기화 아님).
+  if (tab === 'map' && state.map && window.kakao && window.kakao.maps) {
+    window.kakao.maps.event.trigger(state.map, 'relayout');
+  }
+}
+
 function showView(id) {
   VIEWS.forEach(v => {
     document.getElementById(v).style.display = (v === id) ? 'block' : 'none';
@@ -60,6 +100,7 @@ function routeByProfile() {
           renderDongOptions(); // state.sites 기준으로 동 select 옵션을 채운 뒤 이벤트 바인딩
           bindSearchAndSort('site-list');
           renderSiteList('site-list'); // 내부에서 marker도 함께 렌더한다 (getFilteredSortedSites 기준, 즐겨찾기 별표 포함)
+          activateMobileTab(state.mobileActiveTab || 'map'); // STEP15-B. 모바일 하단 탭 초기 표시 상태 적용(PC에서는 CSS로 무효화됨)
         })
         .catch(err => {
           console.error('지도/사업장 초기화 실패:', err);
@@ -144,6 +185,14 @@ async function handleLogout() {
   if (countLabel) countLabel.textContent = '';
   const signupNameInput = document.getElementById('signup-name');
   if (signupNameInput) signupNameInput.value = '';
+  // STEP15-B. 모바일 하단 탭 상태를 초기화한다(재로그인 시 항상 지도 탭부터 시작).
+  state.mobileActiveTab = 'map';
+  mobileFavoriteOnlyBackup = null;
+  const appEl = document.getElementById('app');
+  if (appEl) appEl.dataset.mobileTab = 'map';
+  document.querySelectorAll('.mobile-tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === 'map');
+  });
   showView('view-login');
 }
 
@@ -204,6 +253,11 @@ function bindEvents() {
     if (willOpen) {
       renderSupervisionPanel('supervision-panel');
     }
+  });
+
+  // STEP15-B. 모바일 하단 탭 버튼(6개) 클릭 바인딩. bindEvents()는 bootstrap에서 1회만 호출되므로 중복 등록 없음.
+  document.querySelectorAll('.mobile-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => activateMobileTab(btn.dataset.tab));
   });
 
   document.getElementById('upload-file-input').addEventListener('change', async (e) => {
