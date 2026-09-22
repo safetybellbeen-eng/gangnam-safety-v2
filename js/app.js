@@ -106,7 +106,14 @@ function activateMobileTab(tab) {
 
 function showView(id) {
   VIEWS.forEach(v => {
-    document.getElementById(v).style.display = (v === id) ? 'block' : 'none';
+    // (버그 수정) 활성 뷰는 인라인 'block'을 강제하지 않고 스타일시트가 결정하도록 비워둔다.
+    // #view-approved는 모바일에서 css/mobile.css가 display:flex로 세로 레이아웃을 잡는데,
+    // 여기서 항상 'block'을 강제하면(구버전) 그 flex 레이아웃이 절대 적용되지 못해
+    // #view-approved에 !important를 붙여야 했고, 그 결과 로그인 등 다른 화면이 떠 있을 때도
+    // (인라인 'none'이 !important보다 밀려) #view-approved가 항상 화면 아래에 빈 상태로
+    // flex 표시되어 로그인 화면 아래로 화면 높이만큼 빈 스크롤 영역이 생기는 문제가 있었다.
+    // 비활성 뷰는 기존대로 인라인 'none'으로 확실히 숨긴다.
+    document.getElementById(v).style.display = (v === id) ? '' : 'none';
   });
 }
 
@@ -270,10 +277,71 @@ async function handleLogout() {
   showView('view-login');
 }
 
+// 사용자 요청(3): 사업장 상세정보 패널 상단 터치바를 아래로 스와이프하면 닫힌다.
+// Pointer Events로 마우스/터치를 통합 처리하고, 드래그 중에는 손가락을 따라 패널을
+// translateY로 즉시 이동시켜(따라오는 느낌) 실제 바텀시트처럼 보이게 한다.
+function bindDetailPanelSwipeToClose() {
+  const panel = document.getElementById('site-detail-panel');
+  if (!panel) return;
+  const HANDLE_ZONE = 28; // 핸들이 보이는 상단 영역(px). 이 안에서 시작한 드래그만 인정한다.
+  const CLOSE_THRESHOLD = 70; // 이 이상 내리면 닫힘으로 판정한다.
+  let dragging = false;
+  let startY = 0;
+  let dy = 0;
+
+  panel.addEventListener('pointerdown', (e) => {
+    if (panel.style.display === 'none') return;
+    const rect = panel.getBoundingClientRect();
+    if (e.clientY - rect.top > HANDLE_ZONE) return; // 핸들 영역 밖이면 무시(본문 스크롤/버튼 유지)
+    dragging = true;
+    startY = e.clientY;
+    dy = 0;
+    panel.style.transition = 'none';
+    if (panel.setPointerCapture) panel.setPointerCapture(e.pointerId);
+  });
+  panel.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    e.preventDefault(); // 드래그 중 배경 페이지가 같이 스크롤되지 않도록 한다.
+    dy = e.clientY - startY;
+    if (dy < 0) dy = 0; // 위로는 끌리지 않는다(닫기 전용 제스처).
+    panel.style.transform = `translateY(${dy}px)`;
+  });
+  const endDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    panel.style.transition = '';
+    if (dy > CLOSE_THRESHOLD) {
+      closeDetail();
+    } else {
+      panel.style.transform = '';
+    }
+    dy = 0;
+  };
+  panel.addEventListener('pointerup', endDrag);
+  panel.addEventListener('pointercancel', endDrag);
+}
+
 function bindEvents() {
   document.getElementById('show-signup').addEventListener('click', () => showView('view-signup'));
   document.getElementById('show-login').addEventListener('click', () => showView('view-login'));
+
+  // 비밀번호 표시/숨기기 토글. input의 type만 전환하고 값/검증은 그대로 둔다.
+  const pwToggle = document.getElementById('mobile-login-password-toggle');
+  if (pwToggle) {
+    pwToggle.addEventListener('click', () => {
+      const pwInput = document.getElementById('login-password');
+      const showing = pwInput.type === 'text';
+      pwInput.type = showing ? 'password' : 'text';
+      pwToggle.classList.toggle('active', !showing);
+    });
+  }
   document.getElementById('signup-done-to-login').addEventListener('click', () => showView('view-login'));
+
+  // 사용자 요청(3): 상세정보 패널 상단의 터치바(드래그 핸들)를 아래로 스와이프하면 닫힌다.
+  // 패널 자체는 renderDetail()이 매번 innerHTML만 바꾸고 엘리먼트는 재사용하므로, 리스너는
+  // 여기서 한 번만 바인딩한다. 드래그는 핸들이 보이는 상단 영역(패널 상단에서 28px 이내)에서
+  // 시작할 때만 동작해 본문 스크롤/버튼 클릭과 충돌하지 않는다.
+  bindDetailPanelSwipeToClose();
 
   ['logout-pending', 'logout-rejected', 'logout-disabled', 'logout-approved'].forEach(id => {
     document.getElementById(id).addEventListener('click', handleLogout);

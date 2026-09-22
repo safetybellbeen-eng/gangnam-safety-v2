@@ -681,6 +681,7 @@ export function renderDetail(site) {
 export function closeDetail() {
   const panel = document.getElementById('site-detail-panel');
   panel.style.display = 'none';
+  panel.style.transform = ''; // 스와이프로 닫힌 경우 남아있는 드래그 이동값 초기화(§ app.js 스와이프 핸들러)
   panel.innerHTML = '';
   if (state.selectedSiteId !== null) clearMarkerHighlight(state.selectedSiteId);
   state.selectedSiteId = null;

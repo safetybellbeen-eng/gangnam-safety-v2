@@ -51,27 +51,27 @@ function getQualityMarkerImage(locationQuality) {
 }
 
 // 사용자 요청: 현재 선택되어 상세정보가 열려 있는 핀을 다른 핀과 구분되게 표시한다.
-// location_quality별 색(정확/중간/확인필요) 의미는 그대로 유지하면서, 크기를 키우고
-// 파란 테두리(정부 blue)를 둘러 "지금 이 핀을 보고 있다"는 것을 한눈에 알 수 있게 한다.
-// 닫으면(closeDetail) getQualityMarkerImage()로 원래 크기/모양으로 되돌린다.
-const selectedMarkerImageCache = new Map();
-function getSelectedMarkerImage(locationQuality) {
-  const color = QUALITY_MARKER_COLOR[locationQuality] || QUALITY_MARKER_COLOR.EXACT;
-  if (selectedMarkerImageCache.has(color)) return selectedMarkerImageCache.get(color);
+// 처음엔 location_quality 색(정확/중간/확인필요)을 유지하고 파란 테두리만 둘렀는데,
+// "테두리 말고 핀 색 자체가 파란색이 되어야 시인성이 높다"는 피드백에 따라 location_quality와
+// 무관하게 핀 전체(fill)를 정부 blue(--gnmap-blue와 동일한 #1a73e8)로 바꾼다 — 색상 하나만
+// 쓰므로 더 이상 quality별로 캐시할 필요가 없다. 닫으면(closeDetail) getQualityMarkerImage()로
+// 원래 크기/quality색으로 되돌린다.
+let selectedMarkerImage = null;
+function getSelectedMarkerImage() {
+  if (selectedMarkerImage) return selectedMarkerImage;
 
   const svg =
     '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="38" viewBox="0 0 28 38">' +
-    '<path d="M14 2.5C8.2 2.5 3.5 6.9 3.5 12.3c0 7.9 10.5 23.7 10.5 23.7s10.5-15.8 10.5-23.7C24.5 6.9 19.8 2.5 14 2.5z" fill="' + color + '" stroke="#1a73e8" stroke-width="2.5"/>' +
+    '<path d="M14 2.5C8.2 2.5 3.5 6.9 3.5 12.3c0 7.9 10.5 23.7 10.5 23.7s10.5-15.8 10.5-23.7C24.5 6.9 19.8 2.5 14 2.5z" fill="#1a73e8" stroke="#0d47a1" stroke-width="1.5"/>' +
     '<circle cx="14" cy="12.3" r="4.2" fill="#fff"/>' +
     '</svg>';
   const src = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
-  const image = new kakao.maps.MarkerImage(
+  selectedMarkerImage = new kakao.maps.MarkerImage(
     src,
     new kakao.maps.Size(28, 38),
     { offset: new kakao.maps.Point(14, 38) } // 뾰족한 끝이 좌표를 가리키도록(기본 핀과 동일한 원칙, 커진 크기에 맞춰 재계산).
   );
-  selectedMarkerImageCache.set(color, image);
-  return image;
+  return selectedMarkerImage;
 }
 
 // state.selectedSiteId에 해당하는 마커를 "선택됨" 이미지로 바꾼다. 마커가 아직 없거나
@@ -82,8 +82,7 @@ export function highlightSelectedMarker() {
   if (siteId === null || siteId === undefined) return;
   const marker = state.siteMarkers.get(siteId);
   if (!marker || typeof marker.setImage !== 'function') return;
-  const site = state.sites.find(s => s.id === siteId);
-  marker.setImage(getSelectedMarkerImage(site ? site.location_quality : null));
+  marker.setImage(getSelectedMarkerImage());
 }
 
 // 특정 사업장의 마커를 원래(기본) 이미지로 되돌린다. 상세를 닫거나 다른 핀을 선택했을 때
