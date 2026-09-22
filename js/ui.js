@@ -492,6 +492,24 @@ export function renderDetail(site) {
     });
   }
   actions.appendChild(directionsBtn);
+
+  // 사용자 피드백: 현장/즐겨찾기 탭에서 상세를 열었을 때, 메인 지도에서 바로 위치를 볼 수 있는
+  // 진입점이 없었다. 새 지도 로직을 만들지 않고, 이미 selectSite()가 renderDetail() 전에 호출해둔
+  // panToSite()(지도 중심 이동은 이미 끝나 있음)를 그대로 활용해 하단 "지도" 탭 버튼을 클릭
+  // 위임하는 것만으로 지도로 이동시킨다. 모바일에서만, 그리고 이미 지도 탭이면(중복) 표시하지 않는다.
+  // PC는 지도가 항상 목록과 함께 보이므로 이 버튼 자체를 추가하지 않는다(PC 화면 미변경).
+  if (isMobileViewport() && state.mobileActiveTab !== 'map') {
+    const mapViewBtn = document.createElement('button');
+    mapViewBtn.type = 'button';
+    mapViewBtn.className = 'site-detail-action-btn site-detail-btn-secondary';
+    mapViewBtn.textContent = '지도보기';
+    mapViewBtn.addEventListener('click', () => {
+      const mapTabBtn = document.querySelector('.mobile-tab-btn[data-tab="map"]');
+      if (mapTabBtn) mapTabBtn.click();
+    });
+    actions.appendChild(mapViewBtn);
+  }
+
   panel.appendChild(actions);
 
   renderNoteSection(panel, site.id);

@@ -31,6 +31,16 @@ function activateMobileTab(tab) {
     btn.classList.toggle('active', btn.dataset.tab === tab);
   });
 
+  // 사용자 피드백: 사업장 상세(#site-detail-panel)가 열린 채로 하단 탭을 이동하면 이전 탭에서
+  // 열었던 상세가 새 탭 화면 위에 계속 떠 있는 채로 남아 있었다. 다른 탭으로 이동할 때는
+  // 기존 closeDetail()(state.selectedSiteId 초기화 포함)을 그대로 호출해 자동으로 닫는다.
+  if (tab !== previousTab) {
+    const detailPanel = document.getElementById('site-detail-panel');
+    if (detailPanel && detailPanel.style.display !== 'none') {
+      closeDetail();
+    }
+  }
+
   // "즐겨찾기" 탭 진입/이탈 시에만 기존 favoriteOnly 토글을 임시로 켜고 되돌린다.
   let favoriteOnlyChanged = false;
   if (tab === 'favorite' && previousTab !== 'favorite') {
