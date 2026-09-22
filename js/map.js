@@ -24,8 +24,11 @@ const QUALITY_MARKER_COLOR = {
 // 색상별 kakao.maps.MarkerImage를 1번만 만들어 재사용한다(같은 색을 매 렌더마다 다시 만들지 않음).
 const markerImageCache = new Map();
 
-// 아래쪽이 뾰족한 전형적인 지도 핀 모양 + 내부 흰 원. 그라데이션/그림자 없는 단색 스타일.
-// data URI(SVG)로 만들어 별도 이미지 파일을 관리하지 않고, 색상만 바뀐 버전을 즉시 만들 수 있게 한다.
+// STEP15-E.1-2 후속(핀 슬림화): 기존 30×40의 굵은 물방울형 대신 22×30의 더 얇고 길쭉한
+// 📍형 핀으로 변경. 머리(원) 지름을 캔버스 폭(22)보다 좁은 16으로 그려 양옆에 여백을 두는
+// 방식으로 "얇음"을 만들고, 아래쪽 뾰족한 끝과 중앙 흰 원은 기존과 동일하게 유지한다.
+// 그라데이션/그림자/테두리 등 장식은 추가하지 않는다. data URI(SVG)로 만들어 별도 이미지
+// 파일을 관리하지 않고, 색상만 바뀐 버전을 즉시 만들 수 있게 한다.
 function getQualityMarkerImage(locationQuality) {
   const color = QUALITY_MARKER_COLOR[locationQuality];
   if (!color) return null; // 매핑 없는 값(UNRESOLVED 등)은 커스텀 이미지를 만들지 않고 호출부에서 기본 마커로 폴백한다.
@@ -33,15 +36,15 @@ function getQualityMarkerImage(locationQuality) {
   if (markerImageCache.has(color)) return markerImageCache.get(color);
 
   const svg =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="30" height="40" viewBox="0 0 30 40">' +
-    '<path d="M15 0C6.7 0 0 6.6 0 14.8c0 10.6 13.1 23.6 14.2 24.7a1.1 1.1 0 0 0 1.6 0C16.9 38.4 30 25.4 30 14.8 30 6.6 23.3 0 15 0z" fill="' + color + '"/>' +
-    '<circle cx="15" cy="14.8" r="5.4" fill="#fff"/>' +
+    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="30" viewBox="0 0 22 30">' +
+    '<path d="M11 1C6.03 1 2 4.64 2 9.1c0 6.3 9 20.4 9 20.4s9-14.1 9-20.4C20 4.64 15.97 1 11 1z" fill="' + color + '"/>' +
+    '<circle cx="11" cy="9.1" r="3.1" fill="#fff"/>' +
     '</svg>';
   const src = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
   const image = new kakao.maps.MarkerImage(
     src,
-    new kakao.maps.Size(30, 40),
-    { offset: new kakao.maps.Point(15, 40) } // 핀 뾰족한 끝이 실제 좌표를 가리키도록 anchor를 하단 중앙으로.
+    new kakao.maps.Size(22, 30),
+    { offset: new kakao.maps.Point(11, 30) } // 핀 뾰족한 끝(바닥 중앙, 새 크기 기준)이 실제 좌표를 가리키도록 anchor 재조정.
   );
   markerImageCache.set(color, image);
   return image;
