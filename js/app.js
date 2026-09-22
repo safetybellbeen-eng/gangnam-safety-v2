@@ -324,6 +324,9 @@ function bindDetailPanelSwipeToClose() {
 function bindEvents() {
   document.getElementById('show-signup').addEventListener('click', () => showView('view-signup'));
   document.getElementById('show-login').addEventListener('click', () => showView('view-login'));
+  // 로그인 화면 우상단 "회원가입 >" 링크. 기존 show-signup과 동일한 화면 전환만 재사용한다(신규 로직 없음).
+  const signupTop = document.getElementById('mobile-login-signup-top');
+  if (signupTop) signupTop.addEventListener('click', () => showView('view-signup'));
 
   // 비밀번호 표시/숨기기 토글. input의 type만 전환하고 값/검증은 그대로 둔다.
   const pwToggle = document.getElementById('mobile-login-password-toggle');
