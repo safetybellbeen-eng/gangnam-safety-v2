@@ -889,6 +889,12 @@ function updateDongFilterLabel() {
   else labelEl.textContent = `${selected[0]} 외 ${selected.length - 1}`;
   // css/mobile.css의 .site-select-filter[data-active="true"] 강조 스타일용.
   if (filterEl) filterEl.dataset.active = String(!!(selected && selected.length > 0));
+
+  // 사용자 피드백: "전체" 버튼도 다른 옵션 행과 동일하게, 아무 동도 선택되지 않았을 때
+  // 체크 표시(✓)가 보이도록 한다(.site-select-filter-option:has(input:checked)와 동일한
+  // 선택 강조를 버튼 쪽은 .is-checked 클래스로 흉내낸다 — <button>은 :checked가 없으므로).
+  const clearBtn = document.getElementById('site-dong-filter-clear');
+  if (clearBtn) clearBtn.classList.toggle('is-checked', !selected || selected.length === 0);
 }
 
 // 사용자 요청: 공사금액/점검/산재표를 관할과 동일한 <details> 커스텀 드롭다운(단일선택 radio)
@@ -957,7 +963,9 @@ export function renderDongOptions() {
 
   dongs.forEach(dong => {
     const label = document.createElement('label');
-    label.className = 'site-dong-filter-option';
+    // 사용자 피드백(촌스럽다는 지적): 공사금액/점검/산재표와 완전히 같은 공통 옵션 행 클래스로
+    // 통일한다(이전에는 관할만 별도 .site-dong-filter-option 클래스를 써서 CSS가 어긋나 있었다).
+    label.className = 'site-select-filter-option';
 
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
@@ -976,8 +984,14 @@ export function renderDongOptions() {
     const text = document.createElement('span');
     text.textContent = dong;
 
+    const check = document.createElement('span');
+    check.className = 'site-select-filter-check';
+    check.setAttribute('aria-hidden', 'true');
+    check.textContent = '✓';
+
     label.appendChild(checkbox);
     label.appendChild(text);
+    label.appendChild(check);
     optionsContainer.appendChild(label);
   });
 
