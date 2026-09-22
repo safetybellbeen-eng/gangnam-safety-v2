@@ -283,11 +283,14 @@
   /* STEP15-C.1: 1행 = 검색창(거의 전체 폭), 2행 = 동/금액/정렬/즐겨찾기/확인필요/건수를
      한 줄 가로 스크롤로 압축한다. 검색/필터 state와 getFilteredSortedSites() 로직은
      전혀 건드리지 않고, 기존 <select>/버튼(DOM)과 #site-filter-row wrapper만으로 재구성한다. */
+  /* STEP16.5-B: 좌우 여백을 16px(--gnmap-space-4) 기준으로 통일하고, 검색창-필터 사이
+     간격을 토큰(--gnmap-space-2)으로 정리한다. 세로 padding은 지도가 넓게 보이도록
+     그대로 compact하게 유지(8px). */
   #site-search-bar {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 8px 12px;
+    gap: var(--gnmap-space-2);
+    padding: 8px var(--gnmap-space-4);
   }
   /* STEP15-E.1: 검색창을 감싸는 relative 컨테이너로 만들어 아이콘을 입력창 안쪽 좌측에
      배치한다. #site-search-input의 검색 로직/이벤트/placeholder/×버튼은 전혀 건드리지 않고
@@ -311,15 +314,23 @@
     width: 18px;
     height: 18px;
   }
+  /* STEP16.5-B: 검색창을 지도 화면의 1순위 control로 다듬는다. 높이를 44→46px로
+     살짝 키우고, radius를 지나치게 둥근 lg(18px)에서 차분한 rectangle 느낌의
+     md(14px)로 낮춘다. placeholder 대비를 강화한다. 기능/이벤트/placeholder 텍스트는
+     그대로 둔다. */
   #site-search-input {
     width: 100%;
-    height: 44px;
+    height: 46px;
     box-sizing: border-box;
     padding: 0 36px 0 38px;
     border: 1px solid var(--gnmap-border);
-    border-radius: var(--gnmap-radius-lg);
+    border-radius: var(--gnmap-radius-md);
     background: var(--gnmap-bg-soft);
-    font-size: 14px;
+    color: var(--gnmap-text-primary);
+    font-size: var(--gnmap-fs-body);
+  }
+  #site-search-input::placeholder {
+    color: var(--gnmap-text-sub);
   }
   #site-search-input:focus {
     outline: none;
@@ -327,17 +338,25 @@
     background: #fff;
     box-shadow: var(--gnmap-focus-ring);
   }
+  /* STEP16.5-B: clear(×) 버튼의 실제 클릭 가능 영역을 32px 이상으로 넓힌다.
+     동작/아이콘 텍스트는 그대로다. */
   #site-search-clear-btn {
     position: absolute;
     top: 50%;
-    right: 10px;
+    right: 6px;
     transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    min-height: 32px;
     border: none;
+    border-radius: 50%;
     background: none;
     color: var(--gnmap-text-sub);
     font-size: 16px;
     line-height: 1;
-    padding: 4px;
+    padding: 0;
     cursor: pointer;
   }
   /* PC에서 display:contents였던 #site-filter-row가 모바일에서만 실제 2행 스크롤 컨테이너가 된다. */
@@ -348,7 +367,7 @@
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: center;
-    gap: 6px;
+    gap: var(--gnmap-space-2);
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
@@ -356,6 +375,9 @@
   #site-filter-row::-webkit-scrollbar {
     display: none;
   }
+  /* STEP16.5-B: A(조건 선택: 동/공사금액/정렬)와 B(빠른 toggle: 즐겨찾기/확인필요)를
+     동일한 pill 톤으로 통일하되(높이 34px, radius pill, 글씨 13px), 실제 값/옵션/이벤트는
+     전혀 건드리지 않는다. */
   #site-dong-select,
   #site-amount-select,
   #site-sort-select,
@@ -364,38 +386,56 @@
     flex: 0 0 auto;
     width: auto;
     box-sizing: border-box;
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
     border: 1px solid var(--gnmap-border);
-    border-radius: 14px;
+    border-radius: var(--gnmap-radius-pill);
     background: var(--gnmap-bg-soft);
-    padding: 6px 12px;
-    font-size: 12px;
-    color: #333;
+    padding: 0 var(--gnmap-space-3);
+    font-size: var(--gnmap-fs-secondary);
+    color: var(--gnmap-text-primary);
     -webkit-appearance: none;
     appearance: none;
   }
-  #site-favorite-filter-btn.active,
-  #site-review-filter-btn.active {
+  /* STEP16.5-B: 즐겨찾기 active는 기존과 동일하게 정부 blue. 확인필요 active는
+     STEP16.5-A에서 정의한 상태색 체계(확인필요/위험=red)와 일치시켜 red 계열로 구분한다
+     — location_quality 등 실제 데이터 의미는 변경하지 않고, 필터 버튼의 강조색만 다듬는다. */
+  #site-favorite-filter-btn.active {
     border-color: var(--gnmap-blue);
     background: var(--gnmap-blue-light);
     color: var(--gnmap-blue);
-    font-weight: bold;
+    font-weight: var(--gnmap-fw-semibold);
   }
+  #site-review-filter-btn.active {
+    border-color: var(--gnmap-red);
+    background: var(--gnmap-red-bg);
+    color: var(--gnmap-red);
+    font-weight: var(--gnmap-fw-semibold);
+  }
+  /* STEP16.5-B: toggle 그룹(B) 앞에 얇은 구분선을 두어 "조건 선택(A)"과 시각적으로
+     분리한다. DOM 구조는 바꾸지 않고 기존 wrapper에 border-left만 추가한다. */
   #site-toggle-filter-row {
     flex: 0 0 auto;
     display: flex;
     flex-wrap: nowrap;
     align-items: center;
-    gap: 6px;
+    gap: var(--gnmap-space-2);
+    padding-left: var(--gnmap-space-2);
+    border-left: 1px solid var(--gnmap-border);
     white-space: nowrap;
   }
   #site-review-count {
     font-weight: bold;
   }
+  /* STEP16.5-B: 결과 건수(C)는 클릭 control처럼 보이지 않도록 배경/테두리 없이
+     순수 텍스트 정보로만 표시한다(기존에도 배경/테두리가 없었으나, 글씨 크기를
+     caption 토큰으로 통일해 가독성만 높인다). */
   #site-count-label {
-    margin-left: 6px;
+    margin-left: var(--gnmap-space-2);
     white-space: nowrap;
     color: var(--gnmap-text-sub);
-    font-size: 11px;
+    font-size: var(--gnmap-fs-caption);
   }
   #site-list {
     display: none;
@@ -434,15 +474,19 @@
     bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 16px);
     z-index: 55;
     /* STEP15-E.1: 위치(top/left/right/bottom/z-index)는 STEP15-C.4에서 확정된 값을 그대로 두고,
-       아이콘+텍스트를 나란히 배치하는 카드형 floating 버튼으로 겉모습만 다듬는다. */
+       아이콘+텍스트를 나란히 배치하는 카드형 floating 버튼으로 겉모습만 다듬는다.
+       STEP16.5-B: secondary floating action답게 최소 44px 터치 타겟을 보장한다(레이아웃
+       위치/기존 동작은 그대로). */
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
+    min-height: var(--gnmap-tap-min);
     border: 1px solid var(--gnmap-border);
-    border-radius: 20px;
+    border-radius: var(--gnmap-radius-pill);
     background: #fff;
-    padding: 8px 14px;
-    font-size: 12px;
+    padding: 0 var(--gnmap-space-4);
+    font-size: var(--gnmap-fs-secondary);
     color: var(--gnmap-navy);
     box-shadow: var(--gnmap-shadow-sm);
   }
@@ -467,12 +511,16 @@
     bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 56px);
     z-index: 55;
     max-width: 60vw;
+    /* STEP16.5-B: 임시 텍스트 느낌 대신, 지도 화면의 다른 floating 요소(범례/현재위치
+       버튼)와 같은 white+border+shadow 톤의 compact toast pill로 정돈한다.
+       메시지 내용/노출-숨김 동작(JS)은 전혀 바꾸지 않는다. */
     background: #fff;
-    color: #c0392b;
-    font-size: 11px;
-    padding: 4px 8px;
-    border-radius: 6px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    color: var(--gnmap-red);
+    font-size: var(--gnmap-fs-caption);
+    padding: var(--gnmap-space-2) var(--gnmap-space-3);
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-pill);
+    box-shadow: var(--gnmap-shadow-sm);
   }
 
   /* STEP15-C/E.2: 현장/즐겨찾기 카드형 목록. 기존 .site-list-item 등 DOM/클래스는 그대로 두고
@@ -617,6 +665,9 @@
   /* STEP15-E.1-2: 지도 좌측 상단 정확도 범례. #map-container가 이미 position:relative이므로
      그 안에서만 absolute로 띄운다. 검색창/필터 행은 #map-container 밖(#site-list-panel)에 있어
      겹치지 않는다. pointer-events:none으로 지도 드래그/클릭을 가리지 않는다. 지도 탭에서만 노출. */
+  /* STEP16.5-B: compact legend로 정돈 — 위치/투명 배경/얇은 테두리/subtle shadow 구조는
+     유지하고 padding/글씨만 토큰으로 다듬는다. 정확/중간/확인필요 3개 의미와 위치는
+     변경하지 않는다. */
   #app[data-mobile-tab="map"] #mobile-map-legend {
     display: flex;
     flex-direction: column;
@@ -628,7 +679,7 @@
     background: rgba(255, 255, 255, 0.92);
     border: 1px solid var(--gnmap-border);
     border-radius: var(--gnmap-radius-sm);
-    padding: 6px 10px;
+    padding: var(--gnmap-space-2) var(--gnmap-space-3);
     box-shadow: var(--gnmap-shadow-sm);
     pointer-events: none;
   }
@@ -636,8 +687,8 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 11px;
-    color: #333;
+    font-size: var(--gnmap-fs-caption);
+    color: var(--gnmap-text-primary);
     white-space: nowrap;
   }
   .mobile-map-legend-dot {
@@ -646,9 +697,12 @@
     border-radius: 50%;
     flex-shrink: 0;
   }
-  .mobile-map-legend-dot-exact { background: #2e7d32; }
-  .mobile-map-legend-dot-estimated { background: #b7791f; }
-  .mobile-map-legend-dot-review { background: #c0392b; }
+  /* 색 자체는 marker 색 의미(EXACT/MANUAL=green, ESTIMATED=amber, APPROXIMATE=red)와
+     동일한 값을 그대로 쓰되, STEP16.5-A 상태색 토큰으로 표기만 정리한다(값 변경 없음:
+     #2e7d32/#b7791f/#c0392b 그대로). */
+  .mobile-map-legend-dot-exact { background: var(--gnmap-green); }
+  .mobile-map-legend-dot-estimated { background: var(--gnmap-amber); }
+  .mobile-map-legend-dot-review { background: var(--gnmap-red); }
 
   #app[data-mobile-tab="site"] #site-list-panel,
   #app[data-mobile-tab="favorite"] #site-list-panel {
