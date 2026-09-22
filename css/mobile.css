@@ -3,7 +3,9 @@
    media query 밖 규칙은 "PC에서는 항상 숨김"을 보장하기 위한 기본값이다. */
 
 #mobile-bottom-nav,
-.mobile-view {
+.mobile-view,
+#mobile-app-header,
+.site-list-review-badge {
   display: none;
 }
 
@@ -20,24 +22,33 @@
     overflow-x: hidden;
   }
 
-  /* PC 전용 상단 안내 요소는 모바일 탭 구조와 겹치므로 우선 숨긴다.
-     JS 로직/기능 자체는 변경하지 않으며 PC 화면에는 영향 없다.
-     현재위치 등은 후속 STEP에서 모바일 상단바로 재구성 예정(이번 STEP 범위 아님). */
+  /* PC 전용 상단 안내 요소는 모바일 공통 헤더로 대체한다. JS 로직/기능은 변경하지 않으며 PC 화면에는 영향 없다. */
   #view-approved h1,
-  #approved-role-badge,
-  #btn-current-location,
-  #location-message {
+  #approved-role-badge {
     display: none;
   }
 
-  /* 로그아웃만은 모바일에서도 항상 접근 가능하도록 작게 고정 배치한다. */
+  /* STEP15-C: 모바일 공통 헤더. 텍스트만 사용(CI 이미지 없음). #view-approved가 flex column이 되므로
+     맨 앞에 위치한 이 요소가 자연스럽게 최상단에 온다. */
+  #mobile-app-header {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 12px 16px;
+    background: #fff;
+    border-bottom: 1px solid #eee;
+    box-sizing: border-box;
+  }
+  #mobile-app-header-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: #16326b;
+  }
+
+  /* STEP15-C: 로그아웃은 더보기 탭(STEP15-D)으로 옮겨갈 예정이므로 이번 단계에서는 화면 위에 띄우지 않는다.
+     기능/DOM은 삭제하지 않고 숨김만 처리한다. */
   #logout-approved {
-    position: fixed;
-    top: 8px;
-    right: 8px;
-    z-index: 60;
-    font-size: 12px;
-    padding: 4px 8px;
+    display: none;
   }
 
   /* 관리자 전용 PC 절대배치 버튼/패널 — 모바일 노출(더보기 연결)은 STEP15-D 이후. */
@@ -72,11 +83,45 @@
     flex-shrink: 0;
     box-sizing: border-box;
   }
+  /* STEP15-C: 검색/필터를 세로로 길게 나열하지 않고, 검색창(고정폭) + 필터 칩들을
+     한 줄 가로 스크롤 바로 압축한다. 검색/필터 state와 getFilteredSortedSites() 로직은
+     전혀 건드리지 않고, 기존 <select>/버튼(DOM) 그대로 CSS로만 재구성한다. */
+  #site-search-bar {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  #site-search-input-wrap {
+    flex: 0 0 auto;
+    width: 55vw;
+  }
   #site-dong-select,
   #site-amount-select,
   #site-sort-select {
-    width: 100%;
+    flex: 0 0 auto;
+    width: auto;
     box-sizing: border-box;
+    border: 1px solid #ddd;
+    border-radius: 14px;
+    background: #f5f7fa;
+    padding: 5px 10px;
+    font-size: 12px;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  #site-toggle-filter-row {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+  #site-count-label {
+    margin-left: 6px;
+    white-space: nowrap;
   }
   #site-list {
     display: none;
@@ -90,11 +135,67 @@
     flex: 1;
     min-height: 0;
     height: auto;
+    position: relative;
   }
 
-  /* 상세 패널: 이번 STEP은 완성된 bottom sheet(STEP15-C)가 아니라,
-     화면 하단과 겹치지 않는 최소 오버레이 배치만 한다.
-     표시/숨김은 기존 selectSite/closeDetail의 inline style을 그대로 사용(JS 미변경). */
+  /* STEP15-C: 기존 "현재 위치" 버튼/메시지(#btn-current-location, requestCurrentLocation())를
+     새 로직 없이 그대로 재사용하되, 지도 탭에서만 지도 우측 하단 floating 버튼으로 노출한다. */
+  #btn-current-location,
+  #location-message {
+    display: none;
+  }
+  #app[data-mobile-tab="map"] #btn-current-location {
+    display: block;
+    position: fixed;
+    right: 12px;
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 16px);
+    z-index: 55;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    background: #fff;
+    padding: 8px 14px;
+    font-size: 12px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  }
+  #app[data-mobile-tab="map"] #location-message {
+    display: block;
+    position: fixed;
+    right: 12px;
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 56px);
+    z-index: 55;
+    max-width: 60vw;
+    background: #fff;
+    color: #c0392b;
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  }
+
+  /* STEP15-C: 현장/즐겨찾기 카드형 목록. 기존 .site-list-item 등 DOM/클래스는 그대로 두고
+     모바일에서만 카드 스타일을 입힌다(PC 리스트 스타일은 components.css/layout.css 그대로 유지). */
+  .site-list-item {
+    margin: 8px 12px;
+    padding: 12px;
+    border: 1px solid #eee;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    background: #fff;
+  }
+  .site-list-review-badge {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #fff5f5;
+    color: #c0392b;
+    font-size: 11px;
+  }
+
+  /* 상세 패널: 화면 아래에서 올라오는 bottom sheet 형태로 배치한다.
+     표시/숨김은 기존 selectSite/closeDetail의 inline style을 그대로 사용(JS 미변경).
+     하단 탭(56px + safe-area) 위에서 끝나 네비게이션을 덮지 않고, 내용이 길면 패널 내부만 스크롤한다
+     (overflow-y:auto는 layout.css 기존 규칙을 그대로 물려받는다). */
   #site-detail-panel {
     position: fixed;
     top: auto;
@@ -105,8 +206,19 @@
     max-height: 60vh;
     border-left: none;
     border-top: 1px solid #ddd;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
     z-index: 70;
     box-sizing: border-box;
+  }
+  #site-detail-panel::before {
+    content: "";
+    display: block;
+    width: 36px;
+    height: 4px;
+    margin: 2px auto 8px;
+    border-radius: 2px;
+    background: #ddd;
   }
 
   .mobile-view {
@@ -171,10 +283,14 @@
   }
   .mobile-tab-btn {
     flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
     border: none;
     background: none;
-    padding: 8px 0 6px;
-    font-size: 11px;
+    padding: 6px 0 4px;
+    font-size: 10px;
     color: #888;
     cursor: pointer;
   }
@@ -182,4 +298,15 @@
     color: #1a73e8;
     font-weight: bold;
   }
+  /* 외부 아이콘 라이브러리 없이 Unicode 문자만 사용한다. */
+  .mobile-tab-btn::before {
+    font-size: 18px;
+    line-height: 1;
+  }
+  .mobile-tab-btn[data-tab="map"]::before { content: "📍"; }
+  .mobile-tab-btn[data-tab="site"]::before { content: "🏢"; }
+  .mobile-tab-btn[data-tab="route"]::before { content: "🧭"; }
+  .mobile-tab-btn[data-tab="favorite"]::before { content: "★"; }
+  .mobile-tab-btn[data-tab="alert"]::before { content: "🔔"; }
+  .mobile-tab-btn[data-tab="more"]::before { content: "☰"; }
 }
