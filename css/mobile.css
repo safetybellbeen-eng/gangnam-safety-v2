@@ -267,7 +267,7 @@
     flex-direction: column;
     height: 100vh;
     height: 100dvh;
-    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(50px + env(safe-area-inset-bottom, 0px));
     box-sizing: border-box;
     overflow: hidden;
   }
@@ -596,7 +596,7 @@
     top: auto;
     left: auto;
     right: 12px;
-    bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 16px);
+    bottom: calc(50px + env(safe-area-inset-bottom, 0px) + 16px);
     z-index: 55;
     /* STEP15-E.1: 위치(top/left/right/bottom/z-index)는 STEP15-C.4에서 확정된 값을 그대로 두고,
        아이콘+텍스트를 나란히 배치하는 카드형 floating 버튼으로 겉모습만 다듬는다.
@@ -633,7 +633,7 @@
     top: auto;
     left: auto;
     right: 12px;
-    bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 56px);
+    bottom: calc(50px + env(safe-area-inset-bottom, 0px) + 56px);
     z-index: 55;
     max-width: 60vw;
     /* STEP16.5-B: 임시 텍스트 느낌 대신, 지도 화면의 다른 floating 요소(범례/현재위치
@@ -721,7 +721,7 @@
      토큰으로만 표기한다(정확=green/추정=amber/확인필요=red 의미·값 변경 없음). */
   .site-detail-quality-badge {
     display: inline-block;
-    margin: 0 0 var(--gnmap-space-2);
+    margin: 0 0 4px;
     padding: 2px 10px;
     border-radius: var(--gnmap-radius-pill);
     font-size: var(--gnmap-fs-caption);
@@ -742,7 +742,7 @@
 
   /* 상세 패널: 화면 아래에서 올라오는 bottom sheet 형태로 배치한다.
      표시/숨김은 기존 selectSite/closeDetail의 inline style을 그대로 사용(JS 미변경).
-     하단 탭(56px + safe-area) 위에서 끝나 네비게이션을 덮지 않고, 내용이 길면 패널 내부만 스크롤한다
+     하단 탭(50px + safe-area) 위에서 끝나 네비게이션을 덮지 않고, 내용이 길면 패널 내부만 스크롤한다
      (overflow-y:auto는 layout.css 기존 규칙을 그대로 물려받는다).
      STEP16.5-C §4: 정보/메모를 보기에 60vh는 답답하다는 지적에 따라 74dvh로 넓힌다(요청 범위
      72~78dvh 안). 하단 네비/safe-area는 기존과 동일하게 bottom 계산에 이미 반영되어 있어
@@ -755,7 +755,7 @@
     top: auto;
     left: 0;
     right: 0;
-    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(50px + env(safe-area-inset-bottom, 0px));
     width: 100%;
     max-height: 64dvh;
     max-height: 64vh;
@@ -763,7 +763,7 @@
     border-top: 1px solid var(--gnmap-border);
     border-radius: var(--gnmap-radius-lg) var(--gnmap-radius-lg) 0 0;
     box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
-    padding: 8px var(--gnmap-space-3) var(--gnmap-space-3);
+    padding: 6px var(--gnmap-space-3) 6px;
     z-index: 70;
     box-sizing: border-box;
   }
@@ -774,25 +774,32 @@
   #app[data-mobile-tab="map"][data-detail-open="true"] #site-list-panel {
     display: none;
   }
+  /* 사용자 피드백(4): 지도 탭에서 연 상세는 닫기 전까지 유지한다 — 다른 탭으로 이동해도
+     js/app.js의 activateMobileTab()이 closeDetail()을 건너뛰어 DOM/state는 그대로 남지만,
+     지도 탭이 아닐 때는 화면에 겹쳐 보이면 안 되므로 여기서만 시각적으로 숨긴다.
+     renderDetail()이 인라인으로 지정하는 style.display:block보다 우선해야 하므로 !important 필요. */
+  #app:not([data-mobile-tab="map"]) #site-detail-panel[data-detail-origin="map"] {
+    display: none !important;
+  }
   /* 사용자 피드백: 지도 탭에서 핀을 눌렀을 때 상세정보가 화면을 거의 다 덮어 지도가 거의
      안 보이고 가독성도 떨어진다는 지적 — 지도 탭에서 여는 상세만 "미리보기" 높이(약 42vh)로
      줄여 지도가 함께 보이게 한다. 내용/기능은 그대로이며 내부 스크롤(overflow-y:auto,
      layout.css 기존 규칙)로 나머지(개인 메모 등)를 볼 수 있다. 현장/즐겨찾기 탭에서 여는
      상세는 기존 74vh(전체 정보 확인용)를 그대로 유지한다. */
-  /* 사용자 요청: 길찾기/경로추가/메모 버튼을 보려고 스크롤을 해야 했다는 지적 — 지도 탭
-     상세 패널의 내용(사업장명/업체명/주소 + 2x2 공사정보 + 액션 3버튼, 메모 섹션은 지도
-     탭에서 렌더하지 않음)이 스크롤 없이 한 화면에 다 들어가도록 높이를 34vh→44vh로
-     다시 늘린다(390x760 기준 실제 콘텐츠 높이 약 315px를 측정해 여유를 두고 반영). */
+  /* 사용자 요청(3): 상세정보를 더 작게 만들어 지도를 더 크게 보이게 한다. 내부 여백을
+     줄인 뒤(위 각 규칙) 390x760 기준 실제 콘텐츠 높이를 다시 측정하니 약 272px(≈36vh)로,
+     기존 44vh(약 334px)보다 62px의 불필요한 여백이 있었다 — 스크롤 없이 딱 맞는 38vh로
+     줄여 그만큼 지도 영역을 넓힌다. */
   #app[data-mobile-tab="map"] #site-detail-panel {
-    max-height: 44dvh;
-    max-height: 44vh;
+    max-height: 38dvh;
+    max-height: 38vh;
   }
   #site-detail-panel::before {
     content: "";
     display: block;
     width: 36px;
     height: 4px;
-    margin: 2px auto 8px;
+    margin: 0 auto 4px;
     border-radius: 2px;
     background: var(--gnmap-border);
   }
@@ -828,7 +835,7 @@
      있어 PC(layout.css)는 원래 스타일 그대로다 — 이 override는 @media(max-width:768px) 안에서만
      적용된다. */
   .site-detail-hero {
-    margin: 0 0 var(--gnmap-space-2);
+    margin: 0 0 4px;
   }
   .site-detail-row-name,
   .site-detail-row-company {
@@ -852,22 +859,26 @@
   /* 사용자 요청: 즐겨찾기 추가는 액션 버튼 대신 사업장명 옆 별표 터치로 바로 토글한다.
      기존 handleFavoriteToggle(js/ui.js)을 그대로 재사용하며, 이 요소는 모바일에서만 노출된다
      (PC 기본 숨김은 상단 PC-hide 목록의 .site-detail-name-favorite-btn 참고). */
+  /* 사용자 피드백: 별표를 align-items:center로 두면 제목이 2줄로 줄바꿈될 때 별표가 전체
+     블록(두 줄) 높이의 정중앙, 즉 줄과 줄 사이에 걸쳐 떠서 "제목과 분리되어 보인다"는
+     지적 — flex-start로 바꿔 항상 첫 줄과 같은 높이에서 시작하도록 고정한다. */
   .site-detail-row-name {
     display: flex;
-    align-items: center;
-    gap: 6px;
+    align-items: flex-start;
+    gap: 4px;
   }
   .site-detail-name-favorite-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 26px;
-    height: 26px;
+    width: 20px;
+    height: 20px;
+    margin-top: 1px;
     border: none;
     background: none;
     padding: 0;
-    font-size: 19px;
+    font-size: 17px;
     line-height: 1;
     color: var(--gnmap-text-sub);
     cursor: pointer;
@@ -930,14 +941,14 @@
   .site-detail-meta {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 6px;
-    margin: 6px 0 var(--gnmap-space-2);
+    gap: 4px;
+    margin: 4px 0 6px;
   }
   .site-detail-meta .site-detail-row {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: 6px var(--gnmap-space-2);
+    gap: 1px;
+    padding: 4px 8px;
     border-bottom: none;
     border-radius: var(--gnmap-radius-sm);
     background: var(--gnmap-bg-soft);
@@ -959,11 +970,11 @@
   .site-detail-actions {
     display: flex;
     gap: 6px;
-    margin-bottom: var(--gnmap-space-2);
+    margin-bottom: 2px;
   }
   .site-detail-action-btn {
     flex: 1;
-    min-height: 36px;
+    min-height: 34px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1174,7 +1185,7 @@
     top: 0;
     left: 0;
     right: 0;
-    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(50px + env(safe-area-inset-bottom, 0px));
     width: 100%;
     max-height: none;
     transform: none;
@@ -1368,7 +1379,7 @@
     top: 0;
     left: 0;
     right: 0;
-    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(50px + env(safe-area-inset-bottom, 0px));
     width: 100%;
     max-height: none;
     transform: none;
