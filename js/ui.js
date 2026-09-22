@@ -455,12 +455,59 @@ export function renderMobileRouteView(containerId) {
   container.appendChild(card);
 }
 
-// STEP15-D. 모바일 "더보기" 탭. 회원관리/엑셀업로드/업로드이력/감독일정/로그아웃을 새로 구현하지
-// 않고, 기존 PC 전용 버튼(#btn-admin-panel/#btn-upload-panel/#btn-supervision-panel/
+// STEP15-E.6: 더보기 메뉴 행 왼쪽에 붙는 장식용 line SVG 아이콘. 외부 아이콘 라이브러리를
+// 새로 쓰지 않고, 기존 하단 탭 아이콘(index.html의 .mobile-tab-icon)과 동일한 스타일
+// (stroke="currentColor", stroke-width 1.8, round cap/join)로 그린다. 기능과는 무관한
+// 순수 장식이며, 어떤 클릭 로직과도 연결하지 않는다.
+const MOBILE_MORE_ICON_PATHS = {
+  user: ['<circle cx="12" cy="8" r="3.4"/>', '<path d="M5 20c0-4 3.2-6.5 7-6.5s7 2.5 7 6.5"/>'],
+  upload: ['<path d="M12 15V5"/>', '<path d="M8 9l4-4 4 4"/>', '<path d="M5 15v2.5A2.5 2.5 0 0 0 7.5 20h9a2.5 2.5 0 0 0 2.5-2.5V15"/>'],
+  history: ['<circle cx="12" cy="12" r="8.5"/>', '<path d="M12 7.5V12l3 2.2"/>'],
+  calendar: ['<rect x="4" y="5" width="16" height="15" rx="2"/>', '<path d="M4 10h16"/>', '<path d="M8 3v4M16 3v4"/>'],
+  logout: ['<path d="M10 4H6.5A2.5 2.5 0 0 0 4 6.5v11A2.5 2.5 0 0 0 6.5 20H10"/>', '<path d="M14 12H4.5"/>', '<path d="M11 8.5 14.5 12 11 15.5"/>'],
+  chevron: ['<path d="M9 5.5 15 12l-6 6.5"/>'],
+};
+
+function buildMobileMoreIcon(name) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'mobile-more-icon-svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.8');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  const parts = MOBILE_MORE_ICON_PATHS[name] || [];
+  parts.forEach(markup => svg.insertAdjacentHTML('beforeend', markup));
+  return svg;
+}
+
+// STEP15-E.6: 회원관리/엑셀업로드/업로드이력/감독일정 패널이 mobile-view-more 위에 전체화면으로
+// 덮일 때, 다시 "더보기" 목록으로 돌아갈 수 있는 닫기(×) 버튼이 없던 패널(admin-panel)에
+// 최소한으로 하나 추가한다. 클릭 시 해당 패널의 표시 여부(style.display)만 되돌릴 뿐,
+// 새 router/history나 별도 상태를 만들지 않는다 — 기존 #btn-supervision-close와 동일한 방식.
+function buildMobilePanelCloseBtn(panelId) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'mobile-panel-close-btn';
+  btn.setAttribute('aria-label', '닫기');
+  btn.textContent = '×';
+  btn.addEventListener('click', () => {
+    const panel = document.getElementById(panelId);
+    if (panel) panel.style.display = 'none';
+  });
+  return btn;
+}
+
+// STEP15-D/E.6. 모바일 "더보기" 탭. 회원관리/엑셀업로드/업로드이력/감독일정/로그아웃을 새로
+// 구현하지 않고, 기존 PC 전용 버튼(#btn-admin-panel/#btn-upload-panel/#btn-supervision-panel/
 // #logout-approved)을 그대로 .click()으로 위임한다 — 그 버튼들에 이미 bindEvents()(js/app.js)가
 // 등록해 둔 기존 열기/렌더/권한 검사 로직을 그대로 재사용하고, 여기서는 어떤 데이터 조회나
 // RPC 호출도 직접 하지 않는다. "업로드 이력"도 별도 화면을 새로 만들지 않고 동일한 업로드 패널
-// (이미 상단에 이력을 보여준다)을 그대로 연다.
+// (이미 상단에 이력을 보여준다)을 그대로 연다. STEP15-E.6: 메뉴를 관리/업무/계정 그룹으로
+// 나누고 행마다 아이콘 + chevron을 붙여 iOS/Android 설정화면과 비슷하게 정돈한다 —
+// isAdmin() 분기(관리자만 회원관리/엑셀업로드/업로드이력 노출)는 기존 그대로다.
 export function renderMobileMoreMenu(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
@@ -490,27 +537,63 @@ export function renderMobileMoreMenu(containerId) {
 
   container.appendChild(profileCard);
 
-  const menuList = document.createElement('div');
-  menuList.className = 'mobile-more-menu';
+  // 그룹 제목(관리/업무/계정)은 시각적 분류일 뿐, admin 여부에 따라 항목이 비면 그룹 자체를
+  // 그리지 않는다(빈 "관리" 그룹 헤더가 일반 사용자에게 노출되지 않도록).
+  function addMenuGroup(title, items) {
+    if (!items || items.length === 0) return;
 
-  function addMenuItem(label, onClick) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'mobile-more-item';
-    btn.textContent = label;
-    btn.addEventListener('click', onClick);
-    menuList.appendChild(btn);
+    const groupTitle = document.createElement('div');
+    groupTitle.className = 'mobile-more-group-title';
+    groupTitle.textContent = title;
+    container.appendChild(groupTitle);
+
+    const group = document.createElement('div');
+    group.className = 'mobile-more-menu';
+
+    items.forEach(item => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'mobile-more-item' + (item.danger ? ' mobile-more-item-danger' : '');
+
+      const iconWrap = document.createElement('span');
+      iconWrap.className = 'mobile-more-item-icon';
+      iconWrap.appendChild(buildMobileMoreIcon(item.icon));
+      btn.appendChild(iconWrap);
+
+      const labelEl = document.createElement('span');
+      labelEl.className = 'mobile-more-item-label';
+      labelEl.textContent = item.label;
+      btn.appendChild(labelEl);
+
+      // 로그아웃은 다음 화면으로 "들어가는" 항목이 아니라 즉시 실행되는 동작이라
+      // drill-down을 뜻하는 chevron(>)을 붙이지 않는다.
+      if (!item.danger) {
+        const chevronWrap = document.createElement('span');
+        chevronWrap.className = 'mobile-more-item-chevron';
+        chevronWrap.appendChild(buildMobileMoreIcon('chevron'));
+        btn.appendChild(chevronWrap);
+      }
+
+      btn.addEventListener('click', item.onClick);
+      group.appendChild(btn);
+    });
+
+    container.appendChild(group);
   }
 
-  if (admin) {
-    addMenuItem('회원 관리', () => document.getElementById('btn-admin-panel').click());
-    addMenuItem('엑셀 업로드', () => document.getElementById('btn-upload-panel').click());
-    addMenuItem('업로드 이력', () => document.getElementById('btn-upload-panel').click());
-  }
-  addMenuItem('감독일정', () => document.getElementById('btn-supervision-panel').click());
-  addMenuItem('로그아웃', () => document.getElementById('logout-approved').click());
+  addMenuGroup('관리', admin ? [
+    { label: '회원 관리', icon: 'user', onClick: () => document.getElementById('btn-admin-panel').click() },
+    { label: '엑셀 업로드', icon: 'upload', onClick: () => document.getElementById('btn-upload-panel').click() },
+    { label: '업로드 이력', icon: 'history', onClick: () => document.getElementById('btn-upload-panel').click() },
+  ] : []);
 
-  container.appendChild(menuList);
+  addMenuGroup('업무', [
+    { label: '감독일정', icon: 'calendar', onClick: () => document.getElementById('btn-supervision-panel').click() },
+  ]);
+
+  addMenuGroup('계정', [
+    { label: '로그아웃', icon: 'logout', danger: true, onClick: () => document.getElementById('logout-approved').click() },
+  ]);
 }
 
 let searchDebounceTimer = null;
@@ -611,6 +694,11 @@ export function bindSearchAndSort(containerId) {
 export async function renderAdminPanel(containerId) {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
+
+  // STEP15-E.6: 회원관리 패널은 모바일 "더보기" 탭에서 열면 전체화면으로 덮이는데
+  // 기존에는 닫고 돌아갈 버튼이 없었다. 여기서 닫기(×) 버튼을 하나 추가한다 — PC에서는
+  // css/mobile.css 기본값(.mobile-panel-close-btn)이 항상 숨기므로 PC 화면은 그대로다.
+  container.appendChild(buildMobilePanelCloseBtn(containerId));
 
   const msgEl = document.createElement('p');
   msgEl.id = 'admin-message';
