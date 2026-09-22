@@ -2,10 +2,34 @@
    base.css/layout.css/components.css/map.css는 건드리지 않고, 이 파일에서만 override한다.
    media query 밖 규칙은 "PC에서는 항상 숨김"을 보장하기 위한 기본값이다. */
 
+/* STEP15-E.1: 모바일 디자인 공통 토큰. :root에 등록만 될 뿐, PC의 어떤 선택자도
+   이 변수들을 참조하지 않으므로(전부 media query 안에서만 사용) PC 화면에는 영향이 없다.
+   앞으로 다른 모바일 화면(경로/알림/더보기 등)에도 이 값들을 그대로 재사용한다. */
+:root {
+  --gnmap-navy: #16326b;
+  --gnmap-blue: #1a73e8;
+  --gnmap-blue-light: #eef5ff;
+  --gnmap-bg-soft: #f5f7fa;
+  --gnmap-border: #e2e5ea;
+  --gnmap-text-sub: #666;
+  --gnmap-radius-lg: 18px;
+  --gnmap-radius-md: 14px;
+  --gnmap-radius-sm: 10px;
+  --gnmap-shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.08);
+  --gnmap-shadow-md: 0 4px 16px rgba(15, 23, 42, 0.12);
+}
+
 #mobile-bottom-nav,
 .mobile-view,
 #mobile-app-header,
 .site-list-review-badge {
+  display: none;
+}
+
+/* STEP15-E.1: 장식용 아이콘(검색/현재위치/상세 품질 배지)은 PC 공유 DOM에 추가된 것이라
+   기본값은 항상 숨김 — 모바일 미디어쿼리 안에서만 다시 보이게 한다(PC 화면 무변경 보장). */
+.mobile-icon-svg-wrap,
+.site-detail-quality-badge {
   display: none;
 }
 
@@ -37,20 +61,54 @@
   }
 
   /* STEP15-C: 모바일 공통 헤더. 텍스트만 사용(CI 이미지 없음). #view-approved가 flex column이 되므로
-     맨 앞에 위치한 이 요소가 자연스럽게 최상단에 온다. */
+     맨 앞에 위치한 이 요소가 자연스럽게 최상단에 온다.
+     STEP15-E.1: 좌측 브랜드 영역 + 우측 벨 버튼을 양 끝 정렬하는 구조로 확장(구조는 그대로,
+     spacing/색만 다듬음). #mobile-app-header-logo-slot은 지금은 빈 슬롯이며, 나중에 공식 CI
+     이미지를 <img>로 채우기만 하면 되도록 자리만 잡아둔다. */
   #mobile-app-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     flex-shrink: 0;
-    padding: 12px 16px;
+    padding: 14px 16px;
     background: #fff;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--gnmap-border);
     box-sizing: border-box;
   }
+  #mobile-app-header-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  #mobile-app-header-logo-slot {
+    /* 공식 CI 이미지가 들어올 자리. 이미지가 없는 지금은 폭 0이라 레이아웃에 아무 영향이 없다. */
+    display: inline-block;
+  }
   #mobile-app-header-title {
-    font-size: 16px;
+    font-size: 17px;
     font-weight: bold;
-    color: #16326b;
+    color: var(--gnmap-navy);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #mobile-header-alert-btn {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: none;
+    padding: 0;
+    color: var(--gnmap-navy);
+    cursor: pointer;
+  }
+  #mobile-header-alert-btn .mobile-icon-svg {
+    width: 22px;
+    height: 22px;
   }
 
   /* STEP15-C: 로그아웃은 더보기 탭(STEP15-D)으로 옮겨갈 예정이므로 이번 단계에서는 화면 위에 띄우지 않는다.
@@ -117,10 +175,59 @@
     gap: 6px;
     padding: 8px 12px;
   }
+  /* STEP15-E.1: 검색창을 감싸는 relative 컨테이너로 만들어 아이콘을 입력창 안쪽 좌측에
+     배치한다. #site-search-input의 검색 로직/이벤트/placeholder/×버튼은 전혀 건드리지 않고
+     크기·여백·아이콘 자리만 넓힌다. */
   #site-search-input-wrap {
+    position: relative;
     width: 100%;
   }
+  .mobile-search-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 50%;
+    left: 12px;
+    transform: translateY(-50%);
+    color: var(--gnmap-text-sub);
+    pointer-events: none;
+  }
+  .mobile-search-icon .mobile-icon-svg {
+    width: 18px;
+    height: 18px;
+  }
+  #site-search-input {
+    width: 100%;
+    height: 44px;
+    box-sizing: border-box;
+    padding: 0 36px 0 38px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-lg);
+    background: var(--gnmap-bg-soft);
+    font-size: 14px;
+  }
+  #site-search-input:focus {
+    outline: none;
+    border-color: var(--gnmap-blue);
+    background: #fff;
+  }
+  #site-search-clear-btn {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    border: none;
+    background: none;
+    color: var(--gnmap-text-sub);
+    font-size: 16px;
+    line-height: 1;
+    padding: 4px;
+    cursor: pointer;
+  }
   /* PC에서 display:contents였던 #site-filter-row가 모바일에서만 실제 2행 스크롤 컨테이너가 된다. */
+  /* STEP15-E.1: 가로 스크롤은 그대로 두되, 스크롤바만 숨겨 캡슐 필터 줄이 더 깔끔해 보이게 한다.
+     select/버튼 자체의 값·이벤트·옵션 목록은 전혀 건드리지 않는다. */
   #site-filter-row {
     display: flex;
     flex-direction: row;
@@ -129,20 +236,34 @@
     gap: 6px;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  #site-filter-row::-webkit-scrollbar {
+    display: none;
   }
   #site-dong-select,
   #site-amount-select,
-  #site-sort-select {
+  #site-sort-select,
+  #site-favorite-filter-btn,
+  #site-review-filter-btn {
     flex: 0 0 auto;
     width: auto;
     box-sizing: border-box;
-    border: 1px solid #ddd;
+    border: 1px solid var(--gnmap-border);
     border-radius: 14px;
-    background: #f5f7fa;
-    padding: 5px 10px;
+    background: var(--gnmap-bg-soft);
+    padding: 6px 12px;
     font-size: 12px;
+    color: #333;
     -webkit-appearance: none;
     appearance: none;
+  }
+  #site-favorite-filter-btn.active,
+  #site-review-filter-btn.active {
+    border-color: var(--gnmap-blue);
+    background: var(--gnmap-blue-light);
+    color: var(--gnmap-blue);
+    font-weight: bold;
   }
   #site-toggle-filter-row {
     flex: 0 0 auto;
@@ -152,9 +273,14 @@
     gap: 6px;
     white-space: nowrap;
   }
+  #site-review-count {
+    font-weight: bold;
+  }
   #site-count-label {
     margin-left: 6px;
     white-space: nowrap;
+    color: var(--gnmap-text-sub);
+    font-size: 11px;
   }
   #site-list {
     display: none;
@@ -178,7 +304,6 @@
     display: none;
   }
   #app[data-mobile-tab="map"] #btn-current-location {
-    display: block;
     position: fixed;
     /* STEP15-C.4: css/map.css의 PC용 규칙이 top:70px; left:0;을 이미 지정해 두었고,
        이 모바일 규칙은 지금까지 top/left를 재설정하지 않았다. position:fixed에서
@@ -193,12 +318,28 @@
     right: 12px;
     bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 16px);
     z-index: 55;
-    border: 1px solid #ddd;
+    /* STEP15-E.1: 위치(top/left/right/bottom/z-index)는 STEP15-C.4에서 확정된 값을 그대로 두고,
+       아이콘+텍스트를 나란히 배치하는 카드형 floating 버튼으로 겉모습만 다듬는다. */
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--gnmap-border);
     border-radius: 20px;
     background: #fff;
     padding: 8px 14px;
     font-size: 12px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    color: var(--gnmap-navy);
+    box-shadow: var(--gnmap-shadow-sm);
+  }
+  #app[data-mobile-tab="map"] #btn-current-location .mobile-icon-svg-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gnmap-blue);
+  }
+  #app[data-mobile-tab="map"] #btn-current-location .mobile-icon-svg {
+    width: 16px;
+    height: 16px;
   }
   #app[data-mobile-tab="map"] #location-message {
     display: block;
@@ -237,6 +378,30 @@
     background: #fff5f5;
     color: #c0392b;
     font-size: 11px;
+  }
+
+  /* STEP15-E.1: 상세 패널(bottom sheet) 상단의 위치정확도 배지. 값은 renderDetail()(js/ui.js)이
+     location_quality를 그대로 읽어 정하고, 여기서는 EXACT=녹색/ESTIMATED=주황/APPROXIMATE·
+     UNRESOLVED=빨강(기존 site-list-review-badge/upload-warning-text와 동일 계열 색)만 입힌다. */
+  .site-detail-quality-badge {
+    display: inline-block;
+    margin: 0 0 8px;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: bold;
+  }
+  .site-detail-quality-exact {
+    background: #eafaf0;
+    color: #2e7d32;
+  }
+  .site-detail-quality-estimated {
+    background: #fff8e6;
+    color: #b7791f;
+  }
+  .site-detail-quality-review {
+    background: #fff5f5;
+    color: #c0392b;
   }
 
   /* 상세 패널: 화면 아래에서 올라오는 bottom sheet 형태로 배치한다.
@@ -484,18 +649,14 @@
     cursor: pointer;
   }
   .mobile-tab-btn.active {
-    color: #1a73e8;
+    color: var(--gnmap-blue);
     font-weight: bold;
   }
-  /* 외부 아이콘 라이브러리 없이 Unicode 문자만 사용한다. */
-  .mobile-tab-btn::before {
-    font-size: 18px;
-    line-height: 1;
+  /* STEP15-E.1: 외부 아이콘 라이브러리 없이 index.html에 인라인으로 넣은 SVG(.mobile-tab-icon)를
+     쓴다. 아이콘이 stroke="currentColor"(더보기만 fill="currentColor")라 버튼의 color(위 .active
+     규칙 포함)를 그대로 물려받아, 이전 Unicode(::before) 방식과 동일하게 활성 탭만 파란색이 된다. */
+  .mobile-tab-icon {
+    width: 22px;
+    height: 22px;
   }
-  .mobile-tab-btn[data-tab="map"]::before { content: "📍"; }
-  .mobile-tab-btn[data-tab="site"]::before { content: "🏢"; }
-  .mobile-tab-btn[data-tab="route"]::before { content: "🧭"; }
-  .mobile-tab-btn[data-tab="favorite"]::before { content: "★"; }
-  .mobile-tab-btn[data-tab="alert"]::before { content: "🔔"; }
-  .mobile-tab-btn[data-tab="more"]::before { content: "☰"; }
 }
