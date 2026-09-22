@@ -17,6 +17,46 @@ function displayValue(v) {
   return (v === null || v === undefined || v === '') ? '-' : v;
 }
 
+// STEP16.5-C: 공사금액(site.amount) "표시 전용" 포매터. DB 값/검색/정렬/저장 로직에는
+// 전혀 관여하지 않고, 화면에 보여줄 문자열만 만든다(순수 함수, side effect 없음).
+// null/undefined/빈 문자열/NaN은 displayValue와 동일하게 '-'로 안전 처리한다.
+// 예: 600000000 -> "6억원", 2130916000 -> "21억 3,091만 6,000원", 7450300000 -> "74억 5,030만원".
+function formatAmountKRW(raw) {
+  if (raw === null || raw === undefined || raw === '') return '-';
+  const num = Number(raw);
+  if (!Number.isFinite(num)) return '-';
+  if (num === 0) return '0원';
+
+  const sign = num < 0 ? '-' : '';
+  const abs = Math.trunc(Math.abs(num));
+  const uk = Math.floor(abs / 1e8);
+  const afterUk = abs % 1e8;
+  const man = Math.floor(afterUk / 1e4);
+  const won = afterUk % 1e4;
+
+  const segs = [];
+  if (uk > 0) segs.push({ n: uk, u: '억' });
+  if (man > 0) segs.push({ n: man, u: '만' });
+  if (won > 0) segs.push({ n: won, u: '원' });
+  if (segs.length === 0) return `${sign}0원`;
+
+  const text = segs.map((seg, i) => {
+    const numText = seg.n.toLocaleString('ko-KR');
+    const isLast = i === segs.length - 1;
+    if (!isLast) return `${numText}${seg.u}`;
+    return seg.u === '원' ? `${numText}원` : `${numText}${seg.u}원`;
+  }).join(' ');
+
+  return sign + text;
+}
+
+// STEP16.5-C: css/mobile.css와 완전히 동일한 breakpoint(768px)로 모바일 뷰인지 판단한다.
+// 이 값에 따라 renderDetail()의 공사금액 표시 문자열만 분기하고, PC(>768px)에서는
+// 기존과 동일한 raw 값(displayValue)을 그대로 보여줘 PC 화면을 전혀 바꾸지 않는다.
+function isMobileViewport() {
+  return typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 768px)').matches;
+}
+
 // 카카오맵 공식 웹 링크 형식(REST API 아님, REST Key 불필요)으로 길찾기 페이지 URL을 만든다.
 // 형식: https://map.kakao.com/link/to/{목적지명},{위도},{경도}
 // 목적지명에 콤마/특수문자가 있어도 깨지지 않도록 경로 세그먼트를 개별 encodeURIComponent한다.
@@ -65,8 +105,12 @@ async function handleFavoriteToggle(siteId, triggerBtn) {
 
 // 상세 패널에 개인 메모 섹션(제목/textarea/저장/삭제)을 추가한다.
 // textarea.value만 사용하므로 XSS 위험이 없다 (innerHTML 미사용).
+// STEP16.5-C: id/이벤트/저장·삭제 로직(saveNote/deleteNote)은 그대로 두고, 시각적 구획을 위한
+// 클래스만 추가한다(css/mobile.css @media(max-width:768px) 안에서만 스타일링 — PC는 layout.css의
+// 기존 #site-note-textarea 규칙만 그대로 적용되어 화면이 바뀌지 않는다).
 function renderNoteSection(panel, siteId) {
   const title = document.createElement('h3');
+  title.className = 'site-detail-section-title';
   title.textContent = '개인 메모';
   panel.appendChild(title);
 
@@ -74,16 +118,24 @@ function renderNoteSection(panel, siteId) {
 
   const textarea = document.createElement('textarea');
   textarea.id = 'site-note-textarea';
+  textarea.className = 'site-detail-note-textarea';
   textarea.value = existing ? existing.content : '';
   panel.appendChild(textarea);
 
+  const noteActions = document.createElement('div');
+  noteActions.className = 'site-detail-note-actions';
+
   const saveBtn = document.createElement('button');
   saveBtn.type = 'button';
+  saveBtn.className = 'site-detail-action-btn site-detail-btn-primary';
   saveBtn.textContent = '저장';
 
+  // STEP16.5-C §12: 코드 확인 결과 이 버튼은 deleteNote(siteId) -> gnmap_v2_site_notes 테이블의
+  // 본인 메모 행만 삭제한다(사업장 자체 삭제가 아님). "메모 삭제"로 문구를 명확히 한다(기능/핸들러 동일).
   const deleteBtn = document.createElement('button');
   deleteBtn.type = 'button';
-  deleteBtn.textContent = '삭제';
+  deleteBtn.className = 'site-detail-action-btn site-detail-btn-danger';
+  deleteBtn.textContent = '메모 삭제';
 
   saveBtn.addEventListener('click', async () => {
     if (state.noteInFlight.has(siteId)) return;
@@ -123,8 +175,9 @@ function renderNoteSection(panel, siteId) {
     }
   });
 
-  panel.appendChild(saveBtn);
-  panel.appendChild(deleteBtn);
+  noteActions.appendChild(saveBtn);
+  noteActions.appendChild(deleteBtn);
+  panel.appendChild(noteActions);
 }
 
 // 목록/마커 클릭이 공통으로 호출하는 선택 함수.
@@ -311,6 +364,17 @@ export function renderDetail(site) {
   panel.innerHTML = '';
   panel.style.display = 'block';
 
+  // STEP16.5-C: 모바일 전용 X 닫기 버튼(44px 터치 타겟). closeDetail()을 기존 "닫기" 버튼과
+  // 완전히 동일하게 직접 호출한다(새 로직 없음). PC에서는 css/mobile.css @media 밖이라
+  // 아무 규칙도 매치되지 않아 기본적으로 보이지 않는다(레이아웃에 영향 없음).
+  const closeXBtn = document.createElement('button');
+  closeXBtn.type = 'button';
+  closeXBtn.className = 'site-detail-close-x';
+  closeXBtn.setAttribute('aria-label', '닫기');
+  closeXBtn.textContent = '×';
+  closeXBtn.addEventListener('click', closeDetail);
+  panel.appendChild(closeXBtn);
+
   // STEP15-E.1/E.1-2: location_quality 값(EXACT/ESTIMATED/APPROXIMATE/MANUAL/UNRESOLVED,
   // supabase/migrations의 check 제약과 동일한 5개)을 그대로 읽기만 해서 작은 배지로 보여준다 —
   // 값 자체나 geocoding/import 로직은 전혀 건드리지 않는다. PC에서는 이 배지를 기본적으로
@@ -341,41 +405,83 @@ export function renderDetail(site) {
     panel.appendChild(warningEl);
   }
 
-  const rows = [
-    ['사업장명', site.site_name],
-    ['업체명', site.company_name],
-    ['주소', site.address],
-    ['행정동', site.dong],
-    ['공사금액', site.amount]
-  ];
+  // STEP16.5-C: 사업장명/업체명/주소를 "hero" 정보로, 행정동/공사금액을 "부가정보"로 분리한다.
+  // 두 그룹 모두 여전히 기존 .site-detail-row/.site-detail-label/.site-detail-value 클래스를
+  // 그대로 유지해(추가 클래스만 덧붙임) css/layout.css의 PC 스타일이 전혀 바뀌지 않도록 한다.
+  // 모바일에서는 css/mobile.css가 추가 클래스만 골라 hero를 크게, label은 숨기는 식으로 override한다.
+  const hero = document.createElement('div');
+  hero.className = 'site-detail-hero';
 
-  rows.forEach(([label, value]) => {
+  const heroRows = [
+    ['사업장명', site.site_name, 'name'],
+    ['업체명', site.company_name, 'company'],
+    ['주소', site.address, 'address']
+  ];
+  heroRows.forEach(([label, value, key]) => {
     const row = document.createElement('div');
-    row.className = 'site-detail-row';
+    row.className = `site-detail-row site-detail-row-${key}`;
 
     const labelEl = document.createElement('span');
-    labelEl.className = 'site-detail-label';
+    labelEl.className = `site-detail-label site-detail-label-${key}`;
     labelEl.textContent = label;
 
     const valueEl = document.createElement('span');
-    valueEl.className = 'site-detail-value';
+    valueEl.className = `site-detail-value site-detail-value-${key}`;
     valueEl.textContent = displayValue(value);
 
     row.appendChild(labelEl);
     row.appendChild(valueEl);
-    panel.appendChild(row);
+    hero.appendChild(row);
   });
+  panel.appendChild(hero);
+
+  const meta = document.createElement('div');
+  meta.className = 'site-detail-meta';
+
+  const metaRows = [
+    ['행정동', site.dong, 'dong', false],
+    // STEP16.5-C §8: 공사금액은 DB 원시 숫자를 그대로 저장/검색/정렬하되, "화면 표시"만
+    // 모바일(768px 이하)에서 formatAmountKRW()로 억/만 단위 읽기 쉬운 문자열로 바꾼다.
+    // PC(>768px)는 isMobileViewport()가 false를 반환해 기존 displayValue(raw) 그대로 노출된다.
+    ['공사금액', site.amount, 'amount', true]
+  ];
+  metaRows.forEach(([label, value, key, useAmountFormat]) => {
+    const row = document.createElement('div');
+    row.className = `site-detail-row site-detail-row-${key}`;
+
+    const labelEl = document.createElement('span');
+    labelEl.className = `site-detail-label site-detail-label-${key}`;
+    labelEl.textContent = label;
+
+    const valueEl = document.createElement('span');
+    valueEl.className = `site-detail-value site-detail-value-${key}`;
+    valueEl.textContent = (useAmountFormat && isMobileViewport())
+      ? formatAmountKRW(value)
+      : displayValue(value);
+
+    row.appendChild(labelEl);
+    row.appendChild(valueEl);
+    meta.appendChild(row);
+  });
+  panel.appendChild(meta);
+
+  // STEP16.5-C §9: 즐겨찾기/길찾기를 action row로 묶는다. id/데이터셋/클릭 핸들러/disabled 조건은
+  // 전부 기존 그대로이며, 시각적 클래스만 추가한다.
+  const actions = document.createElement('div');
+  actions.className = 'site-detail-actions';
 
   const favBtn = document.createElement('button');
   favBtn.type = 'button';
   favBtn.id = 'site-detail-favorite-btn';
+  favBtn.className = 'site-detail-action-btn site-detail-btn-secondary';
   favBtn.dataset.siteId = String(site.id);
   favBtn.textContent = isFavorite(site.id) ? '★ 즐겨찾기 해제' : '☆ 즐겨찾기 추가';
   favBtn.addEventListener('click', () => handleFavoriteToggle(site.id, favBtn));
-  panel.appendChild(favBtn);
+  actions.appendChild(favBtn);
 
   const directionsBtn = document.createElement('button');
   directionsBtn.type = 'button';
+  directionsBtn.className = 'site-detail-action-btn site-detail-btn-primary';
   directionsBtn.textContent = '길찾기';
   const hasValidCoord = isValidSiteCoord(site);
   directionsBtn.disabled = !hasValidCoord;
@@ -385,12 +491,17 @@ export function renderDetail(site) {
       window.open(url, '_blank', 'noopener,noreferrer');
     });
   }
-  panel.appendChild(directionsBtn);
+  actions.appendChild(directionsBtn);
+  panel.appendChild(actions);
 
   renderNoteSection(panel, site.id);
 
+  // STEP16.5-C §11: 기존 텍스트 "닫기" 버튼/핸들러는 그대로 유지하되(삭제 금지), 모바일에서는
+  // 위에서 추가한 X 버튼이 동일 기능을 대신하므로 CSS로 시각적으로만 숨긴다(PC는 그대로 노출).
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';
+  closeBtn.id = 'site-detail-close-btn';
+  closeBtn.className = 'site-detail-close-text';
   closeBtn.textContent = '닫기';
   closeBtn.addEventListener('click', closeDetail);
   panel.appendChild(closeBtn);
