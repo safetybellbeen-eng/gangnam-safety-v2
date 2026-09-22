@@ -2,7 +2,12 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<!-- 사용자 피드백: 지도를 손가락으로 확대/축소하려다가 브라우저 네이티브 페이지 확대가
+     함께 발동해 상단 헤더/하단 탭이 같이 늘어나 화면이 깨지는 문제. maximum-scale=1,
+     user-scalable=no로 "페이지 전체"의 네이티브 핀치줌만 막는다. Kakao Maps는 지도 div
+     위에서 자체 touch 이벤트로 확대/축소를 처리하므로(브라우저 네이티브 줌과는 별개 로직),
+     이 설정과 무관하게 지도 자체 확대/축소는 그대로 동작한다. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>강남구 사업장 안전지도 V2</title>
 <link rel="manifest" href="manifest.json">
 <!-- STEP16: iOS Safari는 manifest.json의 icons를 읽지 않고 홈 화면 추가 시 이 태그만 본다.
