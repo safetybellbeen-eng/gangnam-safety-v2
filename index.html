@@ -99,15 +99,12 @@
         <input type="hidden" id="sv-id">
         <label>감독명 <input type="text" id="sv-title"></label>
         <label>담당자 <input type="text" id="sv-manager"></label>
-        <label>시작일 <input type="date" id="sv-start"></label>
-        <label>종료일 <input type="date" id="sv-end"></label>
-        <label>상태
-          <select id="sv-status">
-            <option value="scheduled">예정</option>
-            <option value="ongoing">진행중</option>
-            <option value="done">완료</option>
-          </select>
-        </label>
+        <!-- 연도 입력 폭주(예: 202609) 방지 및 SUPERVISION_MIN_DATE/MAX_DATE(js/ui.js)와 동일한
+             범위로 브라우저 네이티브 날짜 스피너 자체를 제한한다. -->
+        <label>시작일 <input type="date" id="sv-start" min="2000-01-01" max="2100-12-31"></label>
+        <label>종료일 <input type="date" id="sv-end" min="2000-01-01" max="2100-12-31"></label>
+        <!-- 상태(예정/진행중/완료)는 더 이상 수동 선택하지 않는다. 저장 시 오늘 날짜와
+             시작일/종료일을 비교해 js/ui.js의 computeSupervisionStatus()가 자동으로 계산한다. -->
         <button type="button" id="btn-sv-save">저장</button>
         <button type="button" id="btn-sv-cancel">취소</button>
         <p id="supervision-form-error"></p>
