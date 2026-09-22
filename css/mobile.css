@@ -82,7 +82,8 @@
 .mobile-favorite-empty,
 .mobile-panel-close-btn,
 .site-detail-close-x,
-.site-detail-copy-btn {
+.site-detail-copy-btn,
+.site-detail-name-favorite-btn {
   display: none;
 }
 
@@ -153,12 +154,14 @@
      상단 safe-area를 padding에 더한다(index.html의 viewport-fit=cover와 짝을 이룸).
      safe-area가 0인 일반 브라우저에서는 기존 14px 그대로 유지되어 높이가 커지지 않는다.
      좌우 padding/배경/구분선은 기존 값 유지(높이를 과도하게 늘리지 않기 위함). */
+  /* 사용자 요청: 지도를 더 크게 보이도록 헤더 세로 여백을 14px→8px로 줄인다(safe-area는
+     기기 보정용이라 그대로 유지). 좌우 여백/배경/구분선/구조는 바꾸지 않는다. */
   #mobile-app-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-shrink: 0;
-    padding: calc(14px + env(safe-area-inset-top, 0px)) var(--gnmap-space-4) 14px;
+    padding: calc(8px + env(safe-area-inset-top, 0px)) var(--gnmap-space-4) 8px;
     background: #fff;
     border-bottom: 1px solid var(--gnmap-border);
     box-sizing: border-box;
@@ -184,7 +187,7 @@
   }
   #mobile-app-header-logo-slot img {
     display: block;
-    height: 24px;
+    height: 20px;
     width: auto;
   }
   #mobile-app-header-titles {
@@ -198,7 +201,7 @@
     display: none;
   }
   #mobile-app-header-title {
-    font-size: 18px;
+    font-size: 15px;
     font-weight: bold;
     color: var(--gnmap-navy);
     line-height: 1.3;
@@ -206,8 +209,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  /* STEP16.5-A: 터치 타겟을 접근성 기준 tap-min(44px)에 맞춘다. 아이콘 크기(22px)와
-     클릭 동작/위치는 그대로 두고, 버튼 자체의 여백만 넓힌다. */
+  /* STEP16.5-A: 터치 타겟은 접근성 기준 tap-min(44px)을 유지한다(버튼 자체 크기는 그대로,
+     아이콘만 살짝 줄여 헤더 전체 높이를 줄이는 데 기여). 클릭 동작/위치는 변경 없음. */
   #mobile-header-alert-btn {
     flex-shrink: 0;
     display: flex;
@@ -223,8 +226,8 @@
     cursor: pointer;
   }
   #mobile-header-alert-btn .mobile-icon-svg {
-    width: 22px;
-    height: 22px;
+    width: 19px;
+    height: 19px;
   }
 
   /* STEP15-C: 로그아웃은 더보기 탭(STEP15-D)으로 옮겨갈 예정이므로 이번 단계에서는 화면 위에 띄우지 않는다.
@@ -288,11 +291,12 @@
   /* STEP16.5-B: 좌우 여백을 16px(--gnmap-space-4) 기준으로 통일하고, 검색창-필터 사이
      간격을 토큰(--gnmap-space-2)으로 정리한다. 세로 padding은 지도가 넓게 보이도록
      그대로 compact하게 유지(8px). */
+  /* 사용자 요청: 검색/필터 영역도 지도를 더 크게 보기 위해 세로 padding/간격을 줄인다. */
   #site-search-bar {
     display: flex;
     flex-direction: column;
-    gap: var(--gnmap-space-2);
-    padding: 8px var(--gnmap-space-4);
+    gap: 6px;
+    padding: 6px var(--gnmap-space-4);
   }
   /* STEP15-E.1: 검색창을 감싸는 relative 컨테이너로 만들어 아이콘을 입력창 안쪽 좌측에
      배치한다. #site-search-input의 검색 로직/이벤트/placeholder/×버튼은 전혀 건드리지 않고
@@ -322,7 +326,7 @@
      그대로 둔다. */
   #site-search-input {
     width: 100%;
-    height: 46px;
+    height: 40px;
     box-sizing: border-box;
     padding: 0 36px 0 38px;
     border: 1px solid var(--gnmap-border);
@@ -389,7 +393,7 @@
     flex: 0 0 auto;
     width: auto;
     box-sizing: border-box;
-    min-height: 34px;
+    min-height: 30px;
     display: inline-flex;
     align-items: center;
     border: 1px solid var(--gnmap-border);
@@ -681,6 +685,9 @@
      STEP16.5-C §4: 정보/메모를 보기에 60vh는 답답하다는 지적에 따라 74dvh로 넓힌다(요청 범위
      72~78dvh 안). 하단 네비/safe-area는 기존과 동일하게 bottom 계산에 이미 반영되어 있어
      늘어난 높이가 네비게이션을 덮지 않는다. */
+  /* 사용자 요청: 상세정보가 지도를 너무 많이 가린다는 지적에 따라 전반적으로 더 작게 만든다
+     (74vh→64vh, padding도 축소). 현장/즐겨찾기 탭에서 전체 정보를 확인하는 용도는 유지하되
+     불필요하게 크지 않게 조정한다. */
   #site-detail-panel {
     position: fixed;
     top: auto;
@@ -688,13 +695,13 @@
     right: 0;
     bottom: calc(56px + env(safe-area-inset-bottom, 0px));
     width: 100%;
-    max-height: 74dvh;
-    max-height: 74vh;
+    max-height: 64dvh;
+    max-height: 64vh;
     border-left: none;
     border-top: 1px solid var(--gnmap-border);
     border-radius: var(--gnmap-radius-lg) var(--gnmap-radius-lg) 0 0;
     box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
-    padding: 10px var(--gnmap-space-4) var(--gnmap-space-4);
+    padding: 8px var(--gnmap-space-3) var(--gnmap-space-3);
     z-index: 70;
     box-sizing: border-box;
   }
@@ -711,8 +718,8 @@
      layout.css 기존 규칙)로 나머지(개인 메모 등)를 볼 수 있다. 현장/즐겨찾기 탭에서 여는
      상세는 기존 74vh(전체 정보 확인용)를 그대로 유지한다. */
   #app[data-mobile-tab="map"] #site-detail-panel {
-    max-height: 42dvh;
-    max-height: 42vh;
+    max-height: 34dvh;
+    max-height: 34vh;
   }
   #site-detail-panel::before {
     content: "";
@@ -770,11 +777,37 @@
   }
   .site-detail-value-name {
     display: block;
-    font-size: var(--gnmap-fs-card-title);
+    font-size: var(--gnmap-fs-body);
     font-weight: var(--gnmap-fw-semibold);
     color: var(--gnmap-navy);
     line-height: 1.3;
     word-break: keep-all;
+  }
+  /* 사용자 요청: 즐겨찾기 추가는 액션 버튼 대신 사업장명 옆 별표 터치로 바로 토글한다.
+     기존 handleFavoriteToggle(js/ui.js)을 그대로 재사용하며, 이 요소는 모바일에서만 노출된다
+     (PC 기본 숨김은 상단 PC-hide 목록의 .site-detail-name-favorite-btn 참고). */
+  .site-detail-row-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .site-detail-name-favorite-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    border: none;
+    background: none;
+    padding: 0;
+    font-size: 19px;
+    line-height: 1;
+    color: var(--gnmap-text-sub);
+    cursor: pointer;
+  }
+  .site-detail-name-favorite-btn.is-favorite {
+    color: var(--gnmap-amber);
   }
   .site-detail-value-company {
     display: block;
@@ -831,14 +864,14 @@
   .site-detail-meta {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--gnmap-space-2);
-    margin: var(--gnmap-space-2) 0 var(--gnmap-space-3);
+    gap: 6px;
+    margin: 6px 0 var(--gnmap-space-2);
   }
   .site-detail-meta .site-detail-row {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: var(--gnmap-space-2);
+    padding: 6px var(--gnmap-space-2);
     border-bottom: none;
     border-radius: var(--gnmap-radius-sm);
     background: var(--gnmap-bg-soft);
@@ -859,12 +892,12 @@
      3개(즐겨찾기/길찾기/지도보기)가 한 줄에 여유 있게 들어가게 한다. */
   .site-detail-actions {
     display: flex;
-    gap: var(--gnmap-space-2);
-    margin-bottom: var(--gnmap-space-3);
+    gap: 6px;
+    margin-bottom: var(--gnmap-space-2);
   }
   .site-detail-action-btn {
     flex: 1;
-    min-height: 40px;
+    min-height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -874,6 +907,11 @@
     font-weight: var(--gnmap-fw-semibold);
     padding: 0 var(--gnmap-space-2);
     cursor: pointer;
+  }
+  /* 사용자 요청: 즐겨찾기는 사업장명 옆 별표로 이동했으므로, 액션 버튼 행에 남아있는(PC용)
+     #site-detail-favorite-btn은 모바일에서만 숨긴다(PC는 이 media query 밖이라 그대로 노출). */
+  #site-detail-favorite-btn {
+    display: none;
   }
   .site-detail-action-btn:disabled {
     opacity: 0.5;
@@ -906,7 +944,7 @@
   }
   .site-detail-note-textarea {
     width: 100%;
-    min-height: 84px;
+    min-height: 70px;
     box-sizing: border-box;
     padding: var(--gnmap-space-2) var(--gnmap-space-3);
     border: 1px solid var(--gnmap-border);
