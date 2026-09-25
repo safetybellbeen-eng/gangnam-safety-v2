@@ -1749,7 +1749,7 @@
      375×812 기준 31px 예산 안에서만 증가 — 5개 공식 뷰포트 전부 스크롤 재발 없음). */
   #mobile-login-card {
     position: relative;
-    margin-top: -18px;
+    margin-top: -28px;
     background: #fff;
     border-radius: 22px 22px 0 0;
     box-shadow: 0 -6px 20px rgba(15,42,82,0.10);
@@ -1757,7 +1757,7 @@
     font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
   }
   #app #mobile-login-card #login-form {
-    gap: 11px;
+    gap: 12px;
   }
   #mobile-login-card .mobile-login-field {
     position: relative;
@@ -1825,10 +1825,14 @@
   /* [비밀번호 보기 아이콘 겹침 수정] iOS Safari가 비밀번호 입력칸 우측에 자체 "강력한 암호"
      자동완성 열쇠 아이콘을 추가로 그려 우리가 만든 눈 모양 토글 버튼과 겹쳐 보이던 문제.
      네이티브 아이콘만 숨기고(-webkit 전용 의사요소), 토글 버튼 클릭 기능(JS)은 그대로 둔다. */
+  /* [원인 발견/수정] ::-webkit-textfield-decoration-container는 아이콘 전용이 아니라
+     Safari(WebKit)에서 input의 "텍스트 렌더링 영역 전체"(placeholder 포함)를 감싸는
+     의사요소다. 이걸 display:none으로 숨기면 아이콘뿐 아니라 placeholder("비밀번호를
+     입력하세요") 자체가 통째로 사라진다 — 방금 신고된 "안내문구 안 보임" 버그의 원인.
+     아이콘 전용 의사요소만 남기고 이 규칙은 제거한다. */
   #mobile-login-card .mobile-login-field input#login-password::-webkit-credentials-auto-fill-button,
   #mobile-login-card .mobile-login-field input#login-password::-webkit-strong-password-auto-fill-button,
   #mobile-login-card .mobile-login-field input#login-password::-webkit-caps-lock-indicator,
-  #mobile-login-card .mobile-login-field input#login-password::-webkit-textfield-decoration-container,
   #mobile-login-card .mobile-login-field input#login-password::-webkit-contacts-auto-fill-button {
     visibility: hidden;
     display: none !important;
