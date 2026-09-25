@@ -1666,7 +1666,13 @@
      불필요한 세로 스크롤이 생겼다(헤드리스 테스트 환경은 주소창이 없어 vh=dvh라 재현되지
      않았음). 올바른 fallback 순서(구형 브라우저용 100vh를 먼저, dvh 지원 브라우저에서
      이를 덮어쓰는 100dvh를 나중)로 수정. */
+  /* [STEP16.5 FINAL-5] HERO를 줄이면서 생긴 여유 공간이 footer 아래에 그냥 빈 백지로
+     남는 대신, footer가 화면 맨 아래에 자연스럽게 붙도록 flex column + margin-top:auto로
+     그 공간을 footer 쪽에 정직하게 위임한다(스크롤 여지는 min-height와 별개로 항상
+     콘텐츠 합계 ≤ 뷰포트만 성립하면 생기지 않는다 — 아래 실측으로 재확인). */
   #app #view-login {
+    display: flex;
+    flex-direction: column;
     max-width: none;
     margin: 0;
     padding: 0;
@@ -1691,12 +1697,15 @@
      object-position:top 유지 상태에서 노출 비율을 84%로 올린다. cover 특성상 노출비율 =
      (컨테이너높이/컨테이너너비) × (원본너비/원본높이) 이므로 필요한 종횡비(w/h) =
      (941/1672)/0.84 ≈ 0.67 → aspect-ratio: 67/100. */
+  /* [STEP16.5 FINAL-6] 직전 라운드의 HERO 1:1 축소(순찰차/감독관 사라짐)는 사용자가
+     반려했다 — aspect-ratio를 원래 67/100(순찰차+감독관 노출)으로 되돌린다. */
   #mobile-login-hero {
     display: block;
     position: relative;
     width: 100%;
     aspect-ratio: 67 / 100;
     overflow: hidden;
+    flex-shrink: 0;
   }
   #mobile-login-hero-img {
     display: block;
@@ -1747,8 +1756,19 @@
      412×915=79px, 430×932=69px 여유). HERO를 이동시키는 대신 이 "이미 존재하던 여유
      공간"을 카드 내부 padding으로 옮겨 써서 숨 쉴 공간을 늘린다(가장 타이트한
      375×812 기준 31px 예산 안에서만 증가 — 5개 공식 뷰포트 전부 스크롤 재발 없음). */
+  /* [STEP16.5 FINAL-6] "로그인 박스 끝단을 휴대폰 끝단에 맞춰라" 요청 반영: #view-login을
+     flex column으로 두고(위 #app #view-login), 이 카드에 flex:1을 줘서 HERO 아래 남는
+     공간을 카드 자신이 그대로 흡수해 footer 바로 위까지, 즉 사실상 화면 맨 아래까지
+     뻗도록 한다(footer는 카드 바로 다음 형제로 화면 하단에 자연히 닿는다 — 기기별로
+     남는 여백 양이 달라도 항상 끝까지 채워진다). 내용(이메일/비밀번호/버튼/옵션행)은
+     justify-content:center로 카드 안에서 수직 중앙 정렬해, 남는 공간이 위/아래로
+     고르게 분배되어 "적당한 여백"처럼 보이게 한다(한쪽에 몰린 큰 빈 공간 방지). */
   #mobile-login-card {
     position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    flex: 1;
     margin-top: -28px;
     background: #fff;
     border-radius: 22px 22px 0 0;
@@ -1970,6 +1990,7 @@
   #mobile-login-footer {
     display: flex;
     flex-direction: column;
+    flex-shrink: 0;
     margin-top: 0;
   }
   #mobile-login-footer-brand {
