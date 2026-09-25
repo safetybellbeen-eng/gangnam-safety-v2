@@ -1652,21 +1652,23 @@
      지금까지 로그인 화면 전체가 360px로 좁게 갇혀 있었다(HERO/카드가 가운데 작은 박스처럼
      보이던 원인). #app을 붙여 특이도를 200으로 올려 확실히 이긴다 — #view-login 범위만
      override하므로 다른 화면(#app section 적용받는 다른 뷰)에는 영향 없다. */
-  /* [배경 4 : 로그인 1 비율 요청 반영] 카드 하단에 남는 여백을 없애고 배경이 최대한
-     보이도록, HERO를 고정 높이 대신 flex:1로 만들어 "뷰포트 - 카드 - 푸터"의 남는
-     공간을 전부 채우게 한다. 카드/푸터는 내용 크기만큼만 차지(flex: 0 0 auto)한다. */
+  /* [STEP16.5 REFERENCE 정밀조정] REFERENCE 목업(사용자 제공, 872x1804, bezel 제외 실제
+     화면 803x1742)을 픽셀 단위로 측정한 결과 HERO:카드 경계가 화면 높이의 57.8%
+     지점(803:1008 비율)에서 생긴다. 이를 뷰포트 높이가 아니라 HERO 자체의 aspect-ratio로
+     고정해, 어떤 화면 높이에서도 REFERENCE와 동일한 "감독관 상반신+순찰차 상당부분"이
+     보이게 한다. 이전 라운드처럼 뷰포트에 억지로 맞추기 위해 HERO를 눌러 순찰차가 잘리는
+     문제를 근본적으로 없앤다 — 대신 콘텐츠가 뷰포트보다 길면 자연스럽게 세로 스크롤된다
+     (사용자 최신 지시: "필요하면 아래쪽 일부는 자연스럽게 scroll되어도 된다"). */
   #app #view-login {
     max-width: none;
     margin: 0;
     padding: 0;
-    display: flex;
-    flex-direction: column;
     min-height: 100dvh;
     min-height: 100vh;
     background: #fff;
   }
-  /* 스크롤 없이 한 화면에 맞추기 위해 UA 기본 body margin(8px)을 제거한다.
-     이 규칙은 @media(max-width:768px) 안에서만 적용되므로 PC 화면에는 영향이 없다. */
+  /* UA 기본 body margin(8px)을 제거해 HERO가 화면 좌우 끝까지 꽉 차게 한다.
+     @media(max-width:768px) 안에서만 적용되므로 PC 화면에는 영향이 없다. */
   body {
     margin: 0;
   }
@@ -1675,16 +1677,18 @@
   #view-login > h1 {
     display: none;
   }
-  /* [스크롤 제거 + 배경 4:1 비율 요청 반영] 원본 이미지(941:1672)를 height:auto로 그대로
-     쓰면 스크롤이 생기므로 object-fit:cover로 크롭한다. 높이는 고정값이 아니라
-     flex:1(뷰포트 - 카드 - 푸터의 남는 공간을 전부 차지)로 주어, 카드를 압축한 만큼
-     배경이 더 크게 보이고 하단에 빈 여백도 남지 않게 한다. 상단(CI/타이틀/부제/크레인/
-     스카이라인)을 유지하고 하단(순찰차/감독관 하반신 등)만 크롭한다. */
+  /* [STEP16.5 2차 재조정] 이전 803/1008(≈70.7% 노출) 비율은 순찰차 상단(경광등)만 걸치고
+     차체가 거의 드러나지 않았다. login-hero.png(941×1672) 원본에서 순찰차 지붕+차체는
+     세로 63~79%, 감독관 등판 문구는 63~72% 구간에 있다(grid 분석 확인). REFERENCE(5번
+     이미지)는 순찰차 전체+바닥 여유까지 약 84% 지점에서 카드가 시작하므로, object-fit:cover +
+     object-position:top 유지 상태에서 노출 비율을 84%로 올린다. cover 특성상 노출비율 =
+     (컨테이너높이/컨테이너너비) × (원본너비/원본높이) 이므로 필요한 종횡비(w/h) =
+     (941/1672)/0.84 ≈ 0.67 → aspect-ratio: 67/100. */
   #mobile-login-hero {
     display: block;
     position: relative;
-    flex: 1 1 auto;
-    min-height: 0;
+    width: 100%;
+    aspect-ratio: 67 / 100;
     overflow: hidden;
   }
   #mobile-login-hero-img {
@@ -1726,12 +1730,11 @@
      되돌린다(직전의 과도한 압축판보다 카드가 커지고, 그만큼 HERO는 자동으로 작아진다). */
   #mobile-login-card {
     position: relative;
-    flex: 0 0 auto;
-    margin-top: -24px;
+    margin-top: -18px;
     background: #fff;
-    border-radius: 24px 24px 0 0;
+    border-radius: 22px 22px 0 0;
     box-shadow: 0 -6px 20px rgba(15,42,82,0.10);
-    padding: 16px var(--gnmap-space-5) 10px;
+    padding: 8px var(--gnmap-space-5) 6px;
   }
   #app #mobile-login-card #login-form {
     gap: 8px;
@@ -1760,12 +1763,12 @@
   }
   #mobile-login-card .mobile-login-field input {
     width: 100%;
-    height: 48px;
-    border-radius: 15px;
+    height: 46px;
+    border-radius: 14px;
     border: 1px solid #e6e9ef;
     background: #f6f7f9;
-    padding: 0 16px 0 48px;
-    font-size: 15px;
+    padding: 0 16px 0 46px;
+    font-size: 14px;
     color: #1a2233;
   }
   #mobile-login-card .mobile-login-field input::placeholder {
@@ -1803,13 +1806,13 @@
   }
   #app #mobile-login-card #login-form button[type="submit"] {
     width: 100%;
-    height: 48px;
+    height: 44px;
     margin-top: 2px;
     border: none;
-    border-radius: 15px;
+    border-radius: 14px;
     background: var(--gnmap-navy);
     color: #fff;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 700;
     cursor: pointer;
     box-shadow: 0 8px 18px rgba(15,42,82,0.2);
@@ -1821,40 +1824,52 @@
     margin: 4px 2px 0;
   }
 
+  /* [STEP16.5 REFERENCE 정밀조정 - 옵션 행] components.css의 "#app label { flex-direction:
+     column; gap:4px; font-size:14px }"(ID 선택자라 특이도가 #mobile-login-*-label 단독
+     선택자보다 높음)이 이 옵션 라벨에도 걸려 (1) checkbox/텍스트가 세로로 쌓이고
+     (2) "비밀번호 찾기"(12px 상속)와 폰트 크기가 달라 보이는 문제가 있었다. #app을 붙여
+     특이도를 올리고 flex-direction/gap/font-size를 명시적으로 되돌린다(§F/§G 반영,
+     체크박스/레이블/비밀번호 찾기 모두 같은 13px 타이포그래피로 통일). */
   #mobile-login-meta-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-top: 8px;
-    font-size: 12px;
-    color: #5b6472;
-  }
-  /* "아이디 저장" + "자동 로그인" 체크박스를 왼쪽에 나란히 묶는다. */
-  #mobile-login-remember-group {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  #mobile-login-remember-label,
-  #mobile-login-autologin-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
     font-size: 13px;
     color: #5b6472;
   }
+  #mobile-login-remember-group {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  #app #mobile-login-remember-label,
+  #app #mobile-login-autologin-label {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1;
+    color: #5b6472;
+    cursor: pointer;
+  }
   #mobile-login-remember-label input[type="checkbox"],
   #mobile-login-autologin-label input[type="checkbox"] {
-    width: 17px;
-    height: 17px;
+    width: 18px;
+    height: 18px;
+    margin: 0;
     accent-color: var(--gnmap-blue);
   }
   #mobile-login-forgot {
     display: inline-flex;
     align-items: center;
     gap: 2px;
-    color: var(--gnmap-navy);
+    font-size: 13px;
     font-weight: 600;
+    line-height: 1;
+    color: var(--gnmap-navy);
   }
   #mobile-login-forgot .mobile-icon-svg-wrap {
     display: inline-flex;
@@ -1868,7 +1883,7 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    margin: 10px 0 8px;
+    margin: 8px 0 6px;
     color: #b7bec9;
     font-size: 11px;
   }
@@ -1910,31 +1925,20 @@
     height: 17px;
   }
 
-  /* [배경 4:1 비율 요청 반영] 푸터도 flex:0 0 auto로 내용만큼만 차지, 여백 최소화. */
-  /* [1번 시안 반영] 카드 하단에 스카이라인 실루엣 워터마크를 추가한다(요청 3: "로그인화면
-     하단 건물문양"). 새 이미지 asset 없이 인라인 SVG 배경으로 구현한다. */
+  /* [STEP16.5 2차 재조정] REFERENCE(5번 이미지)는 하단 skyline 장식이 없다 — 완전히
+     삭제(DOM/CSS 전부, opacity:0 아님). footer는 "고용노동부 · 산업안전 순찰지도" 배지만
+     남기고 목표 높이 28~34px 수준으로 패딩을 최소화한다(HERO 확대분 확보). */
   #mobile-login-footer {
     display: flex;
     flex-direction: column;
-    flex: 0 0 auto;
-    margin-top: 6px;
-  }
-  #mobile-login-footer-skyline {
-    width: 100%;
-    height: 26px;
-    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='240'%20height='60'%3E%3Crect%20x='0'%20y='34'%20width='18'%20height='26'%20fill='%23dbe7f7'/%3E%3Crect%20x='20'%20y='18'%20width='14'%20height='42'%20fill='%23c9dbf0'/%3E%3Crect%20x='36'%20y='28'%20width='16'%20height='32'%20fill='%23dbe7f7'/%3E%3Crect%20x='54'%20y='8'%20width='20'%20height='52'%20fill='%23c9dbf0'/%3E%3Crect%20x='76'%20y='24'%20width='12'%20height='36'%20fill='%23dbe7f7'/%3E%3Crect%20x='90'%20y='14'%20width='18'%20height='46'%20fill='%23c9dbf0'/%3E%3Crect%20x='110'%20y='30'%20width='14'%20height='30'%20fill='%23dbe7f7'/%3E%3Crect%20x='126'%20y='2'%20width='16'%20height='58'%20fill='%23c9dbf0'/%3E%3Crect%20x='144'%20y='22'%20width='20'%20height='38'%20fill='%23dbe7f7'/%3E%3Crect%20x='166'%20y='12'%20width='14'%20height='48'%20fill='%23c9dbf0'/%3E%3Crect%20x='182'%20y='26'%20width='18'%20height='34'%20fill='%23dbe7f7'/%3E%3Crect%20x='202'%20y='16'%20width='16'%20height='44'%20fill='%23c9dbf0'/%3E%3Crect%20x='220'%20y='30'%20width='20'%20height='30'%20fill='%23dbe7f7'/%3E%3C/svg%3E");
-    background-repeat: repeat-x;
-    background-position: bottom;
-    background-size: 240px 34px;
-    opacity: 0.45;
+    margin-top: 0;
   }
   #mobile-login-footer-brand {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 6px var(--gnmap-space-4) calc(8px + env(safe-area-inset-bottom, 0px));
-    border-top: 1px solid #eef0f4;
+    padding: 3px var(--gnmap-space-4) calc(4px + env(safe-area-inset-bottom, 0px));
     color: #9aa2af;
     font-size: 10.5px;
   }
