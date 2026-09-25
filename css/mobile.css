@@ -90,7 +90,8 @@
 #mobile-login-divider,
 #mobile-login-guide,
 #mobile-login-footer,
-#mobile-login-password-toggle {
+#mobile-login-password-toggle,
+#mobile-splash {
   display: none;
 }
 
@@ -1720,19 +1721,20 @@
     height: 15px;
   }
 
-  /* [배경 4:1 비율 요청 반영] 카드를 내용만큼만 차지하게(flex:0 0 auto) 하고, 여백/입력칸
-     크기를 압축해 카드 전체 높이를 줄인다 — 그만큼 위 HERO(flex:1)가 더 크게 보인다. */
+  /* [사용자 확정 시안(1번 사진) 비율 반영] 카드는 내용만큼만 차지(flex:0 0 auto)하고,
+     HERO(flex:1)가 나머지를 채운다. 입력칸/버튼/여백을 시안 비율에 맞춰 다시 넉넉하게
+     되돌린다(직전의 과도한 압축판보다 카드가 커지고, 그만큼 HERO는 자동으로 작아진다). */
   #mobile-login-card {
     position: relative;
     flex: 0 0 auto;
-    margin-top: -20px;
+    margin-top: -24px;
     background: #fff;
-    border-radius: 22px 22px 0 0;
+    border-radius: 24px 24px 0 0;
     box-shadow: 0 -6px 20px rgba(15,42,82,0.10);
-    padding: 12px var(--gnmap-space-5) 10px;
+    padding: 16px var(--gnmap-space-5) 10px;
   }
   #app #mobile-login-card #login-form {
-    gap: 6px;
+    gap: 8px;
   }
   #mobile-login-card .mobile-login-field {
     position: relative;
@@ -1758,12 +1760,12 @@
   }
   #mobile-login-card .mobile-login-field input {
     width: 100%;
-    height: 42px;
-    border-radius: 14px;
+    height: 48px;
+    border-radius: 15px;
     border: 1px solid #e6e9ef;
     background: #f6f7f9;
-    padding: 0 16px 0 46px;
-    font-size: 14px;
+    padding: 0 16px 0 48px;
+    font-size: 15px;
     color: #1a2233;
   }
   #mobile-login-card .mobile-login-field input::placeholder {
@@ -1801,10 +1803,10 @@
   }
   #app #mobile-login-card #login-form button[type="submit"] {
     width: 100%;
-    height: 42px;
+    height: 48px;
     margin-top: 2px;
     border: none;
-    border-radius: 14px;
+    border-radius: 15px;
     background: var(--gnmap-navy);
     color: #fff;
     font-size: 16px;
@@ -1823,8 +1825,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-top: 6px;
-    font-size: 11px;
+    margin-top: 8px;
+    font-size: 12px;
     color: #5b6472;
   }
   /* "아이디 저장" + "자동 로그인" 체크박스를 왼쪽에 나란히 묶는다. */
@@ -1838,7 +1840,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 11px;
+    font-size: 13px;
     color: #5b6472;
   }
   #mobile-login-remember-label input[type="checkbox"],
@@ -1866,9 +1868,9 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    margin: 8px 0 6px;
+    margin: 10px 0 8px;
     color: #b7bec9;
-    font-size: 10px;
+    font-size: 11px;
   }
   #mobile-login-divider::before,
   #mobile-login-divider::after {
@@ -1889,12 +1891,12 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    height: 36px;
-    border-radius: 12px;
+    height: 42px;
+    border-radius: 13px;
     border: 1px solid #e6e9ef;
     background: #f6f7f9;
     color: var(--gnmap-navy);
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
     cursor: pointer;
   }
@@ -1909,21 +1911,63 @@
   }
 
   /* [배경 4:1 비율 요청 반영] 푸터도 flex:0 0 auto로 내용만큼만 차지, 여백 최소화. */
+  /* [1번 시안 반영] 카드 하단에 스카이라인 실루엣 워터마크를 추가한다(요청 3: "로그인화면
+     하단 건물문양"). 새 이미지 asset 없이 인라인 SVG 배경으로 구현한다. */
   #mobile-login-footer {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
+    margin-top: 6px;
+  }
+  #mobile-login-footer-skyline {
+    width: 100%;
+    height: 26px;
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='240'%20height='60'%3E%3Crect%20x='0'%20y='34'%20width='18'%20height='26'%20fill='%23dbe7f7'/%3E%3Crect%20x='20'%20y='18'%20width='14'%20height='42'%20fill='%23c9dbf0'/%3E%3Crect%20x='36'%20y='28'%20width='16'%20height='32'%20fill='%23dbe7f7'/%3E%3Crect%20x='54'%20y='8'%20width='20'%20height='52'%20fill='%23c9dbf0'/%3E%3Crect%20x='76'%20y='24'%20width='12'%20height='36'%20fill='%23dbe7f7'/%3E%3Crect%20x='90'%20y='14'%20width='18'%20height='46'%20fill='%23c9dbf0'/%3E%3Crect%20x='110'%20y='30'%20width='14'%20height='30'%20fill='%23dbe7f7'/%3E%3Crect%20x='126'%20y='2'%20width='16'%20height='58'%20fill='%23c9dbf0'/%3E%3Crect%20x='144'%20y='22'%20width='20'%20height='38'%20fill='%23dbe7f7'/%3E%3Crect%20x='166'%20y='12'%20width='14'%20height='48'%20fill='%23c9dbf0'/%3E%3Crect%20x='182'%20y='26'%20width='18'%20height='34'%20fill='%23dbe7f7'/%3E%3Crect%20x='202'%20y='16'%20width='16'%20height='44'%20fill='%23c9dbf0'/%3E%3Crect%20x='220'%20y='30'%20width='20'%20height='30'%20fill='%23dbe7f7'/%3E%3C/svg%3E");
+    background-repeat: repeat-x;
+    background-position: bottom;
+    background-size: 240px 34px;
+    opacity: 0.45;
+  }
+  #mobile-login-footer-brand {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    flex: 0 0 auto;
-    margin-top: 4px;
-    padding: 4px var(--gnmap-space-4) calc(4px + env(safe-area-inset-bottom, 0px));
+    padding: 6px var(--gnmap-space-4) calc(8px + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid #eef0f4;
     color: #9aa2af;
     font-size: 10.5px;
   }
-  #mobile-login-footer img {
+  #mobile-login-footer-brand img {
     width: 16px;
     height: 16px;
     opacity: 0.7;
+  }
+
+  /* STEP15-F. 모바일 스플래시. 전체 화면(스크롤 없이 한 화면)을 덮고, object-fit:cover로
+     3번째 시안 이미지(splash.png)를 채운다. app.js가 bootstrap() 완료 후 .mobile-splash-hide
+     클래스를 붙여 페이드아웃시킨다. */
+  #mobile-splash {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: #fff;
+    opacity: 1;
+    transition: opacity 0.4s ease;
+  }
+  #mobile-splash.mobile-splash-hide {
+    opacity: 0;
+    pointer-events: none;
+  }
+  #mobile-splash-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
   }
 }
