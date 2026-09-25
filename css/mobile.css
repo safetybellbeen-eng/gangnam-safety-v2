@@ -1728,6 +1728,10 @@
   /* [사용자 확정 시안(1번 사진) 비율 반영] 카드는 내용만큼만 차지(flex:0 0 auto)하고,
      HERO(flex:1)가 나머지를 채운다. 입력칸/버튼/여백을 시안 비율에 맞춰 다시 넉넉하게
      되돌린다(직전의 과도한 압축판보다 카드가 커지고, 그만큼 HERO는 자동으로 작아진다). */
+  /* [글씨체 통일] 사이트 전체에 sans-serif가 명시된 곳이 #mobile-login-signup-top뿐이라,
+     카드 내 텍스트(라벨/버튼/구분선/바로가기 등)는 브라우저 기본 serif(실기기에서는 한글
+     명조/바탕체로 대체)로 렌더링되어 "아이디 저장/로그인 유지"가 이질적으로 보였다.
+     카드 전체에 동일한 고딕 계열 스택을 지정해 통일한다. */
   #mobile-login-card {
     position: relative;
     margin-top: -18px;
@@ -1735,6 +1739,7 @@
     border-radius: 22px 22px 0 0;
     box-shadow: 0 -6px 20px rgba(15,42,82,0.10);
     padding: 8px var(--gnmap-space-5) 6px;
+    font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
   }
   #app #mobile-login-card #login-form {
     gap: 8px;
@@ -1941,6 +1946,7 @@
     padding: 3px var(--gnmap-space-4) calc(4px + env(safe-area-inset-bottom, 0px));
     color: #9aa2af;
     font-size: 10.5px;
+    font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
   }
   #mobile-login-footer-brand img {
     width: 16px;
