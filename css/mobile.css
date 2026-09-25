@@ -1659,12 +1659,19 @@
      보이게 한다. 이전 라운드처럼 뷰포트에 억지로 맞추기 위해 HERO를 눌러 순찰차가 잘리는
      문제를 근본적으로 없앤다 — 대신 콘텐츠가 뷰포트보다 길면 자연스럽게 세로 스크롤된다
      (사용자 최신 지시: "필요하면 아래쪽 일부는 자연스럽게 scroll되어도 된다"). */
+  /* [STEP16.5 FINAL] min-height fallback 순서가 뒤바뀌어 있었다: 100dvh를 먼저 적고
+     100vh를 나중에 적으면, dvh를 지원하는 최신 모바일 Safari/Chrome에서도 나중 선언인
+     100vh(주소창이 접혔을 때 기준의 "큰" 뷰포트 높이)가 100dvh(실제 보이는 "작은" 뷰포트
+     높이)를 덮어써 버린다. 그 결과 섹션이 실제 화면보다 더 크게 min-height를 강제해
+     불필요한 세로 스크롤이 생겼다(헤드리스 테스트 환경은 주소창이 없어 vh=dvh라 재현되지
+     않았음). 올바른 fallback 순서(구형 브라우저용 100vh를 먼저, dvh 지원 브라우저에서
+     이를 덮어쓰는 100dvh를 나중)로 수정. */
   #app #view-login {
     max-width: none;
     margin: 0;
     padding: 0;
-    min-height: 100dvh;
     min-height: 100vh;
+    min-height: 100dvh;
     background: #fff;
   }
   /* UA 기본 body margin(8px)을 제거해 HERO가 화면 좌우 끝까지 꽉 차게 한다.
@@ -1710,7 +1717,7 @@
     background: none;
     border: none;
     padding: 4px;
-    font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
     font-size: 14px;
     font-weight: 700;
     color: var(--gnmap-navy);
@@ -1739,7 +1746,7 @@
     border-radius: 22px 22px 0 0;
     box-shadow: 0 -6px 20px rgba(15,42,82,0.10);
     padding: 8px var(--gnmap-space-5) 6px;
-    font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
   }
   #app #mobile-login-card #login-form {
     gap: 8px;
@@ -1766,9 +1773,20 @@
   #mobile-login-card .mobile-login-field-label-text {
     display: none;
   }
+  /* [STEP16.5 FINAL - eye icon 위치 근본 수정] box-sizing이 지정되어 있지 않아 기본값인
+     content-box로 렌더링되고 있었다 — width:100%(콘텐츠 폭 기준)에 padding-right:44px가
+     추가로 더해져 input의 실제 렌더링 박스가 wrapper(.mobile-login-field)보다 더 넓어질 수
+     있었고, 그 결과 wrapper 기준으로 absolute 배치된 눈 아이콘이 "실제 input의 우측
+     border" 기준으로는 바깥으로 벗어나 보였다. border-box로 고정해 width:100%가 border
+     포함 전체 박스 기준이 되게 하고, -webkit-appearance/appearance:none으로 iOS/Android
+     브라우저가 입力창에 추가하는 네이티브 테두리/그림자 렌더링(작성한 CSS border와 다르게
+     보일 수 있음)도 제거해 우리가 그린 border가 유일한 시각적 경계가 되게 한다. */
   #mobile-login-card .mobile-login-field input {
     width: 100%;
     height: 46px;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+    appearance: none;
     border-radius: 14px;
     border: 1px solid #e6e9ef;
     background: #f6f7f9;
@@ -1924,7 +1942,7 @@
     padding: 3px var(--gnmap-space-4) calc(4px + env(safe-area-inset-bottom, 0px));
     color: #9aa2af;
     font-size: 10.5px;
-    font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
   }
   #mobile-login-footer-brand img {
     width: 16px;
