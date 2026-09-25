@@ -1651,30 +1651,49 @@
      지금까지 로그인 화면 전체가 360px로 좁게 갇혀 있었다(HERO/카드가 가운데 작은 박스처럼
      보이던 원인). #app을 붙여 특이도를 200으로 올려 확실히 이긴다 — #view-login 범위만
      override하므로 다른 화면(#app section 적용받는 다른 뷰)에는 영향 없다. */
+  /* [배경 4 : 로그인 1 비율 요청 반영] 카드 하단에 남는 여백을 없애고 배경이 최대한
+     보이도록, HERO를 고정 높이 대신 flex:1로 만들어 "뷰포트 - 카드 - 푸터"의 남는
+     공간을 전부 채우게 한다. 카드/푸터는 내용 크기만큼만 차지(flex: 0 0 auto)한다. */
   #app #view-login {
     max-width: none;
     margin: 0;
     padding: 0;
+    display: flex;
+    flex-direction: column;
     min-height: 100dvh;
     min-height: 100vh;
     background: #fff;
+  }
+  /* 스크롤 없이 한 화면에 맞추기 위해 UA 기본 body margin(8px)을 제거한다.
+     이 규칙은 @media(max-width:768px) 안에서만 적용되므로 PC 화면에는 영향이 없다. */
+  body {
+    margin: 0;
   }
   /* PC 전용 원래 제목("강남구 사업장 안전지도 V2")은 모바일 히어로의 브랜드 블록으로
      대체된다(#view-approved h1을 숨기는 것과 동일한 기존 패턴). */
   #view-login > h1 {
     display: none;
   }
-  /* 사용자가 제공한 완성 이미지(CI/제목/부제/현장사진이 이미 전부 합성된 로그인 배경)를
-     HERO로 그대로 사용한다. object-fit:cover로 임의 crop하지 않고, width:100%/height:auto로
-     원본 비율(941:1672)을 그대로 유지한다 — 이미지 내부 어떤 요소도 잘리지 않는다. */
+  /* [스크롤 제거 + 배경 4:1 비율 요청 반영] 원본 이미지(941:1672)를 height:auto로 그대로
+     쓰면 스크롤이 생기므로 object-fit:cover로 크롭한다. 높이는 고정값이 아니라
+     flex:1(뷰포트 - 카드 - 푸터의 남는 공간을 전부 차지)로 주어, 카드를 압축한 만큼
+     배경이 더 크게 보이고 하단에 빈 여백도 남지 않게 한다. 상단(CI/타이틀/부제/크레인/
+     스카이라인)을 유지하고 하단(순찰차/감독관 하반신 등)만 크롭한다. */
   #mobile-login-hero {
     display: block;
     position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
   }
   #mobile-login-hero-img {
     display: block;
+    position: absolute;
+    inset: 0;
     width: 100%;
-    height: auto;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
   }
   #mobile-login-signup-top {
     position: absolute;
@@ -1701,16 +1720,19 @@
     height: 15px;
   }
 
+  /* [배경 4:1 비율 요청 반영] 카드를 내용만큼만 차지하게(flex:0 0 auto) 하고, 여백/입력칸
+     크기를 압축해 카드 전체 높이를 줄인다 — 그만큼 위 HERO(flex:1)가 더 크게 보인다. */
   #mobile-login-card {
     position: relative;
-    margin-top: -32px;
+    flex: 0 0 auto;
+    margin-top: -20px;
     background: #fff;
-    border-radius: 30px 30px 0 0;
+    border-radius: 22px 22px 0 0;
     box-shadow: 0 -6px 20px rgba(15,42,82,0.10);
-    padding: 22px var(--gnmap-space-5) var(--gnmap-space-5);
+    padding: 12px var(--gnmap-space-5) 10px;
   }
   #app #mobile-login-card #login-form {
-    gap: var(--gnmap-space-3);
+    gap: 6px;
   }
   #mobile-login-card .mobile-login-field {
     position: relative;
@@ -1736,12 +1758,12 @@
   }
   #mobile-login-card .mobile-login-field input {
     width: 100%;
-    height: 54px;
-    border-radius: 16px;
+    height: 42px;
+    border-radius: 14px;
     border: 1px solid #e6e9ef;
     background: #f6f7f9;
-    padding: 0 16px 0 48px;
-    font-size: 15px;
+    padding: 0 16px 0 46px;
+    font-size: 14px;
     color: #1a2233;
   }
   #mobile-login-card .mobile-login-field input::placeholder {
@@ -1779,10 +1801,10 @@
   }
   #app #mobile-login-card #login-form button[type="submit"] {
     width: 100%;
-    height: 54px;
-    margin-top: 4px;
+    height: 42px;
+    margin-top: 2px;
     border: none;
-    border-radius: 16px;
+    border-radius: 14px;
     background: var(--gnmap-navy);
     color: #fff;
     font-size: 16px;
@@ -1801,18 +1823,26 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-top: var(--gnmap-space-3);
-    font-size: 13px;
+    margin-top: 6px;
+    font-size: 11px;
     color: #5b6472;
   }
-  #mobile-login-remember-label {
+  /* "아이디 저장" + "자동 로그인" 체크박스를 왼쪽에 나란히 묶는다. */
+  #mobile-login-remember-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  #mobile-login-remember-label,
+  #mobile-login-autologin-label {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 13px;
+    font-size: 11px;
     color: #5b6472;
   }
-  #mobile-login-remember-label input[type="checkbox"] {
+  #mobile-login-remember-label input[type="checkbox"],
+  #mobile-login-autologin-label input[type="checkbox"] {
     width: 17px;
     height: 17px;
     accent-color: var(--gnmap-blue);
@@ -1836,9 +1866,9 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    margin: var(--gnmap-space-4) 0 10px;
+    margin: 8px 0 6px;
     color: #b7bec9;
-    font-size: 12px;
+    font-size: 10px;
   }
   #mobile-login-divider::before,
   #mobile-login-divider::after {
@@ -1859,12 +1889,12 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    height: 50px;
-    border-radius: 16px;
+    height: 36px;
+    border-radius: 12px;
     border: 1px solid #e6e9ef;
     background: #f6f7f9;
     color: var(--gnmap-navy);
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 700;
     cursor: pointer;
   }
@@ -1878,16 +1908,18 @@
     height: 17px;
   }
 
+  /* [배경 4:1 비율 요청 반영] 푸터도 flex:0 0 auto로 내용만큼만 차지, 여백 최소화. */
   #mobile-login-footer {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    margin-top: 8px;
-    padding: 10px var(--gnmap-space-4) calc(12px + env(safe-area-inset-bottom, 0px));
+    flex: 0 0 auto;
+    margin-top: 4px;
+    padding: 4px var(--gnmap-space-4) calc(4px + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid #eef0f4;
     color: #9aa2af;
-    font-size: 11.5px;
+    font-size: 10.5px;
   }
   #mobile-login-footer img {
     width: 16px;
