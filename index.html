@@ -36,8 +36,9 @@
   <section id="view-login">
     <!-- 사용자가 제공한 완성 디자인(로그인 배경(1).png)을 HERO로 그대로 사용한다.
          이 이미지 자체에 CI/제목/부제/현장사진이 전부 완성되어 있으므로, HTML/CSS로
-         CI·제목·부제를 다시 만들지 않는다(중복 금지). object-fit:cover로 임의 crop하지
-         않고 원본 비율(941:1672) 그대로 width:100%/height:auto로 표시한다.
+         CI·제목·부제를 다시 만들지 않는다(중복 금지). object-fit:cover + object-position:
+         top center를 유지하되, aspect-ratio(67/100)로 원본(941×1672)의 약 84%까지
+         노출시켜 순찰차/감독관 등판이 REFERENCE만큼 보이게 한다(css/mobile.css 참고).
          아래 mobile-login-* 요소는 PC 공유 DOM에 추가된 것이라 css/mobile.css 상단
          PC-hide 목록에서 기본 숨김 처리하고, 모바일 media query 안에서만 다시 보이게
          한다 — PC는 기존 폼(h1/label/버튼) 그대로 유지된다.
@@ -83,7 +84,7 @@
       <div id="mobile-login-meta-row">
         <div id="mobile-login-remember-group">
           <label id="mobile-login-remember-label"><input type="checkbox" id="mobile-login-remember"> 아이디 저장</label>
-          <label id="mobile-login-autologin-label"><input type="checkbox" id="mobile-login-autologin"> 자동 로그인</label>
+          <label id="mobile-login-autologin-label"><input type="checkbox" id="mobile-login-autologin"> 로그인 유지</label>
         </div>
         <span id="mobile-login-forgot" title="추후 지원 예정">
           비밀번호 찾기
@@ -112,7 +113,6 @@
     </div>
 
     <div id="mobile-login-footer">
-      <div id="mobile-login-footer-skyline" aria-hidden="true"></div>
       <div id="mobile-login-footer-brand">
         <img src="assets/icons/moel-ci.png" alt="">
         <span>고용노동부 · 산업안전 순찰지도</span>
