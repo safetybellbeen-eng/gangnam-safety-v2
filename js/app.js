@@ -492,15 +492,36 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// STEP15-F. 스플래시 화면 숨김. bootstrap()이 끝나(로그인 화면이든 지도 화면이든 어떤 화면을
+// 보여줄지 결정된 뒤) 최소 노출 시간(너무 빨리 깜빡이며 사라지지 않도록)만큼 기다렸다가
+// 페이드아웃한다. bootstrap()이 실패하거나 오래 걸려도 화면이 영원히 스플래시에 갇히지
+// 않도록 별도의 최대 대기시간(SPLASH_MAX_MS) 안전장치를 둔다.
+const SPLASH_MIN_MS = 900;
+const SPLASH_MAX_MS = 4000;
+let splashHidden = false;
+function hideSplash() {
+  if (splashHidden) return;
+  splashHidden = true;
+  const splash = document.getElementById('mobile-splash');
+  if (splash) splash.classList.add('mobile-splash-hide');
+}
+
 async function bootstrap() {
-  bindEvents();
-  // "자동 로그인"을 체크하지 않고 로그인했던 경우, Supabase가 기본적으로 남겨둔 세션이
-  // 있어도 앱 재시작 시 로그아웃시켜 로그인 화면부터 다시 시작하게 한다.
-  if (localStorage.getItem(AUTO_LOGIN_KEY) !== '1' && (await hasActiveSession())) {
-    await signOut();
+  const splashStartedAt = Date.now();
+  setTimeout(hideSplash, SPLASH_MAX_MS);
+  try {
+    bindEvents();
+    // "자동 로그인"을 체크하지 않고 로그인했던 경우, Supabase가 기본적으로 남겨둔 세션이
+    // 있어도 앱 재시작 시 로그아웃시켜 로그인 화면부터 다시 시작하게 한다.
+    if (localStorage.getItem(AUTO_LOGIN_KEY) !== '1' && (await hasActiveSession())) {
+      await signOut();
+    }
+    await loadCurrentProfile();
+    routeByProfile();
+  } finally {
+    const elapsed = Date.now() - splashStartedAt;
+    setTimeout(hideSplash, Math.max(0, SPLASH_MIN_MS - elapsed));
   }
-  await loadCurrentProfile();
-  routeByProfile();
 }
 
 bootstrap();
