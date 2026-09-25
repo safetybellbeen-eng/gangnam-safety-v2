@@ -1705,6 +1705,14 @@
      HERO를 깎는 대신 이번 라운드에 이미 반영된 다른 장치들(Service Worker 캐시 버전
      v2 — 실기기가 구버전 CSS를 계속 캐시로 보여주던 게 스크롤 재현의 실제 원인이었음,
      입력칸/버튼 40px 축소, 카드 flex:1로 하단까지 채움)로 확보한다. */
+  /* [STEP16.5 FINAL-9] "회원가입 버튼만 빼고 배경화면/로그인박스 등 전부를 약간 위로"
+     요청 반영. HERO 자체의 aspect-ratio/object-fit/object-position(순찰차·감독관 노출)은
+     전혀 바꾸지 않고, HERO 블록 전체에 margin-top:-20px만 줘서 뷰포트 상단으로 20px
+     밀어 올린다 — HERO 위쪽의 빈 하늘 부분 20px만 화면 밖으로 밀려나고(로고/타이틀보다
+     한참 위라 잘려도 무방), HERO가 통째로 위로 이동하는 만큼 뒤따르는 카드/footer도
+     자동으로 20px씩 같이 위로 올라간다(정상 흐름이라 별도 조정 불필요). 회원가입
+     버튼은 HERO 내부 absolute 기준이라 그대로 두면 같이 밀려 올라가므로, 버튼 쪽
+     top 값에 +20px를 더해 화면상 위치를 원래 그대로 유지한다(아래 #mobile-login-signup-top). */
   #mobile-login-hero {
     display: block;
     position: relative;
@@ -1712,6 +1720,7 @@
     aspect-ratio: 67 / 100;
     overflow: hidden;
     flex-shrink: 0;
+    margin-top: -20px;
   }
   #mobile-login-hero-img {
     display: block;
@@ -1724,7 +1733,7 @@
   }
   #mobile-login-signup-top {
     position: absolute;
-    top: calc(env(safe-area-inset-top, 0px) + 18px);
+    top: calc(env(safe-area-inset-top, 0px) + 18px + 20px);
     right: 20px;
     display: flex;
     align-items: center;
@@ -1769,13 +1778,18 @@
      남는 여백 양이 달라도 항상 끝까지 채워진다). 내용(이메일/비밀번호/버튼/옵션행)은
      justify-content:center로 카드 안에서 수직 중앙 정렬해, 남는 공간이 위/아래로
      고르게 분배되어 "적당한 여백"처럼 보이게 한다(한쪽에 몰린 큰 빈 공간 방지). */
+  /* [STEP16.5 FINAL-10] "차량의 고용노동부 마크, 감독관 등판 문구를 가리지 말고 카드를
+     최대한 위로" — 스크린샷 픽셀 측정 결과 차량 "고용노동부" 글자 하단이 카드 시작선
+     기준 약 43px 위(390px 폭 기준)였다. 안전 여유 약 10px를 남기고 33px만 추가로
+     끌어올린다(기존 -28px → -61px). 감독관 등판 문구는 차량 마크보다 더 위에 있어
+     이 조정으로는 가려지지 않는다. */
   #mobile-login-card {
     position: relative;
     display: flex;
     flex-direction: column;
     justify-content: center;
     flex: 1;
-    margin-top: -28px;
+    margin-top: -61px;
     background: #fff;
     border-radius: 22px 22px 0 0;
     box-shadow: 0 -6px 20px rgba(15,42,82,0.10);
