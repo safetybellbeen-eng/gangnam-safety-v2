@@ -1745,11 +1745,11 @@
     background: #fff;
     border-radius: 22px 22px 0 0;
     box-shadow: 0 -6px 20px rgba(15,42,82,0.10);
-    padding: 8px var(--gnmap-space-5) 6px;
+    padding: 3px var(--gnmap-space-5) 2px;
     font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
   }
   #app #mobile-login-card #login-form {
-    gap: 8px;
+    gap: 4px;
   }
   #mobile-login-card .mobile-login-field {
     position: relative;
@@ -1783,7 +1783,7 @@
      보일 수 있음)도 제거해 우리가 그린 border가 유일한 시각적 경계가 되게 한다. */
   #mobile-login-card .mobile-login-field input {
     width: 100%;
-    height: 46px;
+    height: 44px;
     box-sizing: border-box;
     -webkit-appearance: none;
     appearance: none;
@@ -1820,10 +1820,12 @@
   #mobile-login-card .mobile-login-field input#login-password::-ms-clear {
     display: none;
   }
+  /* [STEP16.5 FINAL-2] border-radius:14px 곡선 구간과 겹쳐 아이콘이 테두리 밖으로
+     걸쳐 보이던 문제 — 곡선을 벗어난 안쪽 평평한 영역까지 오른쪽 여백을 늘린다. */
   #mobile-login-password-toggle {
     display: flex;
     position: absolute;
-    right: 12px;
+    right: 16px;
     top: 50%;
     transform: translateY(-50%);
     z-index: 2;
@@ -1846,7 +1848,7 @@
   #app #mobile-login-card #login-form button[type="submit"] {
     width: 100%;
     height: 44px;
-    margin-top: 2px;
+    margin-top: 0;
     border: none;
     border-radius: 14px;
     background: var(--gnmap-navy);
@@ -1859,8 +1861,16 @@
   #app #mobile-login-card #login-form button[type="submit"]:active {
     background: #0f2247;
   }
+  /* [STEP16.5 FINAL-2] 에러 문구가 비어 있을 때도 <p> 태그 자체의 line-height만큼 빈
+     공간을 항상 차지하고 있었다(scroll 원인 중 하나). :empty일 때는 공간을 완전히
+     접고, JS가 textContent를 채우면(그 순간 :empty가 아니게 됨) 자동으로 다시 나타난다
+     — 에러 표시 로직(JS) 자체는 건드리지 않는다. */
   #mobile-login-card .form-error {
     margin: 4px 2px 0;
+  }
+  #mobile-login-card .form-error:empty {
+    margin: 0;
+    line-height: 0;
   }
 
   /* [STEP16.5 REFERENCE 정밀조정 - 옵션 행] components.css의 "#app label { flex-direction:
@@ -1873,7 +1883,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-top: 8px;
+    margin-top: 2px;
     font-size: 13px;
     color: #5b6472;
   }
@@ -1896,8 +1906,8 @@
   }
   #mobile-login-remember-label input[type="checkbox"],
   #mobile-login-autologin-label input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     margin: 0;
     accent-color: var(--gnmap-blue);
   }
@@ -1939,7 +1949,7 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 3px var(--gnmap-space-4) calc(4px + env(safe-area-inset-bottom, 0px));
+    padding: 1px var(--gnmap-space-4) calc(1px + env(safe-area-inset-bottom, 0px));
     color: #9aa2af;
     font-size: 10.5px;
     font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
