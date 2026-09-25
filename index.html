@@ -24,32 +24,24 @@
   <!-- STEP 3B: 인증 테스트용 최소 화면. 각 상태별 섹션은 app.js가 display 전환한다. -->
 
   <section id="view-login">
-    <!-- 사용자 확정 시안(현장 사진 + 고용노동부 CI + 순찰지도 타이틀) 기반 모바일 전용
-         로그인 화면. 아래 mobile-login-* 요소는 전부 PC 공유 DOM에 새로 추가된 것이라
-         css/mobile.css 상단 PC-hide 목록에서 기본 숨김 처리하고, 모바일 media query
-         안에서만 다시 보이게 한다 — PC는 기존 폼(h1/label/버튼) 그대로 유지된다.
-         로그인 필드는 시안상 "아이디"로 보이지만 실제 인증은 Supabase 이메일 로그인이라
+    <!-- 사용자가 제공한 완성 디자인(로그인 배경(1).png)을 HERO로 그대로 사용한다.
+         이 이미지 자체에 CI/제목/부제/현장사진이 전부 완성되어 있으므로, HTML/CSS로
+         CI·제목·부제를 다시 만들지 않는다(중복 금지). object-fit:cover로 임의 crop하지
+         않고 원본 비율(941:1672) 그대로 width:100%/height:auto로 표시한다.
+         아래 mobile-login-* 요소는 PC 공유 DOM에 추가된 것이라 css/mobile.css 상단
+         PC-hide 목록에서 기본 숨김 처리하고, 모바일 media query 안에서만 다시 보이게
+         한다 — PC는 기존 폼(h1/label/버튼) 그대로 유지된다.
+         로그인 필드는 이미지상 "아이디"로 보이지만 실제 인증은 Supabase 이메일 로그인이라
          라벨/placeholder는 "이메일"을 유지한다. "아이디 저장"/"비밀번호 찾기"/"이용안내"는
-         이번 라운드에서는 화면(레이아웃)만 만들고 실제 기능은 연결하지 않았다(추후 STEP). -->
+         화면(레이아웃)만 만들고 실제 기능은 연결하지 않았다(추후 STEP). -->
     <div id="mobile-login-hero">
-      <div id="mobile-login-sky" aria-hidden="true"></div>
-      <div id="mobile-login-photo">
-        <img id="mobile-login-hero-img" src="assets/images/login-hero.jpg" alt="" aria-hidden="true">
-        <div id="mobile-login-photo-fade" aria-hidden="true"></div>
-      </div>
+      <img id="mobile-login-hero-img" src="assets/images/login-hero.png" alt="고용노동부 산업안전 순찰지도">
       <button type="button" id="mobile-login-signup-top">
         회원가입
         <span class="mobile-icon-svg-wrap" aria-hidden="true">
           <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
         </span>
       </button>
-      <div id="mobile-login-brand">
-        <img id="mobile-login-emblem" src="assets/icons/moel-ci.png" alt="고용노동부">
-        <div id="mobile-login-agency">고용노동부</div>
-        <div id="mobile-login-title">산업안전 순찰지도</div>
-        <div id="mobile-login-tagline">현장을 더 가까이, 점검을 더 쉽게</div>
-        <div id="mobile-login-tagline-sub">안전한 일터, 함께 만드는 내일</div>
-      </div>
     </div>
 
     <h1>강남구 사업장 안전지도 V2</h1>
