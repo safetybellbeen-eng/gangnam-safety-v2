@@ -1797,7 +1797,7 @@
     font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
   }
   #app #mobile-login-card #login-form {
-    gap: 12px;
+    gap: 18px;
   }
   #mobile-login-card .mobile-login-field {
     position: relative;
@@ -1916,7 +1916,7 @@
   #app #mobile-login-card #login-form button[type="submit"] {
     width: 100%;
     height: 40px;
-    margin-top: 4px;
+    margin-top: 10px;
     border: none;
     border-radius: 14px;
     background: var(--gnmap-navy);
@@ -1951,7 +1951,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-top: 14px;
+    margin-top: 20px;
     font-size: 13px;
     color: #5b6472;
   }
@@ -2007,11 +2007,12 @@
   /* [STEP16.5 2차 재조정] REFERENCE(5번 이미지)는 하단 skyline 장식이 없다 — 완전히
      삭제(DOM/CSS 전부, opacity:0 아님). footer는 "고용노동부 · 산업안전 순찰지도" 배지만
      남기고 목표 높이 28~34px 수준으로 패딩을 최소화한다(HERO 확대분 확보). */
+  /* [STEP16.5 FINAL-11] "카드 하단의 '고용노동부 산업안전순찰지도' 문구 없애고, 그만큼
+     카드를 늘려라" — DOM은 유지하고 모바일 화면에서만 숨긴다(#mobile-login-quick-row와
+     동일한 패턴, PC는 이미 기본 숨김 목록이라 무영향). 카드가 이미 flex:1이라 footer가
+     차지하던 높이를 자동으로 흡수해 화면 하단까지 늘어난다. */
   #mobile-login-footer {
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    margin-top: 0;
+    display: none;
   }
   #mobile-login-footer-brand {
     display: flex;
