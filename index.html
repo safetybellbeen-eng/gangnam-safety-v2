@@ -13,6 +13,9 @@
 <!-- STEP16: iOS Safari는 manifest.json의 icons를 읽지 않고 홈 화면 추가 시 이 태그만 본다.
      기존 icon(assets/icons/icon-192.png, 태극 원본을 리사이즈만 한 실제 asset)을 그대로 재사용한다. -->
 <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<!-- favicon.ico가 없어 브라우저가 자동으로 /favicon.ico를 요청해 404가 발생하던 것을 방지.
+     새 파일을 만들지 않고 이미 존재하는 PWA 아이콘(icon-192.png)을 그대로 favicon으로 지정한다. -->
+<link rel="icon" type="image/png" href="assets/icons/icon-192.png">
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/layout.css">
 <link rel="stylesheet" href="css/components.css">
