@@ -30,6 +30,14 @@ export async function signOut() {
   state.user = null;
 }
 
+// "자동 로그인" 체크 여부 판단용. Supabase 클라이언트는 기본적으로 세션을 localStorage에
+// 영구 저장하므로, 로그인 시 "자동 로그인"을 체크하지 않았다면 앱 재시작(bootstrap) 시점에
+// 남아있는 세션을 이 함수로 확인한 뒤 로그아웃시켜 로그인 화면부터 다시 시작하게 한다.
+export async function hasActiveSession() {
+  const { data: { session } } = await sb.auth.getSession();
+  return !!session;
+}
+
 // 로그인 성공 후 profile을 조회해 상태를 확인한다.
 // pending/rejected/disabled 사용자는 로그인 자체(auth)는 성공하지만
 // 앱 데이터 접근은 RLS(is_gnmap_v2_approved())가 차단하므로,
