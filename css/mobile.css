@@ -85,6 +85,8 @@
 .site-detail-copy-btn,
 .site-detail-name-favorite-btn,
 #mobile-login-hero,
+#mobile-login-sky,
+#mobile-login-photo,
 #mobile-login-signup-top,
 #mobile-login-meta-row,
 #mobile-login-divider,
@@ -1662,20 +1664,54 @@
   #mobile-login-hero {
     display: block;
     position: relative;
-    height: 52vh;
+    height: 59vh;
+    overflow: hidden;
+    background: #eaf4fc;
+  }
+  /* BRAND / SKY ZONE — 실제 사진이 아니라 CSS gradient로 밝은 하늘을 만든다(TARGET처럼
+     상단에 충분한 여백을 확보하기 위함 — 원본 사진 상단 40%는 베이킹된 브랜딩 텍스트라
+     애초에 하늘 소스로 쓸 수 없다). 아래 FIELD PHOTO ZONE과 겹치는 하단 구간에서
+     같은 톤으로 자연스럽게 이어지도록 흰색 쪽으로 페이드한다. */
+  #mobile-login-sky {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 64%;
+    background: linear-gradient(180deg, #bfe0f7 0%, #d9edfb 45%, #eef6fc 80%, #f7fbfe 100%);
+  }
+  /* FIELD PHOTO ZONE — 실제 현장 사진(크레인/스카이라인/순찰차/감독관)을 보여주는 구간.
+     사진 전체가 아니라 이 구간에만 보이는 좁은 창(overflow:hidden + object-position)으로
+     주요 피사체만 노출한다. 원본 파일은 destructive crop하지 않는다. */
+  #mobile-login-photo {
+    display: block;
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    bottom: 0;
     overflow: hidden;
   }
   #mobile-login-hero-img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    object-position: 50% 20%;
+    object-position: 50% 18%;
     display: block;
+    transform: scale(1.16);
+    transform-origin: 54% 28%;
   }
-  #mobile-login-hero-scrim {
+  /* SKY와 PHOTO ZONE의 경계가 두 장의 사진처럼 뚝 끊어져 보이지 않도록, 사진 상단에
+     sky 톤(연한 하늘색) → 투명으로 이어지는 자연스러운 연결 gradient를 얹는다. */
+  #mobile-login-photo-fade {
     position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.28) 18%, rgba(255,255,255,0.16) 32%, rgba(255,255,255,0.04) 46%, rgba(255,255,255,0) 58%);
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 22%;
+    background: linear-gradient(180deg, #d9edfb 0%, rgba(217,237,251,0.55) 40%, rgba(217,237,251,0) 100%);
+    pointer-events: none;
   }
   #mobile-login-signup-top {
     position: absolute;
@@ -1692,7 +1728,7 @@
     font-weight: 700;
     color: var(--gnmap-navy);
     cursor: pointer;
-    z-index: 2;
+    z-index: 3;
   }
   #mobile-login-signup-top .mobile-icon-svg-wrap {
     display: inline-flex;
@@ -1703,7 +1739,7 @@
   }
   #mobile-login-brand {
     position: absolute;
-    top: 9%;
+    top: 8%;
     left: 0;
     right: 0;
     display: flex;
@@ -1714,43 +1750,39 @@
     font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
   }
   #mobile-login-emblem {
-    width: 60px;
-    height: 60px;
-    filter: drop-shadow(0 4px 10px rgba(15,42,82,0.22));
+    width: clamp(46px, 13vw, 58px);
+    height: clamp(46px, 13vw, 58px);
+    filter: drop-shadow(0 4px 10px rgba(15,42,82,0.18));
   }
   #mobile-login-agency {
-    margin-top: 6px;
+    margin-top: 5px;
     font-size: var(--gnmap-fs-secondary);
     font-weight: 700;
     color: var(--gnmap-navy);
-    text-shadow: 0 1px 2px rgba(255,255,255,0.7), 0 1px 10px rgba(255,255,255,0.5);
   }
   #mobile-login-title {
-    margin-top: 4px;
-    font-size: clamp(26px, 7vw, 34px);
-    font-weight: 800;
+    margin-top: 3px;
+    font-size: clamp(28px, 8vw, 35px);
+    font-weight: 900;
     color: var(--gnmap-navy);
-    letter-spacing: -0.5px;
+    letter-spacing: -1.3px;
     white-space: nowrap;
-    text-shadow: 0 1px 2px rgba(255,255,255,0.7), 0 1px 10px rgba(255,255,255,0.5);
   }
   #mobile-login-tagline {
-    margin-top: var(--gnmap-space-3);
+    margin-top: 8px;
     font-size: 15px;
     font-weight: 600;
     color: #1a2233;
-    text-shadow: 0 1px 2px rgba(255,255,255,0.75), 0 1px 10px rgba(255,255,255,0.55);
   }
   #mobile-login-tagline-sub {
     margin-top: 2px;
     font-size: var(--gnmap-fs-secondary);
     color: #4a5568;
-    text-shadow: 0 1px 2px rgba(255,255,255,0.75), 0 1px 10px rgba(255,255,255,0.55);
   }
 
   #mobile-login-card {
     position: relative;
-    margin-top: -36px;
+    margin-top: -18px;
     background: #fff;
     border-radius: 30px 30px 0 0;
     box-shadow: 0 -6px 20px rgba(15,42,82,0.10);
