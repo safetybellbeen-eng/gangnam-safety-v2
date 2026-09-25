@@ -94,8 +94,10 @@
         </span>
       </div>
 
-      <div id="mobile-login-divider"><span>간편 바로가기</span></div>
-
+      <!-- [STEP16.5 3차] 모바일 로그인 화면 하단 "간편 바로가기(회원가입/이용안내)" 삭제 요청.
+           #show-signup 버튼은 PC 화면에서 유일한 회원가입 진입점이라 DOM에서 완전히 지우지
+           않고, css/mobile.css의 모바일 media query에서 #mobile-login-quick-row 자체를
+           display:none으로 숨긴다(PC는 media query 밖이라 기존 그대로 노출/동작). -->
       <div id="mobile-login-quick-row">
         <button type="button" id="show-signup">
           <span class="mobile-icon-svg-wrap" aria-hidden="true">
@@ -103,12 +105,6 @@
           </span>
           회원가입
         </button>
-        <span id="mobile-login-guide" title="추후 지원 예정">
-          <span class="mobile-icon-svg-wrap" aria-hidden="true">
-            <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-          </span>
-          이용안내
-        </span>
       </div>
     </div>
 
