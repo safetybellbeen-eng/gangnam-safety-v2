@@ -1,7 +1,7 @@
 // app.js — STEP 3B. 인증 흐름 최소 테스트 UI 연결.
 // 지도/사업장 등 실제 기능은 이후 STEP에서 추가한다 (CLAUDE.md 12절: 대규모 UI 금지).
 import { state } from './state.js';
-import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin } from './auth.js';
+import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession } from './auth.js';
 import { initMap, clearMarkers } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
@@ -13,6 +13,11 @@ const VIEWS = [
   'view-login', 'view-signup', 'view-signup-done',
   'view-pending', 'view-rejected', 'view-disabled', 'view-approved'
 ];
+
+// "아이디 저장"/"자동 로그인" 체크박스용 localStorage 키. 서버/DB와 무관한 프론트 전용 편의
+// 기능이며, 이메일 문자열과 '1'/없음 플래그만 저장한다(비밀번호는 절대 저장하지 않는다).
+const REMEMBER_EMAIL_KEY = 'gnmap_v2_remember_email';
+const AUTO_LOGIN_KEY = 'gnmap_v2_auto_login';
 
 // STEP15-B. 모바일 "즐겨찾기" 탭에 들어가기 직전의 state.favoriteOnly 값을 임시 보관한다.
 // (탭을 벗어나면 사용자가 PC/모바일 공용 즐겨찾기 토글로 실제 선택해둔 값으로 복원 — 다른 필터는 건드리지 않는다.)
@@ -340,6 +345,15 @@ function bindEvents() {
   }
   document.getElementById('signup-done-to-login').addEventListener('click', () => showView('view-login'));
 
+  // 저장된 "아이디 저장"/"자동 로그인" 값을 로그인 화면에 반영(1회, bindEvents는 bootstrap에서
+  // 한 번만 호출됨). 비밀번호는 저장하지 않으므로 이메일/체크박스 상태만 복원한다.
+  const savedEmail = localStorage.getItem(REMEMBER_EMAIL_KEY);
+  if (savedEmail) {
+    document.getElementById('login-email').value = savedEmail;
+    document.getElementById('mobile-login-remember').checked = true;
+  }
+  document.getElementById('mobile-login-autologin').checked = localStorage.getItem(AUTO_LOGIN_KEY) === '1';
+
   // 사용자 요청(3): 상세정보 패널 상단의 터치바(드래그 핸들)를 아래로 스와이프하면 닫힌다.
   // 패널 자체는 renderDetail()이 매번 innerHTML만 바꾸고 엘리먼트는 재사용하므로, 리스너는
   // 여기서 한 번만 바인딩한다. 드래그는 핸들이 보이는 상단 영역(패널 상단에서 28px 이내)에서
@@ -435,8 +449,14 @@ function bindEvents() {
     clearError(errorEl);
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
+    const remember = document.getElementById('mobile-login-remember').checked;
+    const autoLogin = document.getElementById('mobile-login-autologin').checked;
     try {
       await signIn(email, password);
+      if (remember) localStorage.setItem(REMEMBER_EMAIL_KEY, email);
+      else localStorage.removeItem(REMEMBER_EMAIL_KEY);
+      if (autoLogin) localStorage.setItem(AUTO_LOGIN_KEY, '1');
+      else localStorage.removeItem(AUTO_LOGIN_KEY);
       routeByProfile();
     } catch (err) {
       errorEl.textContent = err.message || '로그인에 실패했습니다.';
@@ -474,6 +494,11 @@ if ('serviceWorker' in navigator) {
 
 async function bootstrap() {
   bindEvents();
+  // "자동 로그인"을 체크하지 않고 로그인했던 경우, Supabase가 기본적으로 남겨둔 세션이
+  // 있어도 앱 재시작 시 로그아웃시켜 로그인 화면부터 다시 시작하게 한다.
+  if (localStorage.getItem(AUTO_LOGIN_KEY) !== '1' && (await hasActiveSession())) {
+    await signOut();
+  }
   await loadCurrentProfile();
   routeByProfile();
 }
