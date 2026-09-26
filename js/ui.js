@@ -1151,7 +1151,6 @@ export async function renderAdminPanel(containerId) {
     info.className = 'admin-user-info';
     [
       ['이름', u.name],
-      ['이메일', u.email],
       ['역할', u.role],
       ['상태', u.status],
       ['가입일', u.created_at]
