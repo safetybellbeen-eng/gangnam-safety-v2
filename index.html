@@ -63,7 +63,7 @@
             <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
           </span>
           <span class="mobile-login-field-label-text">아이디</span>
-          <input type="email" id="login-email" placeholder="아이디를 입력하세요" required>
+          <input type="text" id="login-email" placeholder="아이디를 입력하세요" required autocomplete="username">
         </label>
         <label class="mobile-login-field">
           <span class="mobile-icon-svg-wrap" aria-hidden="true">
@@ -163,8 +163,9 @@
             <span class="mobile-icon-svg-wrap" aria-hidden="true">
               <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
             </span>
-            <input type="email" id="signup-email" placeholder="아이디를 입력하세요" required>
+            <input type="text" id="signup-email" placeholder="아이디를 입력하세요" required autocomplete="username">
           </span>
+          <span id="signup-id-check-msg" class="mobile-signup-match-msg" aria-live="polite"></span>
         </label>
         <label class="mobile-signup-field">비밀번호<span class="mobile-required-star" aria-hidden="true"> *</span>
           <span class="mobile-signup-field-input-wrap">
