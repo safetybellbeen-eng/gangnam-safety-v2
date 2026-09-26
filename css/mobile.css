@@ -87,6 +87,7 @@
 #mobile-login-hero,
 #mobile-login-signup-top,
 #mobile-login-meta-row,
+#mobile-login-password-help,
 #mobile-login-divider,
 #mobile-login-guide,
 #mobile-login-footer,
@@ -104,7 +105,11 @@
 #mobile-signupdone-header,
 #mobile-signupdone-intro,
 #mobile-signupdone-illustration,
-#mobile-signupdone-info {
+#mobile-signupdone-info,
+.mobile-statusview-header,
+.mobile-statusview-intro,
+.mobile-statusview-illustration,
+.mobile-statusview-info {
   display: none;
 }
 
@@ -1950,6 +1955,11 @@
   #app #mobile-login-card #login-form button[type="submit"]:active {
     background: #0f2247;
   }
+  #app #mobile-login-card #login-form button[type="submit"]:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
   /* [STEP16.5 FINAL-2] 에러 문구가 비어 있을 때도 <p> 태그 자체의 line-height만큼 빈
      공간을 항상 차지하고 있었다(scroll 원인 중 하나). :empty일 때는 공간을 완전히
      접고, JS가 textContent를 채우면(그 순간 :empty가 아니게 됨) 자동으로 다시 나타난다
@@ -1971,10 +1981,17 @@
   #mobile-login-meta-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     margin-top: 26px;
     font-size: 13px;
     color: #5b6472;
+  }
+  #mobile-login-password-help {
+    display: block;
+    margin: 10px 0 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: #8a93a3;
   }
   #mobile-login-remember-group {
     display: flex;
@@ -2000,23 +2017,6 @@
     margin: 0;
     accent-color: var(--gnmap-blue);
   }
-  #mobile-login-forgot {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    font-size: 13px;
-    font-weight: 600;
-    line-height: 1;
-    color: var(--gnmap-navy);
-  }
-  #mobile-login-forgot .mobile-icon-svg-wrap {
-    display: inline-flex;
-  }
-  #mobile-login-forgot .mobile-icon-svg {
-    width: 14px;
-    height: 14px;
-  }
-
   /* [STEP16.5 3차] "간편 바로가기" 구분선(#mobile-login-divider)은 HTML에서 완전히
      삭제했다(PC는 원래도 숨김 목록에 있어 영향 없음). #mobile-login-quick-row는 PC의
      유일한 회원가입 버튼(#show-signup)을 담고 있어 HTML은 유지하되, 모바일에서만
@@ -2320,6 +2320,42 @@
   .mobile-signup-match-msg.is-checking {
     color: #8a93a3;
   }
+  /* STEP16.8(비밀번호 규칙 실시간 체크리스트). 기본은 회색, 규칙을 만족하면(js가 is-met
+     클래스를 추가) 초록 + 체크마크로 바뀐다. */
+  .mobile-signup-rules {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    margin: 2px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .mobile-signup-rules li {
+    font-size: 11.5px;
+    color: #a3abb8;
+    position: relative;
+    padding-left: 14px;
+  }
+  .mobile-signup-rules li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1.5px solid #c7cfdb;
+    box-sizing: border-box;
+  }
+  .mobile-signup-rules li.is-met {
+    color: #1a8f4c;
+    font-weight: 600;
+  }
+  .mobile-signup-rules li.is-met::before {
+    border-color: #1a8f4c;
+    background: #1a8f4c;
+  }
   #app #mobile-signup-card #signup-form button[type="submit"] {
     width: 100%;
     height: 52px;
@@ -2544,6 +2580,15 @@
     line-height: 1.5;
     color: #5b6472;
   }
+  #signup-done-recap {
+    margin: 10px 0 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gnmap-blue);
+  }
+  #signup-done-recap:empty {
+    display: none;
+  }
   #mobile-signupdone-illustration {
     display: flex;
     flex-shrink: 0;
@@ -2622,6 +2667,174 @@
   #app #view-signup-done #signup-done-to-login:active {
     background: #0f2247;
   }
+
+  /* STEP16.8(상태 화면 디자인 통일). view-pending/view-rejected/view-disabled를 view-signup-done과
+     동일한 톤(헤더 고정 + 본문 균등분배 + 스크롤 없음)으로 맞춘다. 3개 화면이 구조를 공유하므로
+     공용 클래스(.mobile-statusview-*)로 한 번에 스타일링한다. */
+  #app #view-pending,
+  #app #view-rejected,
+  #app #view-disabled {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  #app #view-pending > h1, #app #view-pending > p,
+  #app #view-rejected > h1, #app #view-rejected > p,
+  #app #view-disabled > h1, #app #view-disabled > p {
+    display: none;
+  }
+  .mobile-statusview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    padding: calc(env(safe-area-inset-top, 0px) + 14px) var(--gnmap-space-4) 10px;
+  }
+  .mobile-statusview-back {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    margin-left: -8px;
+    background: none;
+    border: none;
+    color: var(--gnmap-navy);
+    cursor: pointer;
+  }
+  .mobile-statusview-back .mobile-icon-svg {
+    width: 22px;
+    height: 22px;
+  }
+  .mobile-statusview-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+  .mobile-statusview-brand img {
+    display: block;
+    height: 22px;
+    width: auto;
+  }
+  .mobile-statusview-brand span {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gnmap-navy);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
+  }
+  .mobile-statusview-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    justify-content: space-evenly;
+    padding: 0 0 12px;
+  }
+  .mobile-statusview-intro {
+    display: block;
+    flex-shrink: 0;
+    padding: 0 var(--gnmap-space-4);
+    text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
+  }
+  .mobile-statusview-intro h1 {
+    margin: 0 0 12px;
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--gnmap-navy);
+  }
+  .mobile-statusview-intro p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #5b6472;
+  }
+  .mobile-statusview-illustration {
+    display: flex;
+    flex-shrink: 0;
+    justify-content: center;
+    padding: 0 var(--gnmap-space-4);
+  }
+  .mobile-statusview-illustration svg {
+    width: 100%;
+    max-width: 200px;
+    height: auto;
+  }
+  .mobile-statusview-info {
+    display: block;
+    flex-shrink: 0;
+    margin: 0 var(--gnmap-space-4);
+    background: #eef4fb;
+    border-radius: 16px;
+    padding: 18px;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
+  }
+  .mobile-statusview-info-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--gnmap-blue);
+  }
+  .mobile-statusview-info-title .mobile-icon-svg-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--gnmap-blue);
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .mobile-statusview-info-title .mobile-icon-svg {
+    width: 14px;
+    height: 14px;
+  }
+  .mobile-statusview-info ul {
+    margin: 12px 0 0;
+    padding-left: 18px;
+    list-style: disc;
+  }
+  .mobile-statusview-info li {
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--gnmap-navy);
+  }
+  .mobile-statusview-info li + li {
+    margin-top: 8px;
+  }
+  .mobile-statusview-info li strong {
+    color: var(--gnmap-blue);
+    font-weight: 800;
+  }
+  .mobile-statusview-btn {
+    display: block;
+    flex-shrink: 0;
+    width: auto;
+    margin: 0 var(--gnmap-space-4);
+    height: 52px;
+    border: none;
+    border-radius: 14px;
+    background: var(--gnmap-blue);
+    color: #fff;
+    font-size: 17px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
+  }
+  .mobile-statusview-btn:active {
+    background: #0f2247;
+  }
 }
 
 /* [STEP16.5 FINAL-3] 짧은 실효 viewport 전용 압축. HERO는 aspect-ratio(67/100)로 폭에
@@ -2647,5 +2860,16 @@
   }
   #mobile-login-footer-brand {
     padding: 1px var(--gnmap-space-4) calc(1px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* STEP16.8(PWA 상하간격 보정). 홈 화면에 설치되어 "독립 실행(standalone)" 모드로 열리면
+   브라우저 주소창이 사라지면서 노치/상태바 영역이 콘텐츠 위로 그대로 겹칠 수 있다.
+   일반 브라우저 탭 모드에서는 이 media query 자체가 매치되지 않아 기존 검증된 레이아웃에
+   전혀 영향이 없고(추가만 하는 안전한 변경), standalone일 때만 상단에 안전영역만큼
+   여백을 더해 HERO/제목이 노치 아래에서 시작하게 한다. */
+@media (max-width: 768px) and (display-mode: standalone) {
+  #app #view-login {
+    padding-top: env(safe-area-inset-top, 0px);
   }
 }
