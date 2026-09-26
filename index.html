@@ -503,6 +503,9 @@
       <input type="file" id="upload-file-input" accept=".xlsx,.xls">
       <div id="upload-history"></div>
       <div id="upload-preview"></div>
+      <!-- 모바일 "사업장 데이터 관리" TARGET UI 전용 컨테이너. #upload-history/#upload-preview(PC)는
+           그대로 두고, css/mobile.css가 화면 폭에 따라 어느 쪽을 보일지만 결정한다(PC 로직 불변). -->
+      <div id="upload-mobile-host"></div>
     </div>
     <button type="button" id="btn-supervision-panel" style="display:none">감독일정</button>
     <div id="supervision-panel" style="display:none">
