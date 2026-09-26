@@ -17,6 +17,15 @@ export async function signUp(email, password, name) {
   return data;
 }
 
+// STEP16.5(회원가입 인증번호). 고정 인증번호는 프론트에 절대 두지 않고, DB의
+// SECURITY DEFINER 함수(gnmap_v2_verify_signup_code)에서만 비교한다 — 이 함수는
+// 일치 여부(boolean)만 반환하며 실제 코드 값은 클라이언트로 내려오지 않는다.
+export async function verifySignupCode(code) {
+  const { data, error } = await sb.rpc('gnmap_v2_verify_signup_code', { p_code: code });
+  if (error) throw error;
+  return data === true;
+}
+
 export async function signIn(email, password) {
   const { data, error } = await sb.auth.signInWithPassword({ email, password });
   if (error) throw error;
