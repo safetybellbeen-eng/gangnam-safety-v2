@@ -42,13 +42,40 @@ export async function signUp(id, password, name) {
   return data;
 }
 
+// STEP16.5(인증번호 시도 잠금용 기기 토큰). 회원가입 전 단계라 auth.uid()가 없으므로,
+// 브라우저에 한 번 생성해 localStorage에 보관하는 임의 토큰을 실패횟수 집계 키로 쓴다.
+// 개인정보가 아닌 임의 문자열이며, 이 브라우저의 회원가입 시도를 구분하는 용도로만 쓰인다.
+const DEVICE_TOKEN_KEY = 'gnmap_v2_device_token';
+
+function getDeviceToken() {
+  try {
+    let token = localStorage.getItem(DEVICE_TOKEN_KEY);
+    if (!token) {
+      token = (crypto && crypto.randomUUID) ? crypto.randomUUID() : `dt_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem(DEVICE_TOKEN_KEY, token);
+    }
+    return token;
+  } catch (e) {
+    // localStorage 사용 불가 환경(프라이빗 모드 등)에서는 매번 새 토큰 — 잠금 추적만 약해질 뿐 기능은 그대로 동작.
+    return null;
+  }
+}
+
 // STEP16.5(회원가입 인증번호). 고정 인증번호는 프론트에 절대 두지 않고, DB의
 // SECURITY DEFINER 함수(gnmap_v2_verify_signup_code)에서만 비교한다 — 이 함수는
-// 일치 여부(boolean)만 반환하며 실제 코드 값은 클라이언트로 내려오지 않는다.
+// 일치 여부만 반환하며 실제 코드 값은 클라이언트로 내려오지 않는다.
+// 5회 연속 실패 시 서버에서 해당 기기 토큰을 10분간 잠근다(gnmap_v2_signup_code_attempts).
+// 반환값: { ok, locked, lockedUntil, attemptsLeft }
 export async function verifySignupCode(code) {
-  const { data, error } = await sb.rpc('gnmap_v2_verify_signup_code', { p_code: code });
+  const deviceToken = getDeviceToken();
+  const { data, error } = await sb.rpc('gnmap_v2_verify_signup_code', { p_code: code, p_device_token: deviceToken });
   if (error) throw error;
-  return data === true;
+  return {
+    ok: data && data.ok === true,
+    locked: !!(data && data.locked),
+    lockedUntil: data ? data.locked_until : null,
+    attemptsLeft: data ? data.attempts_left : null,
+  };
 }
 
 // STEP16.5(아이디 중복확인). gnmap_v2_profiles.email(합성 이메일 포함)과 대조만 하는
