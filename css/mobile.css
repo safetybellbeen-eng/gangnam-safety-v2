@@ -1992,9 +1992,29 @@
     font-weight: var(--gnmap-fw-bold);
     cursor: pointer;
   }
-  /* STEP16.5 추가: 비밀번호 초기화 결과(임시 비밀번호) 표시 박스 — 선택/복사하기 쉽게 monospace. */
-  .admin-sheet-password-box {
+  /* STEP16.5 추가: 비밀번호 초기화 결과(임시 비밀번호) 표시 박스 + 복사 버튼 한 줄 배치. */
+  .admin-sheet-password-row {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
     margin: 4px 0 18px;
+  }
+  .admin-sheet-copy-btn {
+    flex-shrink: 0;
+    padding: 0 16px;
+    border: none;
+    border-radius: var(--gnmap-radius-sm);
+    background: var(--gnmap-blue);
+    color: #fff;
+    font-size: 13px;
+    font-weight: var(--gnmap-fw-semibold);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .admin-sheet-password-box {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
     padding: 14px;
     border: 1px dashed var(--gnmap-border);
     border-radius: var(--gnmap-radius-sm);
