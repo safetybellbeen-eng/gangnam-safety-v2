@@ -77,6 +77,23 @@ export async function resetUserPassword(userId) {
   return { ok: true, tempPassword: data.tempPassword };
 }
 
+// STEP16.5 추가: "완전 삭제" 액션 — 승인거절(rejected) 상태 회원만 대상. 새 RPC
+// (gnmap_v2_delete_rejected_profile)는 상태값 검사/관리자 검증/자기자신 차단을 서버에서
+// 모두 다시 확인한다(UI 숨김만 믿지 않음). 성공 시 목록에서도 해당 행을 즉시 제거한다.
+export async function deleteRejectedProfile(userId) {
+  const { error } = await sb.rpc('gnmap_v2_delete_rejected_profile', {
+    p_user_id: userId
+  });
+
+  if (error) {
+    console.error('회원 삭제 실패:', error);
+    return { ok: false, message: error.message || '삭제에 실패했습니다.' };
+  }
+
+  state.adminUsers = state.adminUsers.filter(u => u.id !== userId);
+  return { ok: true, message: '삭제 완료' };
+}
+
 export async function setUserRole(userId, role) {
   if (!ROLE_VALUES.includes(role)) {
     console.error('유효하지 않은 역할값:', role);
