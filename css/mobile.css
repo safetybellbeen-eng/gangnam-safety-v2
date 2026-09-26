@@ -109,7 +109,9 @@
 .mobile-statusview-header,
 .mobile-statusview-intro,
 .mobile-statusview-illustration,
-.mobile-statusview-info {
+.mobile-statusview-info,
+.admin-mobile-view,
+.admin-sheet-overlay {
   display: none;
 }
 
@@ -1587,6 +1589,423 @@
   }
   .mobile-more-item-danger .mobile-more-item-icon {
     color: #c0392b;
+  }
+
+  /* ============================================================
+     STEP16.5 — 모바일 관리자 회원관리 TARGET UI(js/ui.js의 renderAdminMobileHost 등이 그린다).
+     PC 전용 목록(.admin-user-row/#admin-message)은 위 PC-hide 기본 목록에 없으므로 PC에서
+     계속 보이며, 여기서는 모바일 폭에서만 그것들을 숨기고 .admin-mobile-view를 보여준다.
+     #admin-panel 자체의 위치/전체화면 처리는 기존 #app[data-mobile-tab="more"] #admin-panel
+     규칙(위)을 그대로 쓴다 — 여기서는 그 안쪽 내용만 다룬다. ============================ */
+  .admin-user-row,
+  #admin-message {
+    display: none;
+  }
+  .admin-mobile-view {
+    display: flex;
+    flex-direction: column;
+  }
+  .admin-mobile-state-msg {
+    text-align: center;
+    padding: 40px 0 0;
+    font-size: 14px;
+    color: var(--gnmap-text-meta);
+  }
+  .admin-mobile-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 0;
+  }
+  .admin-mobile-retry-btn {
+    margin-top: 14px;
+    padding: 10px 22px;
+    border: none;
+    border-radius: var(--gnmap-radius-sm);
+    background: var(--gnmap-blue);
+    color: #fff;
+    font-size: 13px;
+    font-weight: var(--gnmap-fw-semibold);
+    cursor: pointer;
+  }
+
+  /* 헤더: CI 로고 + "산업안전 순찰지도" + 알림 벨. #mobile-app-header와 동일한 로고 높이/
+     타이포그래피를 재사용해 화면 전환 시 이질감이 없게 한다. */
+  .admin-mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 var(--gnmap-space-5);
+  }
+  .admin-mobile-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .admin-mobile-brand img {
+    display: block;
+    height: 20px;
+    width: auto;
+  }
+  .admin-mobile-brand span {
+    font-size: 14px;
+    font-weight: var(--gnmap-fw-bold);
+    color: var(--gnmap-navy);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .admin-mobile-bell {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--gnmap-tap-min);
+    height: var(--gnmap-tap-min);
+    margin-right: -8px;
+    border: none;
+    background: none;
+    padding: 0;
+    color: var(--gnmap-navy);
+    cursor: pointer;
+  }
+  .admin-mobile-bell svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .admin-mobile-title {
+    font-size: 26px;
+    font-weight: var(--gnmap-fw-bold);
+    color: var(--gnmap-navy);
+    margin: 0 0 6px;
+  }
+  .admin-mobile-desc {
+    font-size: 14px;
+    color: var(--gnmap-text-sub);
+    line-height: 1.5;
+    margin: 0 0 var(--gnmap-space-5);
+  }
+
+  /* 상태 탭 — 카드/버튼이 아니라 한 줄 text tab + 활성 밑줄(요청사항 9). */
+  .admin-mobile-tabs {
+    display: flex;
+    gap: 20px;
+    border-bottom: 1px solid var(--gnmap-border);
+    margin-bottom: var(--gnmap-space-4);
+  }
+  .admin-mobile-tab {
+    border: none;
+    background: none;
+    padding: 0 0 10px;
+    font-size: 14px;
+    font-weight: var(--gnmap-fw-semibold);
+    color: var(--gnmap-text-sub);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+  }
+  .admin-mobile-tab.active {
+    color: var(--gnmap-blue);
+    font-weight: var(--gnmap-fw-bold);
+    border-bottom-color: var(--gnmap-blue);
+  }
+
+  /* 검색창 — 이름/이메일 검색(요청사항 10/11). */
+  .admin-mobile-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 46px;
+    padding: 0 14px;
+    margin-bottom: var(--gnmap-space-4);
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-md);
+    background: var(--gnmap-bg-soft);
+  }
+  .admin-mobile-search svg {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    color: var(--gnmap-gray);
+  }
+  .admin-mobile-search input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: none;
+    font-size: 14px;
+    color: var(--gnmap-text-primary);
+  }
+  .admin-mobile-search input::placeholder {
+    color: #a3abb8;
+  }
+  .admin-mobile-search input:focus {
+    outline: none;
+  }
+
+  /* 회원 카드 목록(요청사항 12/35) — 한 화면에서 여러 명을 훑어볼 수 있도록 카드 높이를
+     낮게 유지한다. */
+  .admin-mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-bottom: 12px;
+  }
+  .admin-mobile-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-md);
+    background: #fff;
+  }
+  .admin-mobile-avatar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--gnmap-blue-light);
+    color: var(--gnmap-navy);
+  }
+  .admin-mobile-avatar svg {
+    width: 22px;
+    height: 22px;
+  }
+  .admin-mobile-card-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .admin-mobile-card-row1 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .admin-mobile-card-name {
+    flex-shrink: 1;
+    min-width: 0;
+    font-size: 16px;
+    font-weight: var(--gnmap-fw-bold);
+    color: var(--gnmap-navy);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .admin-mobile-role-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: var(--gnmap-blue-light);
+    color: var(--gnmap-blue);
+    font-size: 10.5px;
+    font-weight: var(--gnmap-fw-bold);
+    vertical-align: middle;
+  }
+  .admin-mobile-badge {
+    flex-shrink: 0;
+    margin-left: auto;
+    padding: 3px 10px;
+    border-radius: var(--gnmap-radius-pill);
+    font-size: 12px;
+    font-weight: var(--gnmap-fw-semibold);
+    white-space: nowrap;
+  }
+  .admin-mobile-badge-approved { background: var(--gnmap-green-bg); color: var(--gnmap-green); }
+  .admin-mobile-badge-pending { background: var(--gnmap-blue-light); color: var(--gnmap-blue); }
+  .admin-mobile-badge-rejected { background: var(--gnmap-red-bg); color: var(--gnmap-red); }
+  .admin-mobile-badge-disabled { background: var(--gnmap-gray-bg); color: var(--gnmap-gray); }
+  .admin-mobile-more-btn {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    margin-right: -4px;
+    border: none;
+    background: none;
+    padding: 0;
+    color: var(--gnmap-gray);
+    cursor: pointer;
+  }
+  .admin-mobile-more-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  .admin-mobile-card-row2 {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .admin-mobile-card-email,
+  .admin-mobile-card-org {
+    min-width: 0;
+    font-size: 13px;
+    color: var(--gnmap-text-sub);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .admin-mobile-card-date {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: var(--gnmap-text-meta);
+  }
+
+  /* 빈 상태(검색/탭 결과 0명) — 요청사항 26. */
+  .admin-mobile-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 0;
+    color: var(--gnmap-text-meta);
+  }
+  .admin-mobile-empty svg {
+    width: 36px;
+    height: 36px;
+    margin-bottom: 10px;
+    color: #c3c9d3;
+  }
+  .admin-mobile-empty p {
+    margin: 0;
+    font-size: 13.5px;
+  }
+
+  /* ⋮ 더보기 메뉴 — 작은 desktop dropdown 대신 bottom sheet(요청사항 23). #admin-panel의
+     z-index(90)/#mobile-bottom-nav(80)보다 높게 두어 항상 최상단에 뜨게 한다. */
+  .admin-sheet-overlay {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    align-items: flex-end;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.45);
+    z-index: 200;
+  }
+  .admin-sheet {
+    width: 100%;
+    max-height: 70vh;
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+    border-radius: 20px 20px 0 0;
+    background: #fff;
+    box-shadow: var(--gnmap-shadow-md);
+  }
+  .admin-sheet-name {
+    font-size: 15px;
+    font-weight: var(--gnmap-fw-bold);
+    color: var(--gnmap-navy);
+    text-align: center;
+    padding-bottom: 14px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--gnmap-border);
+  }
+  .admin-sheet-action {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: left;
+    padding: 14px 4px;
+    border: none;
+    border-bottom: 1px solid var(--gnmap-border);
+    background: none;
+    font-size: 15px;
+    color: var(--gnmap-text-primary);
+    cursor: pointer;
+  }
+  .admin-sheet-action:last-of-type {
+    border-bottom: none;
+  }
+  .admin-sheet-action-danger {
+    color: var(--gnmap-red);
+  }
+  .admin-sheet-cancel {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 10px;
+    padding: 14px;
+    border: none;
+    border-radius: var(--gnmap-radius-sm);
+    background: var(--gnmap-bg-soft);
+    color: var(--gnmap-text-sub);
+    font-size: 14px;
+    font-weight: var(--gnmap-fw-semibold);
+    text-align: center;
+    cursor: pointer;
+  }
+  .admin-sheet-info {
+    padding: 4px 0 8px;
+  }
+  .admin-sheet-info-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--gnmap-border);
+    font-size: 14px;
+  }
+  .admin-sheet-info-row:last-child {
+    border-bottom: none;
+  }
+  .admin-sheet-info-label {
+    color: var(--gnmap-text-meta);
+  }
+  .admin-sheet-info-value {
+    color: var(--gnmap-navy);
+    font-weight: var(--gnmap-fw-semibold);
+  }
+  .admin-sheet-confirm-msg {
+    padding: 18px 4px 20px;
+    text-align: center;
+    font-size: 15px;
+    color: var(--gnmap-text-primary);
+    line-height: 1.5;
+  }
+  .admin-sheet-confirm-row {
+    display: flex;
+    gap: 10px;
+  }
+  .admin-sheet-confirm-row .admin-sheet-cancel {
+    flex: 1;
+    margin-top: 0;
+  }
+  .admin-sheet-confirm-ok {
+    flex: 1;
+    box-sizing: border-box;
+    padding: 14px;
+    border: none;
+    border-radius: var(--gnmap-radius-sm);
+    background: var(--gnmap-red);
+    color: #fff;
+    font-size: 14px;
+    font-weight: var(--gnmap-fw-bold);
+    cursor: pointer;
+  }
+  /* STEP16.5 추가: 비밀번호 초기화 결과(임시 비밀번호) 표시 박스 — 선택/복사하기 쉽게 monospace. */
+  .admin-sheet-password-box {
+    margin: 4px 0 18px;
+    padding: 14px;
+    border: 1px dashed var(--gnmap-border);
+    border-radius: var(--gnmap-radius-sm);
+    background: var(--gnmap-bg-soft);
+    color: var(--gnmap-navy);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 16px;
+    font-weight: var(--gnmap-fw-bold);
+    text-align: center;
+    letter-spacing: 0.5px;
+    user-select: all;
   }
 
   /* STEP15-E.6: 더보기 메뉴에서 연 회원관리/엑셀업로드 패널을 닫고 "더보기" 목록으로 돌아가는
