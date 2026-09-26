@@ -2,12 +2,26 @@
 import { sb } from './api.js';
 import { state } from './state.js';
 
+// STEP16.5(아이디 방식 전환). Supabase Auth는 이메일(또는 전화번호/OAuth) 기준으로만
+// 계정을 만들 수 있어 순수 아이디(username) 인증을 지원하지 않는다. 사용자에게는 "@" 없는
+// 순수 아이디만 입력받고, Supabase에는 고정 도메인을 붙인 합성 이메일로 보이게 만든다
+// (Auth 내부 구조/스키마는 변경하지 않음 — 이메일 필드에 넣을 값만 가공). 이미 "@"가 포함된
+// 값(기존 실제 이메일로 가입된 계정)은 그대로 통과시켜 하위호환을 유지한다.
+const SIGNUP_ID_DOMAIN = '@gnmap.local';
+
+export function toAuthEmail(id) {
+  const trimmed = (id || '').trim();
+  if (!trimmed) return trimmed;
+  return trimmed.includes('@') ? trimmed : `${trimmed}${SIGNUP_ID_DOMAIN}`;
+}
+
 // 회원가입: profile 생성은 DB 트리거(handle_gnmap_v2_new_user)가 보장하므로
 // 여기서 별도로 insert하지 않는다 — 프론트 로직 누락으로 profile이 안 생기는 사고를 원천 차단.
 // 회원가입: user metadata에 app='gangnam-safety-v2'와 name을 담아 전달한다.
 // DB 트리거(handle_gnmap_v2_new_user, STEP14.5-B에서 name도 함께 저장하도록 수정됨)가
 // 이 metadata를 확인해 V2 가입자만 gnmap_v2_profiles를 생성한다 — V1/V2가 같은 auth.users를 공유하므로 필수.
-export async function signUp(email, password, name) {
+export async function signUp(id, password, name) {
+  const email = toAuthEmail(id);
   const { data, error } = await sb.auth.signUp({
     email,
     password,
@@ -26,7 +40,18 @@ export async function verifySignupCode(code) {
   return data === true;
 }
 
-export async function signIn(email, password) {
+// STEP16.5(아이디 중복확인). gnmap_v2_profiles.email(합성 이메일 포함)과 대조만 하는
+// DB 함수(gnmap_v2_check_id_exists)를 호출한다. auth.users는 REST로 직접 조회할 수 없어
+// 트리거로 항상 동기화되는 gnmap_v2_profiles.email을 기준으로 확인한다.
+export async function checkIdExists(id) {
+  const email = toAuthEmail(id);
+  const { data, error } = await sb.rpc('gnmap_v2_check_id_exists', { p_email: email });
+  if (error) throw error;
+  return data === true;
+}
+
+export async function signIn(id, password) {
+  const email = toAuthEmail(id);
   const { data, error } = await sb.auth.signInWithPassword({ email, password });
   if (error) throw error;
   await loadCurrentProfile();
