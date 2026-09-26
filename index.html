@@ -81,18 +81,15 @@
       </form>
       <p id="login-error" class="form-error"></p>
 
+      <!-- STEP16.8: "비밀번호 찾기"는 자동 재설정 기능이 없어 제거하고, 비밀번호를 잊은
+           경우의 실제 처리 방법(관리자 문의)을 짧은 안내문으로 대체한다. -->
       <div id="mobile-login-meta-row">
         <div id="mobile-login-remember-group">
           <label id="mobile-login-remember-label"><input type="checkbox" id="mobile-login-remember"> 아이디 저장</label>
           <label id="mobile-login-autologin-label"><input type="checkbox" id="mobile-login-autologin"> 로그인 유지</label>
         </div>
-        <span id="mobile-login-forgot" title="추후 지원 예정">
-          비밀번호 찾기
-          <span class="mobile-icon-svg-wrap" aria-hidden="true">
-            <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-          </span>
-        </span>
       </div>
+      <p id="mobile-login-password-help">비밀번호를 잊으셨다면 관리자에게 문의해주세요.</p>
 
       <!-- [STEP16.5 3차] 모바일 로그인 화면 하단 "간편 바로가기(회원가입/이용안내)" 삭제 요청.
            #show-signup 버튼은 PC 화면에서 유일한 회원가입 진입점이라 DOM에서 완전히 지우지
@@ -182,6 +179,14 @@
               </span>
             </button>
           </span>
+          <!-- STEP16.8(비밀번호 규칙 실시간 체크리스트). 제출 시점 에러 대신, 타이핑하는 동안
+               각 규칙 충족 여부를 실시간으로 보여준다. -->
+          <ul id="signup-password-rules" class="mobile-signup-rules">
+            <li data-rule="length">8~20자</li>
+            <li data-rule="letter">영문 포함</li>
+            <li data-rule="digit">숫자 포함</li>
+            <li data-rule="special">특수문자 포함</li>
+          </ul>
         </label>
         <label class="mobile-signup-field">비밀번호 확인<span class="mobile-required-star" aria-hidden="true"> *</span>
           <span class="mobile-signup-field-input-wrap">
@@ -263,6 +268,11 @@
       <div id="mobile-signupdone-intro">
         <h1>가입 완료</h1>
         <p>관리자 승인 대기 중입니다.<br>승인 후 로그인해주세요.</p>
+        <!-- STEP16.8(가입 신청 상태확인 수단). 별도의 조회 기능을 새로 만드는 대신(익명 조회는
+             계정 존재 여부를 노출하는 보안 위험이 있음), 방금 신청한 소속/아이디를 그대로
+             다시 보여줘 "내가 뭘로 신청했는지" 확인할 수 있게 한다. js/app.js가 가입 성공
+             직후 채운다. -->
+        <p id="signup-done-recap"></p>
       </div>
 
       <!-- STEP16.6(승인대기 일러스트). 외부 이미지를 받아오지 않고 프로젝트 내부 inline SVG로
@@ -297,6 +307,7 @@
         <ul>
           <li>관리자의 승인 절차를 거쳐 이용하실 수 있습니다.</li>
           <li>승인은 <strong>매주 월요일 10시</strong>에 일괄 처리됩니다.</li>
+          <li>승인 전에 로그인하시면 승인 대기 안내 화면이 다시 표시되며, 승인 여부가 자동으로 확인됩니다.</li>
           <li>승인 완료 시 등록하신 계정으로 로그인하여 산업안전 순찰지도를 이용하실 수 있습니다.</li>
         </ul>
       </div>
@@ -305,22 +316,140 @@
     </div>
   </section>
 
+  <!-- STEP16.8(상태 화면 디자인 통일). view-signup-done과 같은 톤(헤더+아이콘+안내box+버튼)으로
+       맞추되, 3개 화면이 구조를 공유하므로 ID 대신 .mobile-statusview-* 공용 클래스를 쓴다.
+       버튼(#logout-*)은 PC와 공유하는 기존 요소라 새로 만들지 않고 그대로 감싸기만 한다. -->
   <section id="view-pending" style="display:none">
     <h1>승인 대기 중</h1>
     <p>관리자 승인을 기다리고 있습니다.</p>
-    <button type="button" id="logout-pending">로그아웃</button>
+    <div class="mobile-statusview-header">
+      <button type="button" id="mobile-pending-back" class="mobile-statusview-back" aria-label="로그아웃">
+        <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="mobile-statusview-brand">
+        <img src="assets/icons/moel-ci-full.png" alt="고용노동부">
+        <span>산업안전 순찰지도</span>
+      </div>
+    </div>
+    <div class="mobile-statusview-body">
+      <div class="mobile-statusview-intro">
+        <h1>승인 대기 중</h1>
+        <p>관리자 승인을 기다리고 있습니다.<br>승인 후 다시 로그인해주세요.</p>
+      </div>
+      <div class="mobile-statusview-illustration" aria-hidden="true">
+        <svg viewBox="0 0 240 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="120" cy="130" rx="95" ry="75" fill="#eaf2fc"/>
+          <g stroke="#8fb8ef" stroke-width="3" stroke-linecap="round">
+            <path d="M45 55l7 7M195 55l-7 7M40 130h10M190 130h10"/>
+          </g>
+          <rect x="63" y="34" width="94" height="150" rx="18" fill="#fff" stroke="#c7dcf6" stroke-width="3"/>
+          <rect x="93" y="24" width="34" height="18" rx="8" fill="#3b7cd6"/>
+          <circle cx="110" cy="80" r="17" fill="#dbe9fb"/>
+          <path d="M92 118c0-10 8-15 18-15s18 5 18 15" stroke="#3b7cd6" stroke-width="4" stroke-linecap="round" fill="none"/>
+          <circle cx="110" cy="80" r="8" fill="#3b7cd6"/>
+          <line x1="82" y1="140" x2="138" y2="140" stroke="#c7dcf6" stroke-width="5" stroke-linecap="round"/>
+          <line x1="82" y1="154" x2="138" y2="154" stroke="#c7dcf6" stroke-width="5" stroke-linecap="round"/>
+          <line x1="82" y1="168" x2="120" y2="168" stroke="#c7dcf6" stroke-width="5" stroke-linecap="round"/>
+          <circle cx="168" cy="150" r="34" fill="#fff" stroke="#3b7cd6" stroke-width="5"/>
+          <path d="M168 132v18l12 10" stroke="#3b7cd6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+      <div class="mobile-statusview-info">
+        <div class="mobile-statusview-info-title">
+          <span class="mobile-icon-svg-wrap" aria-hidden="true">
+            <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
+          </span>
+          승인 안내
+        </div>
+        <ul>
+          <li>관리자의 승인 절차를 거쳐 이용하실 수 있습니다.</li>
+          <li>승인은 <strong>매주 월요일 10시</strong>에 일괄 처리됩니다.</li>
+        </ul>
+      </div>
+      <button type="button" id="logout-pending" class="mobile-statusview-btn">로그아웃</button>
+    </div>
   </section>
 
   <section id="view-rejected" style="display:none">
     <h1>가입이 거절되었습니다</h1>
     <p>문의사항은 관리자에게 연락해주세요.</p>
-    <button type="button" id="logout-rejected">로그아웃</button>
+    <div class="mobile-statusview-header">
+      <button type="button" id="mobile-rejected-back" class="mobile-statusview-back" aria-label="로그아웃">
+        <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="mobile-statusview-brand">
+        <img src="assets/icons/moel-ci-full.png" alt="고용노동부">
+        <span>산업안전 순찰지도</span>
+      </div>
+    </div>
+    <div class="mobile-statusview-body">
+      <div class="mobile-statusview-intro">
+        <h1>가입 거절</h1>
+        <p>가입 신청이 거절되었습니다.<br>문의사항은 관리자에게 연락해주세요.</p>
+      </div>
+      <div class="mobile-statusview-illustration" aria-hidden="true">
+        <svg viewBox="0 0 240 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="120" cy="130" rx="95" ry="75" fill="#eaf2fc"/>
+          <circle cx="120" cy="110" r="60" fill="#fff" stroke="#e0402e" stroke-width="5"/>
+          <path d="M98 88l44 44M142 88l-44 44" stroke="#e0402e" stroke-width="7" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="mobile-statusview-info">
+        <div class="mobile-statusview-info-title">
+          <span class="mobile-icon-svg-wrap" aria-hidden="true">
+            <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
+          </span>
+          안내
+        </div>
+        <ul>
+          <li>가입 신청이 승인되지 않았습니다.</li>
+          <li>사유 및 재신청 여부는 관리자에게 문의해주세요.</li>
+        </ul>
+      </div>
+      <button type="button" id="logout-rejected" class="mobile-statusview-btn">로그아웃</button>
+    </div>
   </section>
 
   <section id="view-disabled" style="display:none">
     <h1>사용이 중지된 계정입니다</h1>
     <p>문의사항은 관리자에게 연락해주세요.</p>
-    <button type="button" id="logout-disabled">로그아웃</button>
+    <div class="mobile-statusview-header">
+      <button type="button" id="mobile-disabled-back" class="mobile-statusview-back" aria-label="로그아웃">
+        <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="mobile-statusview-brand">
+        <img src="assets/icons/moel-ci-full.png" alt="고용노동부">
+        <span>산업안전 순찰지도</span>
+      </div>
+    </div>
+    <div class="mobile-statusview-body">
+      <div class="mobile-statusview-intro">
+        <h1>사용 중지</h1>
+        <p>계정 사용이 중지되었습니다.<br>문의사항은 관리자에게 연락해주세요.</p>
+      </div>
+      <div class="mobile-statusview-illustration" aria-hidden="true">
+        <svg viewBox="0 0 240 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="120" cy="130" rx="95" ry="75" fill="#eaf2fc"/>
+          <rect x="80" y="100" width="80" height="66" rx="12" fill="#fff" stroke="#3b7cd6" stroke-width="5"/>
+          <path d="M96 100v-20a24 24 0 0 1 48 0v20" stroke="#3b7cd6" stroke-width="6" fill="none" stroke-linecap="round"/>
+          <circle cx="120" cy="130" r="9" fill="#3b7cd6"/>
+          <line x1="120" y1="139" x2="120" y2="150" stroke="#3b7cd6" stroke-width="6" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="mobile-statusview-info">
+        <div class="mobile-statusview-info-title">
+          <span class="mobile-icon-svg-wrap" aria-hidden="true">
+            <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
+          </span>
+          안내
+        </div>
+        <ul>
+          <li>관리자에 의해 계정 사용이 중지되었습니다.</li>
+          <li>재사용을 원하시면 관리자에게 문의해주세요.</li>
+        </ul>
+      </div>
+      <button type="button" id="logout-disabled" class="mobile-statusview-btn">로그아웃</button>
+    </div>
   </section>
 
   <section id="view-approved" style="display:none">
