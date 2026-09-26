@@ -96,6 +96,8 @@
 #mobile-signup-intro,
 #mobile-signup-info,
 #mobile-signup-password-toggle,
+#mobile-signup-password-confirm-toggle,
+.mobile-signup-match-msg,
 .mobile-required-star,
 .mobile-signup-label-text,
 .mobile-signup-submit-label {
@@ -2256,6 +2258,60 @@
   #mobile-signup-password-toggle .mobile-icon-svg {
     width: 18px;
     height: 18px;
+  }
+  .mobile-signup-field-input-wrap input#signup-password-confirm {
+    padding-right: 48px;
+  }
+  .mobile-signup-field-input-wrap input#signup-password-confirm::-webkit-credentials-auto-fill-button,
+  .mobile-signup-field-input-wrap input#signup-password-confirm::-webkit-strong-password-auto-fill-button,
+  .mobile-signup-field-input-wrap input#signup-password-confirm::-webkit-caps-lock-indicator,
+  .mobile-signup-field-input-wrap input#signup-password-confirm::-webkit-contacts-auto-fill-button {
+    visibility: hidden;
+    display: none !important;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
+  }
+  .mobile-signup-field-input-wrap input#signup-password-confirm::-ms-reveal,
+  .mobile-signup-field-input-wrap input#signup-password-confirm::-ms-clear {
+    display: none;
+  }
+  #mobile-signup-password-confirm-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    background: none;
+    border: none;
+    padding: 8px;
+    color: #a3abb8;
+    cursor: pointer;
+  }
+  #mobile-signup-password-confirm-toggle.active {
+    color: var(--gnmap-blue);
+  }
+  #mobile-signup-password-confirm-toggle .mobile-icon-svg {
+    width: 18px;
+    height: 18px;
+  }
+  .mobile-signup-match-msg {
+    display: block;
+    font-size: 12px;
+    font-weight: 400;
+    margin-top: 2px;
+  }
+  .mobile-signup-match-msg:empty {
+    display: none;
+  }
+  .mobile-signup-match-msg.is-match {
+    color: #1a8f4c;
+  }
+  .mobile-signup-match-msg.is-mismatch {
+    color: #e0402e;
   }
   #app #mobile-signup-card #signup-form button[type="submit"] {
     width: 100%;
