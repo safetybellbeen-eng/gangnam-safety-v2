@@ -117,14 +117,77 @@
   </section>
 
   <section id="view-signup" style="display:none">
+    <!-- STEP16.5(회원가입 UI). 모바일 전용 헤더/인트로/안내박스는 새로 추가된 요소라
+         css/mobile.css 상단의 "기본 숨김" 목록에 넣어 PC에는 전혀 렌더링되지 않는다(기존
+         #view-login/#view-approved 모바일 헤더와 동일한 패턴). #signup-form 내부의 실제
+         필드(id="signup-name/email/password")·제출 버튼·에러 표시(#signup-error)는 PC와
+         완전히 공유하며 구조/id/이벤트를 그대로 유지한다 — 아이콘/래퍼 span은
+         display:contents 기본값이라 PC 렌더링에 아무 상자도 추가하지 않는다. -->
+    <!-- PC는 이 h1만 그대로 렌더링한다(기존 그대로 유지). 모바일에서는 아래
+         #mobile-signup-intro 안의 자체 h1으로 대체되며, 이 h1은 media query에서
+         display:none 처리된다(중복 방지). -->
     <h1>회원가입</h1>
-    <form id="signup-form">
-      <label>이름(소속) <input type="text" id="signup-name" required></label>
-      <label>이메일 <input type="email" id="signup-email" required></label>
-      <label>비밀번호 <input type="password" id="signup-password" required></label>
-      <button type="submit">가입하기</button>
-    </form>
-    <p id="signup-error" class="form-error"></p>
+    <div id="mobile-signup-header">
+      <button type="button" id="mobile-signup-back" aria-label="뒤로가기">
+        <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div id="mobile-signup-brand">
+        <img src="assets/icons/moel-ci-full.png" alt="고용노동부">
+        <span id="mobile-signup-brand-title">산업안전 순찰지도</span>
+      </div>
+    </div>
+    <div id="mobile-signup-intro">
+      <h1>회원가입</h1>
+      <p>산업안전 순찰지도를 이용을 위한 계정을 만들어주세요.<br>신청 후 관리자 승인 절차를 거쳐 이용하실 수 있습니다.</p>
+    </div>
+    <div id="mobile-signup-card">
+      <form id="signup-form">
+        <label class="mobile-signup-field">이름(소속)<span class="mobile-required-star" aria-hidden="true"> *</span>
+          <span class="mobile-signup-field-input-wrap">
+            <span class="mobile-icon-svg-wrap" aria-hidden="true">
+              <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            </span>
+            <input type="text" id="signup-name" placeholder="이름과 소속을 입력하세요" required>
+          </span>
+        </label>
+        <label class="mobile-signup-field"><span class="signup-label-pc-only">이메일</span><span class="mobile-signup-label-text">아이디</span><span class="mobile-required-star" aria-hidden="true"> *</span>
+          <span class="mobile-signup-field-input-wrap">
+            <span class="mobile-icon-svg-wrap" aria-hidden="true">
+              <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            </span>
+            <input type="email" id="signup-email" placeholder="아이디를 입력하세요" required>
+          </span>
+        </label>
+        <label class="mobile-signup-field">비밀번호<span class="mobile-required-star" aria-hidden="true"> *</span>
+          <span class="mobile-signup-field-input-wrap">
+            <span class="mobile-icon-svg-wrap" aria-hidden="true">
+              <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            </span>
+            <input type="password" id="signup-password" placeholder="영문, 숫자, 특수문자를 포함한 8~20자" required>
+            <button type="button" id="mobile-signup-password-toggle" aria-label="비밀번호 표시/숨기기">
+              <span class="mobile-icon-svg-wrap" aria-hidden="true">
+                <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </span>
+            </button>
+          </span>
+        </label>
+        <button type="submit"><span class="signup-label-pc-only">가입하기</span><span class="mobile-signup-submit-label">가입 신청</span></button>
+      </form>
+      <p id="signup-error" class="form-error"></p>
+    </div>
+    <div id="mobile-signup-info">
+      <div id="mobile-signup-info-title">
+        <span class="mobile-icon-svg-wrap" aria-hidden="true">
+          <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
+        </span>
+        회원가입 안내
+      </div>
+      <ul>
+        <li>고용노동부 소속 산업안전 감독관만 가입할 수 있습니다.</li>
+        <li>가입 신청 후 관리자 승인 절차가 진행됩니다.</li>
+        <li>입력하신 정보는 계정 관리 목적으로만 사용됩니다.</li>
+      </ul>
+    </div>
     <button type="button" id="show-login">로그인으로 돌아가기</button>
   </section>
 
