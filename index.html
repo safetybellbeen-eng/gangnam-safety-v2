@@ -142,12 +142,20 @@
     </div>
     <div id="mobile-signup-card">
       <form id="signup-form">
-        <label class="mobile-signup-field">이름(소속)<span class="mobile-required-star" aria-hidden="true"> *</span>
+        <label class="mobile-signup-field">소속<span class="mobile-required-star" aria-hidden="true"> *</span>
+          <span class="mobile-signup-field-input-wrap">
+            <span class="mobile-icon-svg-wrap" aria-hidden="true">
+              <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"></path><path d="M5 21V7l7-4 7 4v14"></path><path d="M9 21v-6h6v6"></path></svg>
+            </span>
+            <input type="text" id="signup-org" placeholder="예: OO지청" required>
+          </span>
+        </label>
+        <label class="mobile-signup-field">이름<span class="mobile-required-star" aria-hidden="true"> *</span>
           <span class="mobile-signup-field-input-wrap">
             <span class="mobile-icon-svg-wrap" aria-hidden="true">
               <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
             </span>
-            <input type="text" id="signup-name" placeholder="이름과 소속을 입력하세요" required>
+            <input type="text" id="signup-name" placeholder="이름을 입력하세요" required>
           </span>
         </label>
         <label class="mobile-signup-field"><span class="signup-label-pc-only">이메일</span><span class="mobile-signup-label-text">아이디</span><span class="mobile-required-star" aria-hidden="true"> *</span>
@@ -169,6 +177,28 @@
                 <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
               </span>
             </button>
+          </span>
+        </label>
+        <label class="mobile-signup-field">비밀번호 확인<span class="mobile-required-star" aria-hidden="true"> *</span>
+          <span class="mobile-signup-field-input-wrap">
+            <span class="mobile-icon-svg-wrap" aria-hidden="true">
+              <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            </span>
+            <input type="password" id="signup-password-confirm" placeholder="비밀번호를 다시 입력하세요" required>
+            <button type="button" id="mobile-signup-password-confirm-toggle" aria-label="비밀번호 확인 표시/숨기기">
+              <span class="mobile-icon-svg-wrap" aria-hidden="true">
+                <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </span>
+            </button>
+          </span>
+          <span id="signup-password-match-msg" class="mobile-signup-match-msg" aria-live="polite"></span>
+        </label>
+        <label class="mobile-signup-field">인증번호<span class="mobile-required-star" aria-hidden="true"> *</span>
+          <span class="mobile-signup-field-input-wrap">
+            <span class="mobile-icon-svg-wrap" aria-hidden="true">
+              <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"></path><path d="M9 12l2 2 4-4"></path></svg>
+            </span>
+            <input type="text" id="signup-code" placeholder="관리자로부터 안내받은 인증번호를 입력해주세요" required>
           </span>
         </label>
         <button type="submit"><span class="signup-label-pc-only">가입하기</span><span class="mobile-signup-submit-label">가입 신청</span></button>
