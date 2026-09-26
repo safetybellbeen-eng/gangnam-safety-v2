@@ -345,6 +345,13 @@ function bindEvents() {
   }
   document.getElementById('signup-done-to-login').addEventListener('click', () => showView('view-login'));
 
+  // STEP16.6(승인대기 화면 모바일 뒤로가기). 새 로직을 만들지 않고 기존 "로그인으로 이동"
+  // 버튼의 클릭을 그대로 위임한다(#mobile-signup-back과 동일한 원칙).
+  const signupDoneBack = document.getElementById('mobile-signupdone-back');
+  if (signupDoneBack) {
+    signupDoneBack.addEventListener('click', () => document.getElementById('signup-done-to-login').click());
+  }
+
   // 모바일 회원가입 화면 상단 뒤로가기 버튼. 새 로직을 만들지 않고 기존 "로그인으로
   // 돌아가기" 버튼(#show-login)의 클릭을 그대로 위임한다.
   const signupBack = document.getElementById('mobile-signup-back');
