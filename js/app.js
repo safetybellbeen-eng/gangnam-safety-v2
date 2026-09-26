@@ -1,7 +1,7 @@
 // app.js — STEP 3B. 인증 흐름 최소 테스트 UI 연결.
 // 지도/사업장 등 실제 기능은 이후 STEP에서 추가한다 (CLAUDE.md 12절: 대규모 UI 금지).
 import { state } from './state.js';
-import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession } from './auth.js';
+import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, verifySignupCode } from './auth.js';
 import { initMap, clearMarkers } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
@@ -481,20 +481,67 @@ function bindEvents() {
     }
   });
 
+  // STEP16.5(회원가입 필드 분리). 소속/이름을 별도 입력칸으로 나누되, DB(gnmap_v2_profiles.name)는
+  // 컬럼 추가 없이 기존 단일 name 컬럼을 그대로 쓴다 — signUp 호출 시 "소속 이름" 형태로 합쳐서 전달한다.
   document.getElementById('signup-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const errorEl = document.getElementById('signup-error');
     clearError(errorEl);
+    const org = document.getElementById('signup-org').value.trim();
     const name = document.getElementById('signup-name').value.trim();
     const email = document.getElementById('signup-email').value.trim();
     const password = document.getElementById('signup-password').value;
+    const passwordConfirm = document.getElementById('signup-password-confirm').value;
+    const code = document.getElementById('signup-code').value.trim();
+
+    if (password !== passwordConfirm) {
+      errorEl.textContent = '비밀번호가 일치하지 않습니다.';
+      return;
+    }
+
     try {
-      await signUp(email, password, name);
+      const codeOk = await verifySignupCode(code);
+      if (!codeOk) {
+        errorEl.textContent = '인증번호가 올바르지 않습니다.';
+        return;
+      }
+      await signUp(email, password, `${org} ${name}`.trim());
       showView('view-signup-done');
     } catch (err) {
       errorEl.textContent = err.message || '회원가입에 실패했습니다.';
     }
   });
+
+  // 비밀번호/비밀번호 확인 실시간 일치 여부 표시. 검증 로직(제출 시 최종 비교)과는 별개로
+  // 순수 UI 피드백만 담당하며, 값이 실제로 일치하는지는 제출 시 다시 한 번 확인한다.
+  const signupPw = document.getElementById('signup-password');
+  const signupPwConfirm = document.getElementById('signup-password-confirm');
+  const signupPwMatchMsg = document.getElementById('signup-password-match-msg');
+  if (signupPw && signupPwConfirm && signupPwMatchMsg) {
+    const updateMatchMsg = () => {
+      if (!signupPwConfirm.value) {
+        signupPwMatchMsg.textContent = '';
+        signupPwMatchMsg.className = 'mobile-signup-match-msg';
+        return;
+      }
+      const match = signupPw.value === signupPwConfirm.value;
+      signupPwMatchMsg.textContent = match ? '비밀번호가 일치합니다.' : '비밀번호가 일치하지 않습니다.';
+      signupPwMatchMsg.className = 'mobile-signup-match-msg ' + (match ? 'is-match' : 'is-mismatch');
+    };
+    signupPw.addEventListener('input', updateMatchMsg);
+    signupPwConfirm.addEventListener('input', updateMatchMsg);
+  }
+
+  // 회원가입 비밀번호 확인 표시/숨기기 토글 (본인 확인 필드용, 기존 비밀번호 토글과 동일한 원칙).
+  const signupPwConfirmToggle = document.getElementById('mobile-signup-password-confirm-toggle');
+  if (signupPwConfirmToggle) {
+    signupPwConfirmToggle.addEventListener('click', () => {
+      const pwInput = document.getElementById('signup-password-confirm');
+      const showing = pwInput.type === 'text';
+      pwInput.type = showing ? 'password' : 'text';
+      signupPwConfirmToggle.classList.toggle('active', !showing);
+    });
+  }
 }
 
 // STEP16. Service Worker 등록. 상대경로('./sw.js')를 써서 GitHub Pages의 /gangnam-safety-v2/
