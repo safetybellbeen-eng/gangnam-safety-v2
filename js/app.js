@@ -1,7 +1,7 @@
 // app.js — STEP 3B. 인증 흐름 최소 테스트 UI 연결.
 // 지도/사업장 등 실제 기능은 이후 STEP에서 추가한다 (CLAUDE.md 12절: 대규모 UI 금지).
 import { state } from './state.js';
-import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, verifySignupCode, checkIdExists, translateAuthError } from './auth.js';
+import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, verifySignupCode, checkIdExists, checkLoginLock, translateAuthError } from './auth.js';
 import { initMap, clearMarkers } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
@@ -22,6 +22,30 @@ const AUTO_LOGIN_KEY = 'gnmap_v2_auto_login';
 // STEP15-B. 모바일 "즐겨찾기" 탭에 들어가기 직전의 state.favoriteOnly 값을 임시 보관한다.
 // (탭을 벗어나면 사용자가 PC/모바일 공용 즐겨찾기 토글로 실제 선택해둔 값으로 복원 — 다른 필터는 건드리지 않는다.)
 let mobileFavoriteOnlyBackup = null;
+
+// STEP16.8(잠금 카운트다운). 로그인/회원가입 인증번호 잠금 메시지에 공통으로 쓰는 실시간
+// mm:ss 카운트다운. 같은 엘리먼트에 중복으로 걸리지 않도록 이전 타이머를 추적해 정리한다.
+const activeLockCountdowns = new WeakMap();
+function startLockCountdown(el, lockedUntilIso, prefix, onExpire) {
+  if (activeLockCountdowns.has(el)) clearInterval(activeLockCountdowns.get(el));
+  const lockedUntilMs = new Date(lockedUntilIso).getTime();
+  function tick() {
+    const remainingMs = lockedUntilMs - Date.now();
+    if (remainingMs <= 0) {
+      clearInterval(timer);
+      activeLockCountdowns.delete(el);
+      el.textContent = '';
+      if (onExpire) onExpire();
+      return;
+    }
+    const mm = Math.floor(remainingMs / 60000);
+    const ss = Math.floor((remainingMs % 60000) / 1000);
+    el.textContent = `${prefix} ${mm}:${String(ss).padStart(2, '0')} 후 다시 시도해주세요.`;
+  }
+  tick();
+  const timer = setInterval(tick, 1000);
+  activeLockCountdowns.set(el, timer);
+}
 
 // STEP15-B. 모바일 하단 탭 전환. 기존 DOM/데이터 조회는 재사용하고 표시 여부(CSS)만 바꾼다.
 // 지도 인스턴스/marker/cluster는 여기서 절대 재생성하지 않는다.
@@ -123,6 +147,12 @@ function showView(id) {
 }
 
 function clearError(el) {
+  // 이전에 이 엘리먼트에 걸어둔 잠금 카운트다운이 있으면 먼저 멈춘다 — 그렇지 않으면
+  // 타이머가 1초마다 계속 textContent를 덮어써서 새로 표시하려는 메시지를 지워버린다.
+  if (activeLockCountdowns.has(el)) {
+    clearInterval(activeLockCountdowns.get(el));
+    activeLockCountdowns.delete(el);
+  }
   el.textContent = '';
 }
 
@@ -352,6 +382,14 @@ function bindEvents() {
     signupDoneBack.addEventListener('click', () => document.getElementById('signup-done-to-login').click());
   }
 
+  // STEP16.8(상태 화면 뒤로가기). pending/rejected/disabled 화면의 뒤로가기 버튼은 새 로직 없이
+  // 각 화면의 기존 "로그아웃" 버튼 클릭을 그대로 위임한다(#mobile-signupdone-back과 동일한 원칙).
+  [['mobile-pending-back', 'logout-pending'], ['mobile-rejected-back', 'logout-rejected'], ['mobile-disabled-back', 'logout-disabled']]
+    .forEach(([backId, targetId]) => {
+      const backBtn = document.getElementById(backId);
+      if (backBtn) backBtn.addEventListener('click', () => document.getElementById(targetId).click());
+    });
+
   // 모바일 회원가입 화면 상단 뒤로가기 버튼. 새 로직을 만들지 않고 기존 "로그인으로
   // 돌아가기" 버튼(#show-login)의 클릭을 그대로 위임한다.
   const signupBack = document.getElementById('mobile-signup-back');
@@ -476,7 +514,31 @@ function bindEvents() {
     const password = document.getElementById('login-password').value;
     const remember = document.getElementById('mobile-login-remember').checked;
     const autoLogin = document.getElementById('mobile-login-autologin').checked;
+
+    if (!email || !password) {
+      errorEl.textContent = '아이디와 비밀번호를 입력해주세요.';
+      return;
+    }
+
+    // STEP16.8(중복 제출 방지). 회원가입과 동일한 원칙 — 처리 중에는 버튼을 비활성화하고
+    // "로그인 중..."으로 바꾼 뒤, 성공/실패 어느 경우든 finally에서 항상 복구한다.
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    if (submitBtn) {
+      if (submitBtn.disabled) return;
+      submitBtn.dataset.originalText = submitBtn.textContent;
+      submitBtn.disabled = true;
+      submitBtn.textContent = '로그인 중...';
+    }
+
     try {
+      // STEP16.8(로그인 실패 5회 잠금). 실제 로그인을 시도하기 전에 먼저 잠금 여부를 확인해,
+      // 이미 잠긴 계정이면 Supabase Auth 호출 자체를 생략하고 바로 안내한다.
+      const lockStatus = await checkLoginLock(email);
+      if (lockStatus.locked) {
+        startLockCountdown(errorEl, lockStatus.lockedUntil, '로그인을 5회 잘못 시도하여 계정이 잠겼습니다.');
+        return;
+      }
+
       await signIn(email, password);
       if (remember) localStorage.setItem(REMEMBER_EMAIL_KEY, email);
       else localStorage.removeItem(REMEMBER_EMAIL_KEY);
@@ -484,7 +546,19 @@ function bindEvents() {
       else localStorage.removeItem(AUTO_LOGIN_KEY);
       routeByProfile();
     } catch (err) {
-      errorEl.textContent = translateAuthError(err, '로그인에 실패했습니다.');
+      const lockInfo = err && err.lockInfo;
+      if (lockInfo && lockInfo.locked) {
+        startLockCountdown(errorEl, lockInfo.lockedUntil, '로그인을 5회 잘못 시도하여 계정이 잠겼습니다.');
+      } else {
+        const base = translateAuthError(err, '로그인에 실패했습니다.');
+        const left = lockInfo && lockInfo.attemptsLeft;
+        errorEl.textContent = (left != null) ? `${base} (남은 시도 ${left}회)` : base;
+      }
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        if (submitBtn.dataset.originalText != null) submitBtn.textContent = submitBtn.dataset.originalText;
+      }
     }
   });
 
@@ -550,12 +624,11 @@ function bindEvents() {
       // attemptsLeft } 객체를 반환한다(과거의 boolean 반환에서 변경됨).
       const result = await verifySignupCode(code);
       if (result.locked) {
-        const mins = result.lockedUntil
-          ? Math.max(1, Math.ceil((new Date(result.lockedUntil).getTime() - Date.now()) / 60000))
-          : null;
-        errorEl.textContent = mins
-          ? `인증번호를 5회 잘못 입력하여 약 ${mins}분간 잠겼습니다. 잠시 후 다시 시도해주세요.`
-          : '인증번호를 5회 잘못 입력하여 일정 시간 잠겼습니다. 잠시 후 다시 시도해주세요.';
+        if (result.lockedUntil) {
+          startLockCountdown(errorEl, result.lockedUntil, '인증번호를 5회 잘못 입력하여 계정이 잠겼습니다.');
+        } else {
+          errorEl.textContent = '인증번호를 5회 잘못 입력하여 일정 시간 잠겼습니다. 잠시 후 다시 시도해주세요.';
+        }
         return;
       }
       if (!result.ok) {
@@ -566,6 +639,9 @@ function bindEvents() {
         return;
       }
       await signUp(email, password, `${org} ${name}`.trim());
+      // STEP16.8(가입 신청 상태확인 수단). 방금 신청한 소속/아이디를 완료 화면에 그대로 보여준다.
+      const recapEl = document.getElementById('signup-done-recap');
+      if (recapEl) recapEl.textContent = `${org} · 아이디: ${email}`;
       showView('view-signup-done');
     } catch (err) {
       errorEl.textContent = translateAuthError(err, '회원가입에 실패했습니다.');
@@ -577,8 +653,10 @@ function bindEvents() {
     }
   });
 
-  // STEP16.5(아이디 중복확인). 입력을 멈추고 400ms 후 자동으로 서버(gnmap_v2_check_id_exists)에
-  // 확인한다 — 버튼 클릭 없이 자동 표시. 입력이 계속 바뀌면 이전 타이머는 취소해 마지막 값만 확인한다.
+  // STEP16.5(아이디 중복확인) + STEP16.8(아이디 형식 실시간 안내). 입력을 멈추고 400ms 후
+  // 자동으로 확인한다. 형식(영문/숫자 4~20자)부터 즉시 검사해 서버까지 갈 필요가 없는
+  // 오류는 바로 보여주고, 형식이 맞을 때만 중복확인 서버 호출을 한다.
+  const SIGNUP_ID_PATTERN = /^[a-zA-Z0-9]{4,20}$/;
   const signupIdInput = document.getElementById('signup-email');
   const signupIdCheckMsg = document.getElementById('signup-id-check-msg');
   if (signupIdInput && signupIdCheckMsg) {
@@ -590,6 +668,12 @@ function bindEvents() {
       if (!value) {
         signupIdCheckMsg.textContent = '';
         signupIdCheckMsg.className = 'mobile-signup-match-msg';
+        return;
+      }
+      if (!SIGNUP_ID_PATTERN.test(value)) {
+        signupIdCheckMsg.textContent = '영문, 숫자로 4~20자로 입력해주세요.';
+        signupIdCheckMsg.className = 'mobile-signup-match-msg is-mismatch';
+        ++idCheckToken; // 진행 중이던 중복확인 결과가 뒤늦게 와서 이 형식 오류를 덮어쓰지 않게 무효화.
         return;
       }
       signupIdCheckMsg.textContent = '확인 중...';
@@ -607,6 +691,26 @@ function bindEvents() {
           signupIdCheckMsg.className = 'mobile-signup-match-msg';
         }
       }, 400);
+    });
+  }
+
+  // STEP16.8(비밀번호 규칙 실시간 체크리스트). 제출 전에 타이핑하는 동안 각 규칙 충족
+  // 여부를 실시간으로 표시한다(제출 시점 최종 검증 로직과는 별개 — 순수 UI 피드백).
+  const signupPwForRules = document.getElementById('signup-password');
+  const signupPwRulesEl = document.getElementById('signup-password-rules');
+  if (signupPwForRules && signupPwRulesEl) {
+    const RULES = {
+      length: (v) => v.length >= 8 && v.length <= 20,
+      letter: (v) => /[A-Za-z]/.test(v),
+      digit: (v) => /\d/.test(v),
+      special: (v) => /[^A-Za-z0-9]/.test(v),
+    };
+    signupPwForRules.addEventListener('input', () => {
+      const value = signupPwForRules.value;
+      signupPwRulesEl.querySelectorAll('li[data-rule]').forEach((li) => {
+        const rule = RULES[li.dataset.rule];
+        li.classList.toggle('is-met', !!(rule && rule(value)));
+      });
     });
   }
 
