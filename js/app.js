@@ -345,6 +345,24 @@ function bindEvents() {
   }
   document.getElementById('signup-done-to-login').addEventListener('click', () => showView('view-login'));
 
+  // 모바일 회원가입 화면 상단 뒤로가기 버튼. 새 로직을 만들지 않고 기존 "로그인으로
+  // 돌아가기" 버튼(#show-login)의 클릭을 그대로 위임한다.
+  const signupBack = document.getElementById('mobile-signup-back');
+  if (signupBack) {
+    signupBack.addEventListener('click', () => document.getElementById('show-login').click());
+  }
+
+  // 회원가입 비밀번호 표시/숨기기 토글. 로그인 화면과 동일한 원칙(type만 전환, 검증 로직 없음).
+  const signupPwToggle = document.getElementById('mobile-signup-password-toggle');
+  if (signupPwToggle) {
+    signupPwToggle.addEventListener('click', () => {
+      const pwInput = document.getElementById('signup-password');
+      const showing = pwInput.type === 'text';
+      pwInput.type = showing ? 'password' : 'text';
+      signupPwToggle.classList.toggle('active', !showing);
+    });
+  }
+
   // 저장된 "아이디 저장"/"자동 로그인" 값을 로그인 화면에 반영(1회, bindEvents는 bootstrap에서
   // 한 번만 호출됨). 비밀번호는 저장하지 않으므로 이메일/체크박스 상태만 복원한다.
   const savedEmail = localStorage.getItem(REMEMBER_EMAIL_KEY);
