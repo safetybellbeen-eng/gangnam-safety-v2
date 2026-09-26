@@ -236,9 +236,88 @@
   </section>
 
   <section id="view-signup-done" style="display:none">
+    <!-- STEP16.6(승인대기 화면 모바일 UI). PC는 바로 아래 원본 h1/p/button을 그대로 유지한다
+         (변경 없음). 모바일 전용 헤더/일러스트/안내박스/하단 skyline은 새로 추가된 요소라
+         css/mobile.css 상단 PC-hide 목록에서 기본 숨김 처리하고, 모바일 media query 안에서만
+         다시 보이게 한다(#view-signup/#view-login과 동일한 패턴). 원본 h1/p는 모바일에서만
+         display:none 처리해 중복 표시를 막는다. 버튼(#signup-done-to-login)은 새로 만들지
+         않고 기존 하나를 PC/모바일이 공유하며, 모바일에서는 CSS로 스타일만 다르게 입힌다
+         (js/app.js의 기존 클릭 핸들러 그대로 사용). -->
+    <div id="mobile-signupdone-header">
+      <button type="button" id="mobile-signupdone-back" aria-label="뒤로가기">
+        <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div id="mobile-signupdone-brand">
+        <img src="assets/icons/moel-ci-full.png" alt="고용노동부">
+        <span id="mobile-signupdone-brand-title">산업안전 순찰지도</span>
+      </div>
+    </div>
+
     <h1>가입 완료</h1>
     <p>관리자 승인 대기 중입니다. 승인 후 로그인해주세요.</p>
+
+    <div id="mobile-signupdone-intro">
+      <h1>가입 완료</h1>
+      <p>관리자 승인 대기 중입니다.<br>승인 후 로그인해주세요.</p>
+    </div>
+
+    <!-- STEP16.6(승인대기 일러스트). 외부 이미지를 받아오지 않고 프로젝트 내부 inline SVG로
+         직접 그린다 — 클립보드(사용자 프로필 아이콘 + 정보 라인 3개) + 우측 하단 시계 +
+         뒤쪽 연한 파랑 blob + 작은 sparkle. 장식용이라 aria-hidden 처리. -->
+    <div id="mobile-signupdone-illustration" aria-hidden="true">
+      <svg viewBox="0 0 240 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="120" cy="130" rx="95" ry="75" fill="#eaf2fc"/>
+        <g stroke="#8fb8ef" stroke-width="3" stroke-linecap="round">
+          <path d="M45 55l7 7M195 55l-7 7M40 130h10M190 130h10"/>
+        </g>
+        <rect x="63" y="34" width="94" height="150" rx="18" fill="#fff" stroke="#c7dcf6" stroke-width="3"/>
+        <rect x="93" y="24" width="34" height="18" rx="8" fill="#3b7cd6"/>
+        <circle cx="110" cy="80" r="17" fill="#dbe9fb"/>
+        <path d="M92 118c0-10 8-15 18-15s18 5 18 15" stroke="#3b7cd6" stroke-width="4" stroke-linecap="round" fill="none"/>
+        <circle cx="110" cy="80" r="8" fill="#3b7cd6"/>
+        <line x1="82" y1="140" x2="138" y2="140" stroke="#c7dcf6" stroke-width="5" stroke-linecap="round"/>
+        <line x1="82" y1="154" x2="138" y2="154" stroke="#c7dcf6" stroke-width="5" stroke-linecap="round"/>
+        <line x1="82" y1="168" x2="120" y2="168" stroke="#c7dcf6" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="168" cy="150" r="34" fill="#fff" stroke="#3b7cd6" stroke-width="5"/>
+        <path d="M168 132v18l12 10" stroke="#3b7cd6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+    </div>
+
+    <div id="mobile-signupdone-info">
+      <div id="mobile-signupdone-info-title">
+        <span class="mobile-icon-svg-wrap" aria-hidden="true">
+          <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
+        </span>
+        승인 안내
+      </div>
+      <ul>
+        <li>관리자의 승인 절차를 거쳐 이용하실 수 있습니다.</li>
+        <li>승인은 <strong>매주 월요일 10시</strong>에 일괄 처리됩니다.</li>
+        <li>승인 완료 시 등록하신 계정으로 로그인하여 산업안전 순찰지도를 이용하실 수 있습니다.</li>
+      </ul>
+    </div>
+
     <button type="button" id="signup-done-to-login">로그인으로 이동</button>
+
+    <!-- STEP16.6(하단 skyline). 장식용 연한 파랑 실루엣 — 로그인 화면에서는 삭제된 요소이며
+         이 승인대기 화면에만 적용한다(로그인 화면에 다시 추가하지 않음). -->
+    <svg id="mobile-signupdone-skyline" aria-hidden="true" viewBox="0 0 400 90" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
+      <g fill="#dbe9fb">
+        <rect x="0" y="40" width="46" height="50"/>
+        <rect x="52" y="20" width="34" height="70"/>
+        <rect x="92" y="50" width="30" height="40"/>
+        <rect x="128" y="10" width="6" height="30"/>
+        <line x1="112" y1="18" x2="150" y2="18" stroke="#dbe9fb" stroke-width="6"/>
+        <rect x="150" y="34" width="40" height="56"/>
+        <rect x="196" y="14" width="38" height="76"/>
+        <rect x="240" y="46" width="28" height="44"/>
+        <rect x="274" y="26" width="44" height="64"/>
+        <rect x="324" y="52" width="32" height="38"/>
+        <rect x="362" y="12" width="6" height="34"/>
+        <line x1="346" y1="20" x2="384" y2="20" stroke="#dbe9fb" stroke-width="6"/>
+        <rect x="360" y="36" width="40" height="54"/>
+      </g>
+    </svg>
   </section>
 
   <section id="view-pending" style="display:none">
