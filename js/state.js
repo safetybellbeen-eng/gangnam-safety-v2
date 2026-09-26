@@ -23,6 +23,9 @@ export const state = {
   adminUsers: [],          // gnmap_v2_profiles 목록 (admin.js loadUsers 결과). 관리자만 채워짐.
   adminUserInFlight: new Set(), // status/role 변경 요청이 진행 중인 userId (중복 RPC 호출 방지)
   adminMessage: '',          // 회원관리 패널에 표시할 최근 메시지(성공/실패/권한 없음 등)
+  adminLoadError: false,     // STEP16.5: 회원 목록 조회 자체가 실패했는지(0명인 것과 구분, 모바일 에러 상태용)
+  adminMobileFilter: 'all',  // STEP16.5(모바일 회원관리): 'all' | 'pending' | 'approved' 탭 상태
+  adminMobileQuery: '',      // STEP16.5(모바일 회원관리): 검색어(이름/이메일)
   uploadParsedRows: [],       // excel.js 파싱+검증 결과 (아직 DB에 반영되지 않은 상태, STEP 11/12에서 사용)
                                 // 각 행은 geocoding 진행 시 _geocodeStatus('PENDING'|'SUCCESS'|'NOT_FOUND'|'ERROR')와
                                 // 성공 시 lat/lng, 실패 시 _geocodeError가 추가된다 (validation 필드는 그대로 유지).
@@ -53,5 +56,6 @@ export const state = {
   // 사용자 요청: 상단 필터에서 "확인필요" 토글/카운트를 제거하면서 reviewOnly도 함께 제거했다
   // (더 이상 화면 어디에서도 트리거되지 않음). location_quality 값 자체나 목록 카드의
   // "위치확인필요" 배지(site-list-review-badge)는 이 필터와 무관하게 그대로 유지된다.
-  mobileActiveTab: 'map'              // STEP15-B. 모바일 하단 탭 현재 선택값: 'map'|'site'|'route'|'favorite'|'alert'|'more'. PC 화면에서는 사용하지 않음.
+  mobileActiveTab: 'map',             // STEP15-B. 모바일 하단 탭 현재 선택값: 'map'|'site'|'route'|'favorite'|'alert'|'more'. PC 화면에서는 사용하지 않음.
+  uploadMobileTab: 'file'             // 모바일 "사업장 데이터 관리" 화면 내부 탭: 'file'(파일 업로드) | 'history'(업로드 이력). PC 화면에서는 사용하지 않음.
 };
