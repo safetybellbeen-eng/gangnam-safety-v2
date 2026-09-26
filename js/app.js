@@ -1,7 +1,7 @@
 // app.js — STEP 3B. 인증 흐름 최소 테스트 UI 연결.
 // 지도/사업장 등 실제 기능은 이후 STEP에서 추가한다 (CLAUDE.md 12절: 대규모 UI 금지).
 import { state } from './state.js';
-import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, verifySignupCode, checkIdExists } from './auth.js';
+import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, verifySignupCode, checkIdExists, translateAuthError } from './auth.js';
 import { initMap, clearMarkers } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
@@ -477,7 +477,7 @@ function bindEvents() {
       else localStorage.removeItem(AUTO_LOGIN_KEY);
       routeByProfile();
     } catch (err) {
-      errorEl.textContent = err.message || '로그인에 실패했습니다.';
+      errorEl.textContent = translateAuthError(err, '로그인에 실패했습니다.');
     }
   });
 
@@ -508,7 +508,7 @@ function bindEvents() {
       await signUp(email, password, `${org} ${name}`.trim());
       showView('view-signup-done');
     } catch (err) {
-      errorEl.textContent = err.message || '회원가입에 실패했습니다.';
+      errorEl.textContent = translateAuthError(err, '회원가입에 실패했습니다.');
     }
   });
 
