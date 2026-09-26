@@ -88,10 +88,46 @@ export async function checkIdExists(id) {
   return data === true;
 }
 
+// STEP16.8(로그인 실패 5회 잠금). 회원가입 인증번호 잠금과 동일한 정책(5회 실패 시 10분
+// 잠금)을 로그인에도 적용한다. 다만 로그인은 "누가 이 계정을 시도하는가"가 중요하므로
+// 기기 토큰이 아니라 대상 계정의 합성 이메일(아이디)을 키로 서버(gnmap_v2_login_attempts)에서
+// 추적한다 — 브라우저를 바꿔도 동일 계정은 동일하게 잠긴다. Supabase Auth 자체의 내장
+// rate limit과는 별개로, 사용자에게 남은 시도/잠금 해제 시각을 안내하기 위한 용도다.
+export async function checkLoginLock(id) {
+  const email = toAuthEmail(id);
+  const { data, error } = await sb.rpc('gnmap_v2_check_login_lock', { p_email: email });
+  if (error) throw error;
+  return {
+    locked: !!(data && data.locked),
+    lockedUntil: data ? data.locked_until : null,
+  };
+}
+
+async function recordLoginResult(id, success) {
+  const email = toAuthEmail(id);
+  const { data, error } = await sb.rpc('gnmap_v2_record_login_result', { p_email: email, p_success: success });
+  if (error) throw error;
+  return {
+    locked: !!(data && data.locked),
+    lockedUntil: data ? data.locked_until : null,
+    attemptsLeft: data ? data.attempts_left : null,
+  };
+}
+
+// signIn()은 이제 lockout 기록까지 함께 처리한다(app.js는 checkLoginLock()으로 시도 전
+// 잠금 여부만 먼저 확인하면 되고, 성공/실패 기록은 이 함수 안에서 자동으로 이루어진다).
+// 로그인 자체가 실패하면 원래 Supabase 오류(err)에 lockInfo를 덧붙여 던진다 — app.js는
+// translateAuthError(err)로 기본 메시지를, err.lockInfo로 잠금/남은시도 안내를 함께 보여줄 수 있다.
 export async function signIn(id, password) {
   const email = toAuthEmail(id);
   const { data, error } = await sb.auth.signInWithPassword({ email, password });
-  if (error) throw error;
+  if (error) {
+    let lockInfo = null;
+    try { lockInfo = await recordLoginResult(id, false); } catch (e) { /* 잠금 기록 실패는 로그인 실패 처리 자체를 막지 않는다 */ }
+    if (lockInfo) error.lockInfo = lockInfo;
+    throw error;
+  }
+  try { await recordLoginResult(id, true); } catch (e) { /* 무시 — 다음 로그인 때 다시 리셋 시도 */ }
   await loadCurrentProfile();
   return data;
 }
