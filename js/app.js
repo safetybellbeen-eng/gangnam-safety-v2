@@ -6,7 +6,7 @@ import { initMap, clearMarkers } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
-import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderSupervisionPanel, renderMobileRouteView, renderMobileMoreMenu } from './ui.js';
+import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderMobileRouteView, renderMobileMoreMenu } from './ui.js';
 import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
 
 const VIEWS = [
@@ -463,6 +463,7 @@ function bindEvents() {
     panel.style.display = willOpen ? 'block' : 'none';
     if (willOpen) {
       renderUploadHistoryPanel('upload-history'); // STEP13-5: 패널을 열 때 최근 업로드 이력을 표시한다.
+      renderUploadMobileHost(); // 모바일 "사업장 데이터 관리" TARGET UI. state를 그대로 다시 읽어 그린다.
     }
   });
 
@@ -504,6 +505,7 @@ function bindEvents() {
     const file = e.target.files[0];
     if (!file) return;
     await handleExcelFileSelect(file, 'upload-preview');
+    renderUploadMobileHost(); // PC 미리보기(upload-preview)와 별개로 모바일 화면도 새 파싱 결과로 갱신한다.
   });
 
   document.getElementById('login-form').addEventListener('submit', async (e) => {
