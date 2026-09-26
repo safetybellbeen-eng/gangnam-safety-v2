@@ -6,7 +6,7 @@ import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMar
 import { getFilteredSortedSites, getDongOptions, loadActiveSites } from './sites.js';
 import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
-import { loadUsers, setUserStatus, setUserRole } from './admin.js';
+import { loadUsers, setUserStatus, setUserRole, resetUserPassword } from './admin.js';
 import { parseExcelFile } from './excel.js';
 import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, buildLotQueries, runJusoNormalize, buildJusoQuery, runKakaoJusoRecovery, runRoadApproximateRecovery, extractApproximateStructure } from './geocoding.js';
 import { importSitesToDatabase, previewImportImpact, loadUploadHistory } from './import.js';
@@ -1117,7 +1117,9 @@ export function bindSearchAndSort(containerId) {
 }
 
 // 회원관리 패널을 렌더한다. loadUsers()로 채워진 state.adminUsers를 그린다 (관리자 전용).
-// 상태/역할은 select 변경만으로 DB에 반영되지 않고, 각자 "저장" 버튼을 눌러야 RPC가 호출된다.
+// PC 화면(.admin-user-row, select+저장 버튼)은 STEP9 그대로 유지하고, STEP16.5에서는 같은
+// 컨테이너 안에 모바일 전용 TARGET UI(.admin-mobile-view)를 추가로 그려 넣는다 — 두 마크업은
+// 항상 함께 렌더링되고 css/mobile.css가 화면 폭에 따라 어느 쪽을 보일지만 결정한다(PC 로직 불변).
 export async function renderAdminPanel(containerId) {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
@@ -1132,18 +1134,35 @@ export async function renderAdminPanel(containerId) {
   msgEl.textContent = state.adminMessage;
   container.appendChild(msgEl);
 
+  // STEP16.5: 모바일 뷰가 데이터 로딩 중임을 보여줄 수 있도록, 네트워크 조회 전에 먼저
+  // 로딩 상태로 한 번 그린다(PC는 이 블록이 기본 숨김 목록에 있어 영향 없음).
+  const mobileHost = document.createElement('div');
+  mobileHost.id = 'admin-mobile-host';
+  container.appendChild(mobileHost);
+  renderAdminMobileLoading(mobileHost);
+
   await loadUsers();
 
-  if (!state.adminUsers || state.adminUsers.length === 0) {
+  renderAdminDesktopRows(container, state.adminUsers, containerId);
+  renderAdminMobileHost(mobileHost, containerId);
+}
+
+// PC 전용 목록(select+저장 버튼) — STEP9 로직 그대로, 위치만 별도 함수로 추출했다.
+function renderAdminDesktopRows(container, users, containerId) {
+  const wrap = document.createElement('div');
+  wrap.id = 'admin-desktop-rows';
+
+  if (!users || users.length === 0) {
     const empty = document.createElement('p');
     empty.textContent = '표시할 회원이 없습니다.';
-    container.appendChild(empty);
+    wrap.appendChild(empty);
+    container.appendChild(wrap);
     return;
   }
 
   const currentUserId = state.user ? state.user.id : null;
 
-  state.adminUsers.forEach(u => {
+  users.forEach(u => {
     const row = document.createElement('div');
     row.className = 'admin-user-row';
 
@@ -1206,8 +1225,564 @@ export async function renderAdminPanel(containerId) {
     row.appendChild(roleSelect);
     row.appendChild(roleSaveBtn);
 
-    container.appendChild(row);
+    wrap.appendChild(row);
   });
+
+  container.appendChild(wrap);
+}
+
+// ============================================================
+// STEP16.5 — 모바일 관리자 회원관리 TARGET UI.
+// 기존 PC 기능(loadUsers/setUserStatus/setUserRole, STEP9 self-protection)만 재사용하고
+// 새 RPC/스키마는 추가하지 않는다. state.adminUsers를 그대로 데이터 소스로 쓴다.
+// ============================================================
+
+const ADMIN_STATUS_META = {
+  approved: { label: '승인완료', cls: 'approved' },
+  pending: { label: '승인대기', cls: 'pending' },
+  rejected: { label: '승인거절', cls: 'rejected' },
+  disabled: { label: '휴면', cls: 'disabled' },
+};
+
+// name 컬럼은 회원가입 화면(#signup-org)에서 고른 소속을 그대로 합쳐 "{지청} {실명}" 형태로
+// 저장된다(예: "강남지청 임종빈") — 별도 지청 컬럼은 없다(실 데이터로 확인 완료). 지청 컬럼을
+// 새로 만들지 않고, 첫 공백을 기준으로 표시용으로만 분리한다. 공백이 없으면(예: 이름 없이
+// 만들어진 시드 관리자 계정) 지청 없이 이름만 있는 것으로 본다.
+function splitOrgName(rawName) {
+  const value = (rawName || '').trim();
+  if (!value) return { org: '', name: '' };
+  const idx = value.indexOf(' ');
+  if (idx === -1) return { org: '', name: value };
+  return { org: value.slice(0, idx).trim(), name: value.slice(idx + 1).trim() };
+}
+
+// 이메일 로컬파트만 노출하고 "@" 뒤 도메인은 마스킹한다(요청: 메일 주소의 @ 이후 내용이 안 보였으면 함).
+function maskEmailDomain(rawEmail) {
+  const value = (rawEmail || '').trim();
+  if (!value) return displayValue(value);
+  const at = value.indexOf('@');
+  if (at === -1) return value;
+  return `${value.slice(0, at)}@***`;
+}
+
+// created_at(timestamptz) -> "YYYY. MM. DD." 표시 전용 포매터. 실제 값이 없으면 '-'.
+function formatAdminDate(iso) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '-';
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}. ${mm}. ${dd}.`;
+}
+
+function getAdminCounts(users) {
+  const list = users || [];
+  return {
+    all: list.length,
+    pending: list.filter(u => u.status === 'pending').length,
+    approved: list.filter(u => u.status === 'approved').length,
+  };
+}
+
+// 현재 탭(state.adminMobileFilter) + 검색어(state.adminMobileQuery, 이름/이메일 대소문자 무관 부분일치)를
+// 동시에 적용한다. "전체" 탭은 rejected/disabled를 포함한 전체 회원을 보여준다(요청사항 8).
+function getFilteredAdminUsers(users) {
+  const list = users || [];
+  const filter = state.adminMobileFilter || 'all';
+  const query = (state.adminMobileQuery || '').trim().toLowerCase();
+
+  return list.filter(u => {
+    if (filter === 'pending' && u.status !== 'pending') return false;
+    if (filter === 'approved' && u.status !== 'approved') return false;
+    if (!query) return true;
+    const name = (u.name || '').toLowerCase();
+    const email = (u.email || '').toLowerCase();
+    return name.includes(query) || email.includes(query);
+  });
+}
+
+function buildAdminSvg(pathsMarkup, viewBox) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', viewBox || '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.8');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.insertAdjacentHTML('beforeend', pathsMarkup);
+  return svg;
+}
+
+function renderAdminMobileLoading(host) {
+  host.innerHTML = '';
+  const view = document.createElement('div');
+  view.className = 'admin-mobile-view';
+  const loading = document.createElement('p');
+  loading.className = 'admin-mobile-state-msg';
+  loading.textContent = '회원 정보를 불러오는 중...';
+  view.appendChild(loading);
+  host.appendChild(view);
+}
+
+// 데이터 로딩이 끝난 뒤 mobileHost 안에 TARGET UI 전체를 그린다. 탭/검색 변경, 조치(승인 등) 후
+// 재조회 없이 다시 부를 수 있도록(state.adminUsers를 그대로 다시 읽음) 매번 전체를 재구성한다.
+function renderAdminMobileHost(host, containerId) {
+  host.innerHTML = '';
+
+  const view = document.createElement('div');
+  view.className = 'admin-mobile-view';
+
+  // 헤더: 고용노동부 CI + 산업안전 순찰지도 브랜딩(기존 asset 재사용) + 알림 벨.
+  // 벨은 기존 "알림" 하단 탭(activateMobileTab('alert'))으로 실제 이동한다 — 새 알림
+  // 데이터가 없으므로 read/unread 점(dot)은 절대 하드코딩하지 않는다(요청사항 5/31).
+  const header = document.createElement('div');
+  header.className = 'admin-mobile-header';
+  const brand = document.createElement('div');
+  brand.className = 'admin-mobile-brand';
+  const logoImg = document.createElement('img');
+  logoImg.src = 'assets/icons/moel-ci-full.png';
+  logoImg.alt = '고용노동부';
+  brand.appendChild(logoImg);
+  const brandTitle = document.createElement('span');
+  brandTitle.textContent = '산업안전 순찰지도';
+  brand.appendChild(brandTitle);
+  header.appendChild(brand);
+
+  const bellBtn = document.createElement('button');
+  bellBtn.type = 'button';
+  bellBtn.className = 'admin-mobile-bell';
+  bellBtn.setAttribute('aria-label', '알림');
+  bellBtn.appendChild(buildAdminSvg('<path d="M18 16v-5a6 6 0 1 0-12 0v5l-1.5 2.5h15L18 16Z"/><path d="M9.5 20a2.5 2.5 0 0 0 5 0"/>'));
+  bellBtn.addEventListener('click', () => {
+    const panel = document.getElementById(containerId);
+    if (panel) panel.style.display = 'none';
+    const alertTabBtn = document.querySelector('.mobile-tab-btn[data-tab="alert"]');
+    if (alertTabBtn) alertTabBtn.click();
+  });
+  header.appendChild(bellBtn);
+  view.appendChild(header);
+
+  const title = document.createElement('h2');
+  title.className = 'admin-mobile-title';
+  title.textContent = '회원관리';
+  view.appendChild(title);
+
+  const desc = document.createElement('p');
+  desc.className = 'admin-mobile-desc';
+  desc.textContent = '산업안전 순찰지도를 이용하는 사용자를 관리합니다.';
+  view.appendChild(desc);
+
+  if (state.adminLoadError) {
+    const errWrap = document.createElement('div');
+    errWrap.className = 'admin-mobile-state';
+    const errMsg = document.createElement('p');
+    errMsg.className = 'admin-mobile-state-msg';
+    errMsg.textContent = '회원 정보를 불러오지 못했습니다.';
+    errWrap.appendChild(errMsg);
+    const retryBtn = document.createElement('button');
+    retryBtn.type = 'button';
+    retryBtn.className = 'admin-mobile-retry-btn';
+    retryBtn.textContent = '다시 시도';
+    retryBtn.addEventListener('click', async () => {
+      renderAdminMobileLoading(host);
+      await loadUsers();
+      // PC 목록(.admin-user-row)도 함께 다시 그려야 두 마크업이 어긋나지 않는다.
+      const oldDesktop = document.getElementById('admin-desktop-rows');
+      if (oldDesktop) oldDesktop.remove();
+      renderAdminDesktopRows(document.getElementById(containerId), state.adminUsers, containerId);
+      renderAdminMobileHost(host, containerId);
+    });
+    errWrap.appendChild(retryBtn);
+    view.appendChild(errWrap);
+    host.appendChild(view);
+    return;
+  }
+
+  const counts = getAdminCounts(state.adminUsers);
+
+  // 상태 탭 — 전체/승인대기/승인완료 3개(요청사항 7/9). 탭 전환은 네트워크 재조회 없이
+  // state.adminMobileFilter만 바꾸고 목록만 다시 그린다.
+  const tabs = document.createElement('div');
+  tabs.className = 'admin-mobile-tabs';
+  tabs.setAttribute('role', 'tablist');
+  [
+    ['all', `전체 (${counts.all})`],
+    ['pending', `승인대기 (${counts.pending})`],
+    ['approved', `승인완료 (${counts.approved})`],
+  ].forEach(([key, label]) => {
+    const tabBtn = document.createElement('button');
+    tabBtn.type = 'button';
+    tabBtn.className = 'admin-mobile-tab' + (state.adminMobileFilter === key ? ' active' : '');
+    tabBtn.setAttribute('role', 'tab');
+    tabBtn.setAttribute('aria-selected', String(state.adminMobileFilter === key));
+    tabBtn.textContent = label;
+    tabBtn.addEventListener('click', () => {
+      state.adminMobileFilter = key;
+      renderAdminMobileHost(host, containerId);
+    });
+    tabs.appendChild(tabBtn);
+  });
+  view.appendChild(tabs);
+
+  // 검색창 — 이름/이메일 대상(요청사항 10/11). V2는 아이디 기반 로그인이지만 실제 계정
+  // 식별자는 email 컬럼(합성 이메일 포함)이므로 "아이디"라고 쓰지 않는다. 소속 컬럼은
+  // 스키마에 없으므로 문구에 넣지 않는다.
+  const searchWrap = document.createElement('div');
+  searchWrap.className = 'admin-mobile-search';
+  searchWrap.appendChild(buildAdminSvg('<circle cx="11" cy="11" r="6.5"/><path d="m20 20-3.8-3.8"/>'));
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.setAttribute('aria-label', '회원 검색');
+  searchInput.placeholder = '이름, 이메일을 검색하세요.';
+  searchInput.value = state.adminMobileQuery || '';
+  searchInput.addEventListener('input', () => {
+    state.adminMobileQuery = searchInput.value;
+    renderAdminMobileList(listEl, containerId);
+  });
+  searchWrap.appendChild(searchInput);
+  view.appendChild(searchWrap);
+
+  const listEl = document.createElement('div');
+  listEl.className = 'admin-mobile-list';
+  view.appendChild(listEl);
+  renderAdminMobileList(listEl, containerId);
+
+  host.appendChild(view);
+
+  // 검색 입력 리스너(위)는 view 전체를 다시 그리지 않고 renderAdminMobileList(listEl, ...)만
+  // 호출하므로, 매 키 입력마다 헤더/탭/검색창이 재생성되어 포커스가 끊기는 문제가 없다.
+}
+
+// 탭/검색 필터만 반영해 카드 목록 부분만 다시 그린다(헤더/탭/검색창은 유지 — 검색 중 포커스 유지).
+function renderAdminMobileList(listEl, containerId) {
+  listEl.innerHTML = '';
+  const filtered = getFilteredAdminUsers(state.adminUsers);
+
+  if (filtered.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'admin-mobile-empty';
+    empty.appendChild(buildAdminSvg('<circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.6 3.1-6.5 7-6.5s7 2.9 7 6.5"/>', '0 0 24 24'));
+    const emptyMsg = document.createElement('p');
+    emptyMsg.textContent = (state.adminMobileQuery || '').trim()
+      ? '검색 결과가 없습니다.'
+      : (state.adminMobileFilter === 'pending' ? '승인 대기 중인 회원이 없습니다.' : '표시할 회원이 없습니다.');
+    empty.appendChild(emptyMsg);
+    listEl.appendChild(empty);
+    return;
+  }
+
+  const currentUserId = state.user ? state.user.id : null;
+  filtered.forEach(u => {
+    listEl.appendChild(buildAdminMemberCard(u, currentUserId, listEl, containerId));
+  });
+}
+
+function buildAdminMemberCard(u, currentUserId, listEl, containerId) {
+  const card = document.createElement('div');
+  card.className = 'admin-mobile-card';
+
+  const avatar = document.createElement('div');
+  avatar.className = 'admin-mobile-avatar';
+  avatar.appendChild(buildAdminSvg('<circle cx="12" cy="8.2" r="3.4"/><path d="M5 19.2c0-3.9 3.13-7 7-7s7 3.1 7 7"/>'));
+  card.appendChild(avatar);
+
+  const body = document.createElement('div');
+  body.className = 'admin-mobile-card-body';
+
+  const { org, name } = splitOrgName(u.name);
+
+  const row1 = document.createElement('div');
+  row1.className = 'admin-mobile-card-row1';
+
+  const nameWrap = document.createElement('span');
+  nameWrap.className = 'admin-mobile-card-name';
+  nameWrap.textContent = displayValue(name);
+  if (u.role === 'admin') {
+    const roleBadge = document.createElement('span');
+    roleBadge.className = 'admin-mobile-role-badge';
+    roleBadge.textContent = '관리자';
+    nameWrap.appendChild(roleBadge);
+  }
+  row1.appendChild(nameWrap);
+
+  const meta = ADMIN_STATUS_META[u.status] || { label: displayValue(u.status), cls: 'disabled' };
+  const statusBadge = document.createElement('span');
+  statusBadge.className = `admin-mobile-badge admin-mobile-badge-${meta.cls}`;
+  statusBadge.textContent = meta.label;
+  row1.appendChild(statusBadge);
+
+  const moreBtn = document.createElement('button');
+  moreBtn.type = 'button';
+  moreBtn.className = 'admin-mobile-more-btn';
+  moreBtn.setAttribute('aria-label', '회원 관리 메뉴');
+  moreBtn.appendChild(buildAdminSvg('<circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/>'));
+  moreBtn.addEventListener('click', () => openAdminActionSheet(u, currentUserId, listEl, containerId));
+  row1.appendChild(moreBtn);
+
+  body.appendChild(row1);
+
+  // row2: 계정(이메일, 도메인은 마스킹 — 요청사항)
+  const row2 = document.createElement('div');
+  row2.className = 'admin-mobile-card-row2';
+  const emailEl = document.createElement('span');
+  emailEl.className = 'admin-mobile-card-email';
+  emailEl.textContent = `계정 ${maskEmailDomain(u.email)}`;
+  row2.appendChild(emailEl);
+  body.appendChild(row2);
+
+  // row3: 지청(요청사항) + 가입일
+  const row3 = document.createElement('div');
+  row3.className = 'admin-mobile-card-row2';
+  const orgEl = document.createElement('span');
+  orgEl.className = 'admin-mobile-card-org';
+  orgEl.textContent = `지청 ${org || '-'}`;
+  row3.appendChild(orgEl);
+  const dateEl = document.createElement('span');
+  dateEl.className = 'admin-mobile-card-date';
+  dateEl.textContent = formatAdminDate(u.created_at);
+  row3.appendChild(dateEl);
+  body.appendChild(row3);
+
+  card.appendChild(body);
+  return card;
+}
+
+// 상태별로 실제 지원되는 조치만 나열한다(요청사항 19~21). 전부 기존 setUserStatus(admin.js)
+// -> gnmap_v2_set_user_status RPC만 호출하며, 새 client-side 상태 판단 로직을 추가하지 않는다.
+function getAdminActionsForStatus(status, isSelf) {
+  if (isSelf) return []; // STEP9 서버 보호와 별개로, 본인 행은 상태 변경 액션 자체를 보여주지 않는다.
+  if (status === 'pending') {
+    return [
+      { key: 'approved', type: 'status', label: '승인완료', danger: false },
+      { key: 'rejected', type: 'status', label: '승인거절', danger: true, confirm: '이 회원의 가입을 거절하시겠습니까?' },
+    ];
+  }
+  if (status === 'approved') {
+    return [
+      // "비밀번호 초기화"는 gnmap_v2_set_user_status RPC가 아니라 별도 Edge Function
+      // (gnmap-v2-reset-password)을 호출한다 — status/role 값은 전혀 바뀌지 않는다.
+      { type: 'reset-password', label: '비밀번호 초기화', danger: true, confirm: '이 회원의 비밀번호를 초기화하시겠습니까? 새 임시 비밀번호가 발급됩니다.' },
+      { key: 'disabled', type: 'status', label: '휴면전환', danger: true, confirm: '이 회원을 휴면 상태로 전환하시겠습니까?' },
+    ];
+  }
+  if (status === 'rejected') {
+    return [
+      { key: 'approved', type: 'status', label: '재승인', danger: false },
+    ];
+  }
+  if (status === 'disabled') {
+    return [
+      { key: 'approved', type: 'status', label: '재활성화', danger: false },
+    ];
+  }
+  return [];
+}
+
+// 모바일 ⋮ 메뉴 — 작은 desktop dropdown 대신 하단 bottom sheet를 새로 만든다(요청사항 23).
+// 실제 조치는 기존 setUserStatus(admin.js)만 호출하고, 성공 시 loadUsers()로 다시 조회해
+// 카드/카운트/배지를 즉시 갱신한다(요청사항 25). document.body에 붙여 admin-panel의 내부
+// 스크롤 위치와 무관하게 항상 화면 전체를 덮도록 한다.
+function openAdminActionSheet(u, currentUserId, listEl, containerId) {
+  const isSelf = currentUserId === u.id;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'admin-sheet-overlay';
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeSheet();
+  });
+
+  const sheet = document.createElement('div');
+  sheet.className = 'admin-sheet';
+  overlay.appendChild(sheet);
+
+  function closeSheet() {
+    overlay.remove();
+  }
+
+  function renderMainMenu() {
+    sheet.innerHTML = '';
+    const nameEl = document.createElement('div');
+    nameEl.className = 'admin-sheet-name';
+    nameEl.textContent = displayValue(splitOrgName(u.name).name);
+    sheet.appendChild(nameEl);
+
+    const infoBtn = document.createElement('button');
+    infoBtn.type = 'button';
+    infoBtn.className = 'admin-sheet-action';
+    infoBtn.textContent = '회원 정보 보기';
+    infoBtn.addEventListener('click', renderInfoView);
+    sheet.appendChild(infoBtn);
+
+    getAdminActionsForStatus(u.status, isSelf).forEach(action => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'admin-sheet-action' + (action.danger ? ' admin-sheet-action-danger' : '');
+      btn.textContent = action.label;
+      btn.addEventListener('click', () => {
+        if (action.confirm) renderConfirmView(action);
+        else runAction(action);
+      });
+      sheet.appendChild(btn);
+    });
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'admin-sheet-cancel';
+    cancelBtn.textContent = '취소';
+    cancelBtn.addEventListener('click', closeSheet);
+    sheet.appendChild(cancelBtn);
+  }
+
+  // 새 네트워크 호출 없이 이미 알고 있는 값만 보여준다(요청사항 12의 카드 정보를 그대로 나열).
+  function renderInfoView() {
+    sheet.innerHTML = '';
+    const { org: infoOrg, name: infoName } = splitOrgName(u.name);
+    const nameEl = document.createElement('div');
+    nameEl.className = 'admin-sheet-name';
+    nameEl.textContent = displayValue(infoName);
+    sheet.appendChild(nameEl);
+
+    const infoList = document.createElement('div');
+    infoList.className = 'admin-sheet-info';
+    [
+      ['계정', maskEmailDomain(u.email)],
+      ['지청', infoOrg || '-'],
+      ['역할', u.role === 'admin' ? '관리자' : '일반 사용자'],
+      ['상태', (ADMIN_STATUS_META[u.status] || {}).label || displayValue(u.status)],
+      ['가입일', formatAdminDate(u.created_at)],
+    ].forEach(([label, value]) => {
+      const line = document.createElement('div');
+      line.className = 'admin-sheet-info-row';
+      const labelEl = document.createElement('span');
+      labelEl.className = 'admin-sheet-info-label';
+      labelEl.textContent = label;
+      const valueEl = document.createElement('span');
+      valueEl.className = 'admin-sheet-info-value';
+      valueEl.textContent = value;
+      line.appendChild(labelEl);
+      line.appendChild(valueEl);
+      infoList.appendChild(line);
+    });
+    sheet.appendChild(infoList);
+
+    const backBtn = document.createElement('button');
+    backBtn.type = 'button';
+    backBtn.className = 'admin-sheet-cancel';
+    backBtn.textContent = '닫기';
+    backBtn.addEventListener('click', closeSheet);
+    sheet.appendChild(backBtn);
+  }
+
+  // 거절/비활성화 등 destructive action 확인 단계(요청사항 24).
+  function renderConfirmView(action) {
+    sheet.innerHTML = '';
+    const confirmMsg = document.createElement('div');
+    confirmMsg.className = 'admin-sheet-confirm-msg';
+    confirmMsg.textContent = action.confirm;
+    sheet.appendChild(confirmMsg);
+
+    const btnRow = document.createElement('div');
+    btnRow.className = 'admin-sheet-confirm-row';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'admin-sheet-cancel';
+    cancelBtn.textContent = '취소';
+    cancelBtn.addEventListener('click', renderMainMenu);
+    const okBtn = document.createElement('button');
+    okBtn.type = 'button';
+    okBtn.className = 'admin-sheet-action-danger admin-sheet-confirm-ok';
+    okBtn.textContent = action.label;
+    okBtn.addEventListener('click', () => runAction(action));
+    btnRow.appendChild(cancelBtn);
+    btnRow.appendChild(okBtn);
+    sheet.appendChild(btnRow);
+  }
+
+  // 비밀번호 초기화 결과(임시 비밀번호)를 보여준다. 상태/카운트가 바뀌는 조치가 아니므로
+  // loadUsers() 재조회 없이 여기서 그대로 끝난다.
+  function renderPasswordResultView(tempPassword) {
+    sheet.innerHTML = '';
+    const nameEl = document.createElement('div');
+    nameEl.className = 'admin-sheet-name';
+    nameEl.textContent = '비밀번호 초기화 완료';
+    sheet.appendChild(nameEl);
+
+    const msg = document.createElement('p');
+    msg.className = 'admin-sheet-confirm-msg';
+    msg.textContent = '아래 임시 비밀번호를 회원에게 별도의 안전한 방법으로 전달해주세요. 이 창을 닫으면 다시 확인할 수 없습니다.';
+    sheet.appendChild(msg);
+
+    const pwBox = document.createElement('div');
+    pwBox.className = 'admin-sheet-password-box';
+    pwBox.textContent = tempPassword;
+    sheet.appendChild(pwBox);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'admin-sheet-cancel';
+    closeBtn.textContent = '확인';
+    closeBtn.addEventListener('click', closeSheet);
+    sheet.appendChild(closeBtn);
+  }
+
+  async function runAction(action) {
+    if (state.adminUserInFlight.has(u.id)) return;
+    state.adminUserInFlight.add(u.id);
+    sheet.innerHTML = '';
+    const loadingMsg = document.createElement('div');
+    loadingMsg.className = 'admin-sheet-confirm-msg';
+    loadingMsg.textContent = '처리 중...';
+    sheet.appendChild(loadingMsg);
+
+    try {
+      if (action.type === 'reset-password') {
+        const result = await resetUserPassword(u.id);
+        if (!result.ok) {
+          loadingMsg.textContent = result.message || '비밀번호 초기화에 실패했습니다.';
+          const backBtn = document.createElement('button');
+          backBtn.type = 'button';
+          backBtn.className = 'admin-sheet-cancel';
+          backBtn.textContent = '닫기';
+          backBtn.addEventListener('click', closeSheet);
+          sheet.appendChild(backBtn);
+          return;
+        }
+        renderPasswordResultView(result.tempPassword);
+        return;
+      }
+
+      const result = await setUserStatus(u.id, action.key);
+      state.adminMessage = result.message;
+      if (!result.ok) {
+        loadingMsg.textContent = result.message || '처리에 실패했습니다.';
+        const backBtn = document.createElement('button');
+        backBtn.type = 'button';
+        backBtn.className = 'admin-sheet-cancel';
+        backBtn.textContent = '닫기';
+        backBtn.addEventListener('click', closeSheet);
+        sheet.appendChild(backBtn);
+        return;
+      }
+    } finally {
+      state.adminUserInFlight.delete(u.id);
+    }
+
+    closeSheet();
+    // 요청사항 25: RPC 성공 후 목록/카운트/배지를 즉시 갱신한다. 서버가 최종 진실이므로
+    // client-side로 값을 추정해 넣지 않고 loadUsers()로 다시 조회한다.
+    await loadUsers();
+    const desktopHost = document.getElementById(containerId);
+    const oldDesktop = document.getElementById('admin-desktop-rows');
+    if (oldDesktop) oldDesktop.remove();
+    if (desktopHost) renderAdminDesktopRows(desktopHost, state.adminUsers, containerId);
+    const mobileHost = document.getElementById('admin-mobile-host');
+    if (mobileHost) renderAdminMobileHost(mobileHost, containerId);
+  }
+
+  renderMainMenu();
+  document.body.appendChild(overlay);
 }
 
 // status/role 변경 공통 처리. userId 기준 in-flight로 중복 요청을 막고,
