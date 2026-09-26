@@ -6,7 +6,7 @@ import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMar
 import { getFilteredSortedSites, getDongOptions, loadActiveSites } from './sites.js';
 import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
-import { loadUsers, setUserStatus, setUserRole, resetUserPassword } from './admin.js';
+import { loadUsers, setUserStatus, setUserRole, resetUserPassword, deleteRejectedProfile } from './admin.js';
 import { parseExcelFile } from './excel.js';
 import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, buildLotQueries, runJusoNormalize, buildJusoQuery, runKakaoJusoRecovery, runRoadApproximateRecovery, extractApproximateStructure } from './geocoding.js';
 import { importSitesToDatabase, previewImportImpact, loadUploadHistory } from './import.js';
@@ -1256,13 +1256,16 @@ function splitOrgName(rawName) {
   return { org: value.slice(0, idx).trim(), name: value.slice(idx + 1).trim() };
 }
 
-// 이메일 로컬파트만 노출하고 "@" 뒤 도메인은 마스킹한다(요청: 메일 주소의 @ 이후 내용이 안 보였으면 함).
+// "계정"에는 실제 로그인 아이디만 보여준다 — "@" 이후 도메인은 아예 표시하지 않고, V1/V2
+// 네임스페이스 충돌 방지용 내부 태그("+v2", toAuthEmail() 참고)도 사용자에게는 무의미하므로
+// 함께 제거한다(요청: "+v2@**"까지 안 보였으면 함).
 function maskEmailDomain(rawEmail) {
   const value = (rawEmail || '').trim();
   if (!value) return displayValue(value);
   const at = value.indexOf('@');
-  if (at === -1) return value;
-  return `${value.slice(0, at)}@***`;
+  let local = at === -1 ? value : value.slice(0, at);
+  local = local.replace(/\+v2$/i, '');
+  return local || displayValue(value);
 }
 
 // created_at(timestamptz) -> "YYYY. MM. DD." 표시 전용 포매터. 실제 값이 없으면 '-'.
@@ -1528,7 +1531,7 @@ function buildAdminMemberCard(u, currentUserId, listEl, containerId) {
   row2.className = 'admin-mobile-card-row2';
   const emailEl = document.createElement('span');
   emailEl.className = 'admin-mobile-card-email';
-  emailEl.textContent = `계정 ${maskEmailDomain(u.email)}`;
+  emailEl.textContent = `계정: ${maskEmailDomain(u.email)}`;
   row2.appendChild(emailEl);
   body.appendChild(row2);
 
@@ -1537,7 +1540,7 @@ function buildAdminMemberCard(u, currentUserId, listEl, containerId) {
   row3.className = 'admin-mobile-card-row2';
   const orgEl = document.createElement('span');
   orgEl.className = 'admin-mobile-card-org';
-  orgEl.textContent = `지청 ${org || '-'}`;
+  orgEl.textContent = `지청: ${org || '-'}`;
   row3.appendChild(orgEl);
   const dateEl = document.createElement('span');
   dateEl.className = 'admin-mobile-card-date';
@@ -1570,6 +1573,10 @@ function getAdminActionsForStatus(status, isSelf) {
   if (status === 'rejected') {
     return [
       { key: 'approved', type: 'status', label: '재승인', danger: false },
+      // "완전 삭제"는 status RPC가 아니라 별도 RPC(gnmap_v2_delete_rejected_profile)를 호출한다.
+      // 그 함수 내부에서도 rejected 상태인지 다시 검사하므로, 다른 상태 회원은 이 액션으로
+      // 지울 수 없다(서버가 최종 방어선).
+      { type: 'delete-rejected', label: '완전 삭제', danger: true, confirm: '이 회원 데이터를 완전히 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.' },
     ];
   }
   if (status === 'disabled') {
@@ -1714,10 +1721,46 @@ function openAdminActionSheet(u, currentUserId, listEl, containerId) {
     msg.textContent = '아래 임시 비밀번호를 회원에게 별도의 안전한 방법으로 전달해주세요. 이 창을 닫으면 다시 확인할 수 없습니다.';
     sheet.appendChild(msg);
 
+    const pwRow = document.createElement('div');
+    pwRow.className = 'admin-sheet-password-row';
     const pwBox = document.createElement('div');
     pwBox.className = 'admin-sheet-password-box';
     pwBox.textContent = tempPassword;
-    sheet.appendChild(pwBox);
+    pwRow.appendChild(pwBox);
+
+    // 클립보드 복사(요청사항). Clipboard API를 못 쓰는 환경(구형 웹뷰 등)을 대비해
+    // execCommand('copy') fallback도 함께 둔다. 복사 성공/실패는 버튼 텍스트로만 잠깐 알려준다.
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'admin-sheet-copy-btn';
+    copyBtn.textContent = '복사';
+    copyBtn.setAttribute('aria-label', '임시 비밀번호 복사');
+    copyBtn.addEventListener('click', async () => {
+      let copied = false;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(tempPassword);
+          copied = true;
+        }
+      } catch (e) { /* 아래 fallback 시도 */ }
+      if (!copied) {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = tempPassword;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          copied = document.execCommand('copy');
+          ta.remove();
+        } catch (e) { /* 무시 — 아래에서 실패로 표시 */ }
+      }
+      copyBtn.textContent = copied ? '복사됨' : '복사 실패';
+      setTimeout(() => { copyBtn.textContent = '복사'; }, 1500);
+    });
+    pwRow.appendChild(copyBtn);
+    sheet.appendChild(pwRow);
 
     const closeBtn = document.createElement('button');
     closeBtn.type = 'button';
@@ -1753,17 +1796,33 @@ function openAdminActionSheet(u, currentUserId, listEl, containerId) {
         return;
       }
 
-      const result = await setUserStatus(u.id, action.key);
-      state.adminMessage = result.message;
-      if (!result.ok) {
-        loadingMsg.textContent = result.message || '처리에 실패했습니다.';
-        const backBtn = document.createElement('button');
-        backBtn.type = 'button';
-        backBtn.className = 'admin-sheet-cancel';
-        backBtn.textContent = '닫기';
-        backBtn.addEventListener('click', closeSheet);
-        sheet.appendChild(backBtn);
-        return;
+      if (action.type === 'delete-rejected') {
+        const result = await deleteRejectedProfile(u.id);
+        if (!result.ok) {
+          loadingMsg.textContent = result.message || '삭제에 실패했습니다.';
+          const backBtn = document.createElement('button');
+          backBtn.type = 'button';
+          backBtn.className = 'admin-sheet-cancel';
+          backBtn.textContent = '닫기';
+          backBtn.addEventListener('click', closeSheet);
+          sheet.appendChild(backBtn);
+          return;
+        }
+        // 삭제는 전체 카운트가 줄어드는 조치이므로 승인/거절과 동일하게 목록을 다시 그린다
+        // (아래 공통 마무리 코드로 흘러가도록 여기서는 return하지 않는다).
+      } else {
+        const result = await setUserStatus(u.id, action.key);
+        state.adminMessage = result.message;
+        if (!result.ok) {
+          loadingMsg.textContent = result.message || '처리에 실패했습니다.';
+          const backBtn = document.createElement('button');
+          backBtn.type = 'button';
+          backBtn.className = 'admin-sheet-cancel';
+          backBtn.textContent = '닫기';
+          backBtn.addEventListener('click', closeSheet);
+          sheet.appendChild(backBtn);
+          return;
+        }
       }
     } finally {
       state.adminUserInFlight.delete(u.id);
