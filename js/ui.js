@@ -876,8 +876,7 @@ export function renderMobileMoreMenu(containerId) {
 
   addMenuGroup('관리', admin ? [
     { label: '회원 관리', icon: 'user', onClick: () => document.getElementById('btn-admin-panel').click() },
-    { label: '엑셀 업로드', icon: 'upload', onClick: () => document.getElementById('btn-upload-panel').click() },
-    { label: '업로드 이력', icon: 'history', onClick: () => document.getElementById('btn-upload-panel').click() },
+    { label: '사업장 데이터 관리', icon: 'upload', onClick: () => document.getElementById('btn-upload-panel').click() },
   ] : []);
 
   addMenuGroup('업무', [
@@ -2117,6 +2116,530 @@ async function handleDeleteSupervision(containerId, id) {
     return;
   }
   await renderSupervisionPanel(containerId);
+}
+
+// ============================================================
+// 모바일 "사업장 데이터 관리" TARGET UI.
+// 기존 PC 엑셀 업로드/검증/geocoding/import/이력 로직(parseExcelFile, runGeocodingForParsedRows,
+// previewImportImpact/importSitesToDatabase, loadUploadHistory 등)만 그대로 재사용한다.
+// 새 파싱/검증/geocoding/import 로직은 추가하지 않으며, 여기서는 화면 구성과
+// state.uploadMobileTab(탭 상태)만 다룬다. PC 전용 고급 복구 도구(결과없음 CSV, keyword/LOT/
+// JUSO/도로대표위치 재검색 등)는 TARGET 목업에 없으므로 모바일 화면에는 노출하지 않는다 —
+// 기능을 삭제하는 것이 아니라 PC 화면(#upload-preview)에서는 기존 그대로 계속 쓸 수 있다.
+// ============================================================
+
+const UPLOAD_MOBILE_HOST_ID = 'upload-mobile-host';
+
+// TARGET의 "좌표 확인 N / 확인 필요 N" 2분류로 단순화한다.
+// 좌표 확인 = 위/경도가 실제로 채워진 품질(EXACT/ESTIMATED/APPROXIMATE/MANUAL).
+// 확인 필요 = geocoding을 시도했지만 UNRESOLVED(결과없음/오류 포함)로 남은 건.
+function getUploadLocationBuckets(rows) {
+  let resolved = 0;
+  let needsReview = 0;
+  (rows || []).forEach(row => {
+    if (['EXACT', 'ESTIMATED', 'APPROXIMATE', 'MANUAL'].includes(row._locationQuality)) resolved++;
+    else if (row._geocodeStatus) needsReview++;
+  });
+  return { resolved, needsReview };
+}
+
+function formatUploadDateTime(iso) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '-';
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  return `${yyyy}. ${mm}. ${dd}. ${hh}:${mi}`;
+}
+
+function formatUploadFileSize(bytes) {
+  if (bytes === null || bytes === undefined || Number.isNaN(bytes)) return '';
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+}
+
+function buildUploadMobileHeader() {
+  const header = document.createElement('div');
+  header.className = 'admin-mobile-header';
+
+  const brand = document.createElement('div');
+  brand.className = 'admin-mobile-brand';
+  const logoImg = document.createElement('img');
+  logoImg.src = 'assets/icons/moel-ci-full.png';
+  logoImg.alt = '고용노동부';
+  brand.appendChild(logoImg);
+  const brandTitle = document.createElement('span');
+  brandTitle.textContent = '산업안전 순찰지도';
+  brand.appendChild(brandTitle);
+  header.appendChild(brand);
+
+  const bellBtn = document.createElement('button');
+  bellBtn.type = 'button';
+  bellBtn.className = 'admin-mobile-bell';
+  bellBtn.setAttribute('aria-label', '알림');
+  bellBtn.appendChild(buildAdminSvg('<path d="M18 16v-5a6 6 0 1 0-12 0v5l-1.5 2.5h15L18 16Z"/><path d="M9.5 20a2.5 2.5 0 0 0 5 0"/>'));
+  bellBtn.addEventListener('click', () => {
+    const panel = document.getElementById('upload-panel');
+    if (panel) panel.style.display = 'none';
+    const alertTabBtn = document.querySelector('.mobile-tab-btn[data-tab="alert"]');
+    if (alertTabBtn) alertTabBtn.click();
+  });
+  header.appendChild(bellBtn);
+
+  return header;
+}
+
+// "검증 결과 자세히 보기" 바텀시트 — state.uploadParsedRows 중 VALID가 아닌 행만 나열한다.
+// 기존 admin-sheet 스타일(admin-sheet-overlay/admin-sheet)을 그대로 재사용한다.
+function openUploadDetailSheet() {
+  const overlay = document.createElement('div');
+  overlay.className = 'admin-sheet-overlay';
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+  const sheet = document.createElement('div');
+  sheet.className = 'admin-sheet';
+
+  const title = document.createElement('div');
+  title.className = 'admin-sheet-name';
+  title.textContent = '검증 결과 자세히 보기';
+  sheet.appendChild(title);
+
+  const problemRows = (state.uploadParsedRows || []).filter(r => r._validation !== 'VALID');
+  if (problemRows.length === 0) {
+    const okMsg = document.createElement('p');
+    okMsg.className = 'admin-sheet-confirm-msg';
+    okMsg.textContent = '경고 또는 오류가 있는 행이 없습니다.';
+    sheet.appendChild(okMsg);
+  } else {
+    problemRows.slice(0, 100).forEach(row => {
+      const item = document.createElement('div');
+      item.className = 'upload-mobile-detail-row';
+
+      const name = row.site_name || row.company_name || '(사업장명 없음)';
+      const bizNo = row.business_start_no || '(식별번호 없음)';
+      const isError = row._validation === 'ERROR';
+
+      const line1 = document.createElement('div');
+      line1.className = 'upload-mobile-detail-row-title' + (isError ? ' error' : ' warn');
+      line1.textContent = `[${isError ? '오류' : '경고'}] ${name} (${bizNo})`;
+      item.appendChild(line1);
+
+      const line2 = document.createElement('div');
+      line2.className = 'upload-mobile-detail-row-msg';
+      line2.textContent = ((isError ? row._errors : row._warnings) || []).join(', ');
+      item.appendChild(line2);
+
+      sheet.appendChild(item);
+    });
+    if (problemRows.length > 100) {
+      const more = document.createElement('p');
+      more.className = 'admin-sheet-confirm-msg';
+      more.textContent = `그 외 ${problemRows.length - 100}건은 표시되지 않았습니다.`;
+      sheet.appendChild(more);
+    }
+  }
+
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'admin-sheet-cancel';
+  closeBtn.textContent = '닫기';
+  closeBtn.addEventListener('click', () => overlay.remove());
+  sheet.appendChild(closeBtn);
+
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+}
+
+// "주소 좌표 확인" 모바일 버튼 — PC의 handleGeocodeStart와 동일하게 geocoding.js의
+// runGeocodingForParsedRows만 호출한다(중복 클릭 방지 플래그도 PC와 동일한 state.geocodeInProgress
+// 공유). 다른 점은 렌더 대상이 모바일 컨테이너라는 것 뿐이다.
+async function handleGeocodeStartMobile() {
+  if (state.geocodeInProgress) return;
+  state.geocodeInProgress = true;
+  renderUploadMobileHost();
+
+  let isFirstProgressTick = true;
+  try {
+    await runGeocodingForParsedRows((progress) => {
+      state.geocodeProgress = progress;
+      if (isFirstProgressTick) {
+        isFirstProgressTick = false;
+      }
+      renderUploadMobileHost();
+    });
+  } finally {
+    state.geocodeInProgress = false;
+    renderUploadMobileHost();
+  }
+}
+
+// "사업장 데이터 업로드" 모바일 버튼 — PC의 handleImportToDatabase와 동일한 흐름
+// (사전 검증 -> 확인 -> RPC 실행 -> 성공 시 지도/이력 갱신)을 그대로 따른다.
+async function handleImportToDatabaseMobile() {
+  if (state.uploadImportInProgress || state.importPreviewInProgress) return;
+
+  state.importPreviewInProgress = true;
+  renderUploadMobileHost();
+
+  let preview;
+  try {
+    preview = await previewImportImpact(state.uploadFileName, state.uploadDetectedForm);
+    state.importPreview = preview;
+  } finally {
+    state.importPreviewInProgress = false;
+    renderUploadMobileHost();
+  }
+
+  if (!preview.success) return;
+
+  const confirmed = window.confirm(
+    `전체 ${preview.total}건 중 신규 ${preview.insertCount}건, 갱신 ${preview.updateCount}건을 저장하시겠습니까?`
+  );
+  if (!confirmed) return;
+
+  state.uploadImportInProgress = true;
+  renderUploadMobileHost();
+
+  try {
+    const result = await importSitesToDatabase(state.uploadFileName, state.uploadDetectedForm);
+    state.uploadImportResult = result;
+
+    if (result.success) {
+      const sites = await loadActiveSites();
+      state.sites = sites;
+      renderSiteList('site-list');
+      await renderUploadHistoryPanel('upload-history');
+    }
+  } finally {
+    state.uploadImportInProgress = false;
+    renderUploadMobileHost();
+  }
+}
+
+// TARGET ①: 아직 파일을 선택하지 않은 초기 화면.
+function renderUploadMobileInitial(body, fileInput) {
+  const box = document.createElement('div');
+  box.className = 'upload-mobile-dropzone';
+
+  const icon = document.createElement('div');
+  icon.className = 'upload-mobile-dropzone-icon';
+  icon.appendChild(buildAdminSvg('<path d="M12 3v12M7 8l5-5 5 5M5 21h14"/>'));
+  box.appendChild(icon);
+
+  const heading = document.createElement('p');
+  heading.className = 'upload-mobile-dropzone-title';
+  heading.textContent = '엑셀 파일 업로드';
+  box.appendChild(heading);
+
+  const guide = document.createElement('p');
+  guide.className = 'upload-mobile-dropzone-desc';
+  guide.textContent = '사업장 목록이 담긴 엑셀 파일을 업로드하면 자동으로 검증 후 위치 정보를 확인합니다.';
+  box.appendChild(guide);
+
+  const formatBox = document.createElement('div');
+  formatBox.className = 'upload-mobile-format-box';
+  formatBox.textContent = '지원 형식: XLS, XLSX';
+  box.appendChild(formatBox);
+
+  const selectBtn = document.createElement('button');
+  selectBtn.type = 'button';
+  selectBtn.className = 'upload-mobile-primary-btn';
+  selectBtn.textContent = '파일 선택';
+  selectBtn.addEventListener('click', () => fileInput && fileInput.click());
+  box.appendChild(selectBtn);
+
+  body.appendChild(box);
+
+  const infoBox = document.createElement('div');
+  infoBox.className = 'upload-mobile-info-box';
+  [
+    '본사명/사업장명, 산재관리번호, 사업개시번호가 포함된 양식을 지원합니다.',
+    '주소가 있는 사업장은 업로드 후 자동으로 좌표를 확인합니다.',
+    '기존 사업장은 사업개시번호 기준으로 갱신되고, 신규 사업장은 새로 추가됩니다.',
+    '수동으로 위치를 지정한 사업장의 좌표는 엑셀 업로드로 덮어쓰지 않습니다.',
+  ].forEach(text => {
+    const p = document.createElement('p');
+    p.textContent = `· ${text}`;
+    infoBox.appendChild(p);
+  });
+  body.appendChild(infoBox);
+}
+
+// TARGET ②: 파일 분석/검증 완료 화면.
+function renderUploadMobileAnalyzed(body, fileInput) {
+  const summary = state.uploadValidationSummary || { total: 0, validCount: 0, warningCount: 0, errorCount: 0 };
+
+  const fileCard = document.createElement('div');
+  fileCard.className = 'upload-mobile-file-card';
+
+  const fileInfo = document.createElement('div');
+  fileInfo.className = 'upload-mobile-file-info';
+  const fileNameEl = document.createElement('div');
+  fileNameEl.className = 'upload-mobile-file-name';
+  fileNameEl.textContent = state.uploadFileName || '-';
+  fileInfo.appendChild(fileNameEl);
+  const fileMetaEl = document.createElement('div');
+  fileMetaEl.className = 'upload-mobile-file-meta';
+  const currentFile = fileInput && fileInput.files && fileInput.files[0];
+  fileMetaEl.textContent = currentFile ? formatUploadFileSize(currentFile.size) : '';
+  fileInfo.appendChild(fileMetaEl);
+  fileCard.appendChild(fileInfo);
+
+  const changeBtn = document.createElement('button');
+  changeBtn.type = 'button';
+  changeBtn.className = 'upload-mobile-change-btn';
+  changeBtn.textContent = '파일 변경';
+  changeBtn.addEventListener('click', () => fileInput && fileInput.click());
+  fileCard.appendChild(changeBtn);
+
+  body.appendChild(fileCard);
+
+  const grid = document.createElement('div');
+  grid.className = 'upload-mobile-stat-grid';
+  [
+    ['전체', summary.total, ''],
+    ['정상', summary.validCount, 'ok'],
+    ['경고', summary.warningCount, 'warn'],
+    ['오류', summary.errorCount, 'error'],
+  ].forEach(([label, value, cls]) => {
+    const box = document.createElement('div');
+    box.className = 'upload-mobile-stat-box' + (cls ? ' ' + cls : '');
+    const num = document.createElement('div');
+    num.className = 'upload-mobile-stat-num';
+    num.textContent = String(value ?? 0);
+    box.appendChild(num);
+    const lab = document.createElement('div');
+    lab.className = 'upload-mobile-stat-label';
+    lab.textContent = label;
+    box.appendChild(lab);
+    grid.appendChild(box);
+  });
+  body.appendChild(grid);
+
+  const geoCard = document.createElement('div');
+  geoCard.className = 'upload-mobile-card';
+  const geoTitle = document.createElement('div');
+  geoTitle.className = 'upload-mobile-card-title';
+  geoTitle.textContent = '주소·위치 확인';
+  geoCard.appendChild(geoTitle);
+
+  const hasGeocodeRun = (state.uploadParsedRows || []).some(row => row._geocodeStatus);
+  if (!hasGeocodeRun) {
+    const geoDesc = document.createElement('p');
+    geoDesc.className = 'upload-mobile-card-desc';
+    geoDesc.textContent = '주소를 기반으로 좌표를 확인합니다.';
+    geoCard.appendChild(geoDesc);
+
+    const geoBtn = document.createElement('button');
+    geoBtn.type = 'button';
+    geoBtn.className = 'upload-mobile-secondary-btn';
+    geoBtn.textContent = state.geocodeInProgress ? '주소 좌표 확인 중...' : '주소 좌표 확인';
+    geoBtn.disabled = state.geocodeInProgress;
+    geoBtn.addEventListener('click', () => handleGeocodeStartMobile());
+    geoCard.appendChild(geoBtn);
+
+    if (state.geocodeProgress) {
+      const p = state.geocodeProgress;
+      const progressP = document.createElement('p');
+      progressP.className = 'upload-mobile-card-desc';
+      progressP.textContent = `확인 중 ${p.done}/${p.total}건...`;
+      geoCard.appendChild(progressP);
+    }
+  } else {
+    const { resolved, needsReview } = getUploadLocationBuckets(state.uploadParsedRows);
+    const geoGrid = document.createElement('div');
+    geoGrid.className = 'upload-mobile-geo-grid';
+    [
+      ['좌표 확인', resolved, 'ok'],
+      ['확인 필요', needsReview, needsReview > 0 ? 'warn' : 'ok'],
+    ].forEach(([label, value, cls]) => {
+      const box = document.createElement('div');
+      box.className = 'upload-mobile-geo-box ' + cls;
+      const num = document.createElement('div');
+      num.className = 'upload-mobile-geo-num';
+      num.textContent = String(value);
+      box.appendChild(num);
+      const lab = document.createElement('div');
+      lab.className = 'upload-mobile-geo-label';
+      lab.textContent = label;
+      box.appendChild(lab);
+      geoGrid.appendChild(box);
+    });
+    geoCard.appendChild(geoGrid);
+  }
+  body.appendChild(geoCard);
+
+  const detailBtn = document.createElement('button');
+  detailBtn.type = 'button';
+  detailBtn.className = 'upload-mobile-secondary-btn';
+  detailBtn.textContent = '검증 결과 자세히 보기';
+  detailBtn.addEventListener('click', openUploadDetailSheet);
+  body.appendChild(detailBtn);
+
+  if (state.uploadImportResult) {
+    const r = state.uploadImportResult;
+    const resultCard = document.createElement('div');
+    resultCard.className = 'upload-mobile-card' + (r.success ? ' upload-mobile-result-ok' : ' upload-mobile-result-error');
+    const resultTitle = document.createElement('div');
+    resultTitle.className = 'upload-mobile-card-title';
+    resultTitle.textContent = r.success ? '업로드 완료' : '업로드 실패';
+    resultCard.appendChild(resultTitle);
+    const resultDesc = document.createElement('p');
+    resultDesc.className = 'upload-mobile-card-desc';
+    resultDesc.textContent = r.success
+      ? `전체 ${r.total_rows}건 · 신규 ${r.inserted}건 · 갱신 ${r.updated}건 · 확인필요 ${r.review_count}건`
+      : (r.message || '저장에 실패했습니다.');
+    resultCard.appendChild(resultDesc);
+    body.appendChild(resultCard);
+  } else if (state.importPreview && !state.importPreview.success) {
+    const err = document.createElement('p');
+    err.className = 'upload-mobile-error-text';
+    err.textContent = `사전 검증 실패: ${state.importPreview.message}`;
+    body.appendChild(err);
+  }
+
+  const importTargetRows = (state.uploadParsedRows || []).filter(row => row._validation !== 'ERROR');
+  const canImport =
+    !!state.uploadDetectedForm &&
+    importTargetRows.length > 0 &&
+    importTargetRows.every(row => ['EXACT', 'ESTIMATED', 'APPROXIMATE', 'UNRESOLVED'].includes(row._locationQuality)) &&
+    !state.uploadImportInProgress;
+
+  const importBtn = document.createElement('button');
+  importBtn.type = 'button';
+  importBtn.className = 'upload-mobile-primary-btn';
+  importBtn.textContent = (state.uploadImportInProgress || state.importPreviewInProgress) ? '저장 중...' : '사업장 데이터 업로드';
+  importBtn.disabled = !canImport || state.importPreviewInProgress;
+  importBtn.addEventListener('click', () => handleImportToDatabaseMobile());
+  body.appendChild(importBtn);
+
+  if (!canImport && !state.uploadImportInProgress) {
+    const hint = document.createElement('p');
+    hint.className = 'upload-mobile-card-desc';
+    hint.textContent = '주소 좌표 확인을 완료한 후 저장할 수 있습니다.';
+    body.appendChild(hint);
+  }
+}
+
+function renderUploadMobileFile(body) {
+  body.innerHTML = '';
+  const fileInput = document.getElementById('upload-file-input');
+  if (!state.uploadDetectedForm) {
+    renderUploadMobileInitial(body, fileInput);
+  } else {
+    renderUploadMobileAnalyzed(body, fileInput);
+  }
+}
+
+// TARGET ③: 업로드 이력 탭 — gnmap_v2_upload_history에 실제로 저장된 컬럼만 사용한다
+// (신규/갱신 분리, 별도 상태 컬럼이 DB에 없으므로 review_rows>0 여부로만 배지를 구분한다).
+function renderUploadMobileHistory(body) {
+  body.innerHTML = '';
+  const list = state.uploadHistoryList || [];
+
+  if (list.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'admin-mobile-empty';
+    empty.appendChild(buildAdminSvg('<path d="M4 4h16v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4Z"/><path d="M4 9h16"/><path d="M9 13h6M9 17h4"/>'));
+    const p = document.createElement('p');
+    p.textContent = '업로드 이력이 없습니다.';
+    empty.appendChild(p);
+    body.appendChild(empty);
+    return;
+  }
+
+  const listEl = document.createElement('div');
+  listEl.className = 'upload-mobile-history-list';
+  list.forEach(h => {
+    const card = document.createElement('div');
+    card.className = 'upload-mobile-history-card';
+
+    const row1 = document.createElement('div');
+    row1.className = 'upload-mobile-history-row1';
+    const nameEl = document.createElement('span');
+    nameEl.className = 'upload-mobile-history-file';
+    nameEl.textContent = h.file_name || '-';
+    row1.appendChild(nameEl);
+
+    const hasReview = (h.review_rows || 0) > 0;
+    const badge = document.createElement('span');
+    badge.className = 'upload-mobile-history-badge' + (hasReview ? ' warn' : ' ok');
+    badge.textContent = hasReview ? '확인필요 있음' : '완료';
+    row1.appendChild(badge);
+    card.appendChild(row1);
+
+    const row2 = document.createElement('div');
+    row2.className = 'upload-mobile-history-row2';
+    row2.textContent = `전체 ${h.total_rows ?? '-'}건 · 확정 ${h.confirmed_rows ?? '-'}건 · 확인필요 ${h.review_rows ?? '-'}건`;
+    card.appendChild(row2);
+
+    const row3 = document.createElement('div');
+    row3.className = 'upload-mobile-history-row3';
+    row3.textContent = `${h.uploaded_by_name || '-'} · ${formatUploadDateTime(h.uploaded_at)}`;
+    card.appendChild(row3);
+
+    listEl.appendChild(card);
+  });
+  body.appendChild(listEl);
+}
+
+// 진입점 — app.js가 (1) 업로드 패널을 열 때, (2) 파일 선택이 끝났을 때, (3) 탭 전환 시 호출한다.
+// admin-mobile-view와 동일하게 항상 전체를 다시 그린다(state를 그대로 다시 읽음).
+export function renderUploadMobileHost() {
+  const host = document.getElementById(UPLOAD_MOBILE_HOST_ID);
+  if (!host) return;
+  host.innerHTML = '';
+
+  const view = document.createElement('div');
+  view.className = 'upload-mobile-view';
+
+  view.appendChild(buildUploadMobileHeader());
+
+  const title = document.createElement('h2');
+  title.className = 'admin-mobile-title';
+  title.textContent = '사업장 데이터 관리';
+  view.appendChild(title);
+
+  const desc = document.createElement('p');
+  desc.className = 'admin-mobile-desc';
+  desc.textContent = '엑셀 파일로 사업장 정보를 업로드하고 이력을 확인합니다.';
+  view.appendChild(desc);
+
+  const tabs = document.createElement('div');
+  tabs.className = 'admin-mobile-tabs';
+  [['file', '파일 업로드'], ['history', '업로드 이력']].forEach(([key, label]) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'admin-mobile-tab' + (state.uploadMobileTab === key ? ' active' : '');
+    btn.textContent = label;
+    btn.addEventListener('click', async () => {
+      if (state.uploadMobileTab === key) return;
+      state.uploadMobileTab = key;
+      renderUploadMobileHost();
+      if (key === 'history') {
+        await renderUploadHistoryPanel('upload-history');
+        renderUploadMobileHost();
+      }
+    });
+    tabs.appendChild(btn);
+  });
+  view.appendChild(tabs);
+
+  const body = document.createElement('div');
+  body.id = 'upload-mobile-body';
+  view.appendChild(body);
+
+  if (state.uploadMobileTab === 'history') {
+    renderUploadMobileHistory(body);
+  } else {
+    renderUploadMobileFile(body);
+  }
+
+  host.appendChild(view);
 }
 
 // STEP13-5: 관리자 업로드 영역(upload-panel)이 열릴 때 최근 업로드 이력을 조회해 표시한다.
