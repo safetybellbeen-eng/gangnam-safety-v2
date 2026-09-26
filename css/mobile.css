@@ -1819,11 +1819,17 @@
     background: #fff;
     border-radius: 22px 22px 0 0;
     box-shadow: 0 -6px 20px rgba(15,42,82,0.10);
-    padding: 20px var(--gnmap-space-5) 16px;
+    /* [STEP16.5 간격 재조정] 카드가 flex:1 + justify-content:center라 내용이 카드 안에서
+       수직 중앙정렬되므로, 단순히 padding만으로는 "위/아래 여백"이 보장되지 않는다. 대신
+       내부 그룹 사이 간격 자체를 높이/낮춰 위계를 분명히 하고(입력칸끼리는 가깝게, 로그인
+       버튼 위/옵션 행 사이는 뚜렷하게, 안내문구는 옵션 행에 캡션처럼 붙게), 하단 padding에
+       홈 인디케이터 안전영역(env(safe-area-inset-bottom))을 더해 실기기(특히 TWA)에서
+       안내문구가 화면 맨 끝/제스처 바에 닿지 않도록 한다. */
+    padding: 22px var(--gnmap-space-5) calc(22px + env(safe-area-inset-bottom, 0px));
     font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
   }
   #app #mobile-login-card #login-form {
-    gap: 22px;
+    gap: 18px;
   }
   #mobile-login-card .mobile-login-field {
     position: relative;
@@ -1942,7 +1948,7 @@
   #app #mobile-login-card #login-form button[type="submit"] {
     width: 100%;
     height: 40px;
-    margin-top: 14px;
+    margin-top: 22px;
     border: none;
     border-radius: 14px;
     background: var(--gnmap-navy);
@@ -1982,13 +1988,13 @@
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    margin-top: 26px;
+    margin-top: 18px;
     font-size: 13px;
     color: #5b6472;
   }
   #mobile-login-password-help {
     display: block;
-    margin: 10px 0 0;
+    margin: 8px 0 0;
     font-size: 12.5px;
     line-height: 1.5;
     color: #8a93a3;
@@ -1996,7 +2002,7 @@
   #mobile-login-remember-group {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 18px;
   }
   #app #mobile-login-remember-label,
   #app #mobile-login-autologin-label {
