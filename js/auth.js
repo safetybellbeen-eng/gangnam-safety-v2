@@ -123,7 +123,10 @@ export function isAdmin() {
 // 화면에 그대로 노출하면 사용자가 이해하기 어렵다. 자주 발생하는 메시지만 한글로 매핑하고,
 // 매핑에 없는 메시지는 원문을 노출하지 않고 안전한 일반 문구로 대체한다.
 const AUTH_ERROR_MAP = [
-  { test: /database error saving new user/i, ko: '계정 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' },
+  // "Database error saving new user"는 이 프로젝트에서 실질적으로 거의 항상 아이디 중복(같은 로그인
+  // 시스템을 공유하는 다른 앱 쪽 아이디와 겹치는 경우 포함)이 원인이었으므로, 사용자에게는
+  // 원인이 같은 "이미 사용 중인 아이디입니다."로 안내한다(내부적으로는 +v2 태그로 재발을 막아뒀다).
+  { test: /database error saving new user/i, ko: '이미 사용 중인 아이디입니다.' },
   { test: /user already registered/i, ko: '이미 등록된 아이디입니다.' },
   { test: /invalid login credentials/i, ko: '아이디 또는 비밀번호가 올바르지 않습니다.' },
   { test: /email not confirmed/i, ko: '계정 인증이 완료되지 않았습니다. 관리자에게 문의해주세요.' },
