@@ -100,7 +100,12 @@
 .mobile-signup-match-msg,
 .mobile-required-star,
 .mobile-signup-label-text,
-.mobile-signup-submit-label {
+.mobile-signup-submit-label,
+#mobile-signupdone-header,
+#mobile-signupdone-intro,
+#mobile-signupdone-illustration,
+#mobile-signupdone-info,
+#mobile-signupdone-skyline {
   display: none;
 }
 
@@ -2450,6 +2455,164 @@
   }
   #view-signup #show-login {
     display: none;
+  }
+
+  /* STEP16.6(승인대기 화면 모바일 UI). #view-signup과 동일한 원칙: 컨테이너를 전체 폭/높이로
+     펼치고, 세로 스크롤은 자연스럽게 허용한다(모든 요소를 억지로 압축하지 않는다). */
+  #app #view-signup-done {
+    max-width: none;
+    margin: 0;
+    padding: 0 0 40px;
+    background: #fff;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  #app #view-signup-done > h1,
+  #app #view-signup-done > p {
+    display: none;
+  }
+  #mobile-signupdone-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: calc(env(safe-area-inset-top, 0px) + 14px) var(--gnmap-space-4) 10px;
+  }
+  #mobile-signupdone-back {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    margin-left: -8px;
+    background: none;
+    border: none;
+    color: var(--gnmap-navy);
+    cursor: pointer;
+  }
+  #mobile-signupdone-back .mobile-icon-svg {
+    width: 22px;
+    height: 22px;
+  }
+  #mobile-signupdone-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+  #mobile-signupdone-brand img {
+    display: block;
+    height: 22px;
+    width: auto;
+  }
+  #mobile-signupdone-brand-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gnmap-navy);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
+  }
+  #mobile-signupdone-intro {
+    display: block;
+    padding: 28px var(--gnmap-space-4) 0;
+    text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
+  }
+  #mobile-signupdone-intro h1 {
+    margin: 0 0 12px;
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--gnmap-navy);
+  }
+  #mobile-signupdone-intro p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #5b6472;
+  }
+  #mobile-signupdone-illustration {
+    display: flex;
+    justify-content: center;
+    padding: 24px var(--gnmap-space-4) 0;
+  }
+  #mobile-signupdone-illustration svg {
+    width: 100%;
+    max-width: 240px;
+    height: auto;
+  }
+  #mobile-signupdone-info {
+    display: block;
+    margin: 24px var(--gnmap-space-4) 0;
+    background: #eef4fb;
+    border-radius: 16px;
+    padding: 18px;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
+  }
+  #mobile-signupdone-info-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--gnmap-blue);
+  }
+  #mobile-signupdone-info-title .mobile-icon-svg-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--gnmap-blue);
+    color: #fff;
+    flex-shrink: 0;
+  }
+  #mobile-signupdone-info-title .mobile-icon-svg {
+    width: 14px;
+    height: 14px;
+  }
+  #mobile-signupdone-info ul {
+    margin: 12px 0 0;
+    padding-left: 18px;
+    list-style: disc;
+  }
+  #mobile-signupdone-info li {
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--gnmap-navy);
+  }
+  #mobile-signupdone-info li + li {
+    margin-top: 8px;
+  }
+  #mobile-signupdone-info li strong {
+    color: var(--gnmap-blue);
+    font-weight: 800;
+  }
+  #app #view-signup-done #signup-done-to-login {
+    display: block;
+    width: auto;
+    margin: 20px var(--gnmap-space-4) 0;
+    height: 52px;
+    border: none;
+    border-radius: 14px;
+    background: var(--gnmap-blue);
+    color: #fff;
+    font-size: 17px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
+  }
+  #app #view-signup-done #signup-done-to-login:active {
+    background: #0f2247;
+  }
+  #mobile-signupdone-skyline {
+    display: block;
+    width: 100%;
+    height: 70px;
+    margin-top: auto;
+    padding-top: 24px;
+    opacity: 0.6;
   }
 }
 
