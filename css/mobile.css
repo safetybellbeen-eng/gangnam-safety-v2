@@ -2313,6 +2313,9 @@
   .mobile-signup-match-msg.is-mismatch {
     color: #e0402e;
   }
+  .mobile-signup-match-msg.is-checking {
+    color: #8a93a3;
+  }
   #app #mobile-signup-card #signup-form button[type="submit"] {
     width: 100%;
     height: 52px;
