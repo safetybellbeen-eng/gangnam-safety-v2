@@ -1570,18 +1570,21 @@ function getAdminActionsForStatus(status, isSelf) {
       { key: 'disabled', type: 'status', label: '휴면전환', danger: true, confirm: '이 회원을 휴면 상태로 전환하시겠습니까?' },
     ];
   }
+  // "완전 삭제"는 status RPC가 아니라 별도 RPC(gnmap_v2_delete_rejected_profile)를 호출한다.
+  // 그 함수 내부에서도 rejected/disabled 상태인지 다시 검사하므로, 다른 상태 회원은 이 액션으로
+  // 지울 수 없다(서버가 최종 방어선). rejected/disabled 둘 다 같은 조치를 공유한다.
+  const DELETE_ACTION = { type: 'delete-rejected', label: '완전 삭제', danger: true, confirm: '이 회원 데이터를 완전히 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.' };
+
   if (status === 'rejected') {
     return [
       { key: 'approved', type: 'status', label: '재승인', danger: false },
-      // "완전 삭제"는 status RPC가 아니라 별도 RPC(gnmap_v2_delete_rejected_profile)를 호출한다.
-      // 그 함수 내부에서도 rejected 상태인지 다시 검사하므로, 다른 상태 회원은 이 액션으로
-      // 지울 수 없다(서버가 최종 방어선).
-      { type: 'delete-rejected', label: '완전 삭제', danger: true, confirm: '이 회원 데이터를 완전히 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.' },
+      DELETE_ACTION,
     ];
   }
   if (status === 'disabled') {
     return [
       { key: 'approved', type: 'status', label: '재활성화', danger: false },
+      DELETE_ACTION,
     ];
   }
   return [];
