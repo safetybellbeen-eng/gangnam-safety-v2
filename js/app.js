@@ -1,7 +1,7 @@
 // app.js — STEP 3B. 인증 흐름 최소 테스트 UI 연결.
 // 지도/사업장 등 실제 기능은 이후 STEP에서 추가한다 (CLAUDE.md 12절: 대규모 UI 금지).
 import { state } from './state.js';
-import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, verifySignupCode } from './auth.js';
+import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, verifySignupCode, checkIdExists } from './auth.js';
 import { initMap, clearMarkers } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
@@ -511,6 +511,39 @@ function bindEvents() {
       errorEl.textContent = err.message || '회원가입에 실패했습니다.';
     }
   });
+
+  // STEP16.5(아이디 중복확인). 입력을 멈추고 400ms 후 자동으로 서버(gnmap_v2_check_id_exists)에
+  // 확인한다 — 버튼 클릭 없이 자동 표시. 입력이 계속 바뀌면 이전 타이머는 취소해 마지막 값만 확인한다.
+  const signupIdInput = document.getElementById('signup-email');
+  const signupIdCheckMsg = document.getElementById('signup-id-check-msg');
+  if (signupIdInput && signupIdCheckMsg) {
+    let idCheckTimer = null;
+    let idCheckToken = 0;
+    signupIdInput.addEventListener('input', () => {
+      const value = signupIdInput.value.trim();
+      clearTimeout(idCheckTimer);
+      if (!value) {
+        signupIdCheckMsg.textContent = '';
+        signupIdCheckMsg.className = 'mobile-signup-match-msg';
+        return;
+      }
+      signupIdCheckMsg.textContent = '확인 중...';
+      signupIdCheckMsg.className = 'mobile-signup-match-msg is-checking';
+      const myToken = ++idCheckToken;
+      idCheckTimer = setTimeout(async () => {
+        try {
+          const exists = await checkIdExists(value);
+          if (myToken !== idCheckToken) return; // 그 사이 입력이 더 바뀌었으면 이 결과는 버린다.
+          signupIdCheckMsg.textContent = exists ? '이미 사용 중인 아이디입니다.' : '사용 가능한 아이디입니다.';
+          signupIdCheckMsg.className = 'mobile-signup-match-msg ' + (exists ? 'is-mismatch' : 'is-match');
+        } catch (err) {
+          if (myToken !== idCheckToken) return;
+          signupIdCheckMsg.textContent = '';
+          signupIdCheckMsg.className = 'mobile-signup-match-msg';
+        }
+      }, 400);
+    });
+  }
 
   // 비밀번호/비밀번호 확인 실시간 일치 여부 표시. 검증 로직(제출 시 최종 비교)과는 별개로
   // 순수 UI 피드백만 담당하며, 값이 실제로 일치하는지는 제출 시 다시 한 번 확인한다.
