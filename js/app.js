@@ -494,21 +494,79 @@ function bindEvents() {
     const passwordConfirm = document.getElementById('signup-password-confirm').value;
     const code = document.getElementById('signup-code').value.trim();
 
+    // STEP16.5(필수값 검증). form에 novalidate를 적용해 브라우저 기본 유효성 검사 팝업 대신
+    // 항상 한글 오류 메시지(errorEl)로 통일해서 보여준다 — 아래 개별 항목 검증들도 같은 이유.
+    if (!org || !name || !email || !password || !passwordConfirm || !code) {
+      errorEl.textContent = '모든 항목을 입력해주세요.';
+      return;
+    }
+
+    // STEP16.5(아이디 형식 제한). 영문/숫자만, 4~20자 — 합성 이메일 로컬파트로 안전하게 쓰일 수 있는
+    // 문자만 허용한다(공백/한글/특수문자 등으로 인한 가입 오류를 사전에 막음).
+    const ID_PATTERN = /^[a-zA-Z0-9]{4,20}$/;
+    if (!ID_PATTERN.test(email)) {
+      errorEl.textContent = '아이디는 영문, 숫자로 4~20자로 입력해주세요.';
+      return;
+    }
+
+    // STEP16.5(비밀번호 정책 강제). 영문/숫자/특수문자를 모두 포함한 8~20자.
+    const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,20}$/;
+    if (!PASSWORD_PATTERN.test(password)) {
+      errorEl.textContent = '비밀번호는 영문, 숫자, 특수문자를 모두 포함하여 8~20자로 입력해주세요.';
+      return;
+    }
+
     if (password !== passwordConfirm) {
       errorEl.textContent = '비밀번호가 일치하지 않습니다.';
       return;
     }
 
+    // STEP16.5(개인정보 수집·이용 동의).
+    const privacyAgree = document.getElementById('signup-privacy-agree');
+    if (privacyAgree && !privacyAgree.checked) {
+      errorEl.textContent = '개인정보 수집·이용에 동의해주세요.';
+      return;
+    }
+
+    // STEP16.5(중복 제출 방지). 요청이 끝날 때까지 제출 버튼을 비활성화해 중복 클릭으로 인한
+    // 중복 요청(중복 가입 시도 등)을 막는다. 성공/실패 어느 경우든 finally에서 항상 복구한다.
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    if (submitBtn) {
+      if (submitBtn.disabled) return;
+      submitBtn.dataset.originalHtml = submitBtn.innerHTML;
+      submitBtn.disabled = true;
+      submitBtn.textContent = '처리 중...';
+    }
+
     try {
-      const codeOk = await verifySignupCode(code);
-      if (!codeOk) {
-        errorEl.textContent = '인증번호가 올바르지 않습니다.';
+      // STEP16.5(인증번호 5회 실패 잠금). verifySignupCode()는 이제 { ok, locked, lockedUntil,
+      // attemptsLeft } 객체를 반환한다(과거의 boolean 반환에서 변경됨).
+      const result = await verifySignupCode(code);
+      if (result.locked) {
+        const mins = result.lockedUntil
+          ? Math.max(1, Math.ceil((new Date(result.lockedUntil).getTime() - Date.now()) / 60000))
+          : null;
+        errorEl.textContent = mins
+          ? `인증번호를 5회 잘못 입력하여 약 ${mins}분간 잠겼습니다. 잠시 후 다시 시도해주세요.`
+          : '인증번호를 5회 잘못 입력하여 일정 시간 잠겼습니다. 잠시 후 다시 시도해주세요.';
+        return;
+      }
+      if (!result.ok) {
+        const left = result.attemptsLeft;
+        errorEl.textContent = (left != null)
+          ? `인증번호가 올바르지 않습니다. (남은 시도 ${left}회)`
+          : '인증번호가 올바르지 않습니다.';
         return;
       }
       await signUp(email, password, `${org} ${name}`.trim());
       showView('view-signup-done');
     } catch (err) {
       errorEl.textContent = translateAuthError(err, '회원가입에 실패했습니다.');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        if (submitBtn.dataset.originalHtml != null) submitBtn.innerHTML = submitBtn.dataset.originalHtml;
+      }
     }
   });
 
