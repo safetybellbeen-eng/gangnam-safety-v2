@@ -2347,6 +2347,63 @@
     margin: 0;
     line-height: 0;
   }
+  /* STEP16.5(소속 드롭다운). 기존 input과 동일한 박스 스타일을 select에도 적용한다. */
+  .mobile-signup-field-input-wrap select {
+    width: 100%;
+    height: 52px;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 14px;
+    border: 1px solid #e6e9ef;
+    background: #f6f7f9;
+    padding: 0 16px 0 46px;
+    font-size: 14px;
+    font-weight: 400;
+    color: #1a2233;
+  }
+  .mobile-signup-field-input-wrap select:focus {
+    outline: none;
+    border-color: var(--gnmap-blue);
+    background: #fff;
+  }
+  /* STEP16.5(인증번호 안내문구 / 개인정보 동의 안내). 동적 검증 메시지(.mobile-signup-match-msg)와
+     구분되는, 항상 보이는 정적 안내문구용 스타일. */
+  .mobile-signup-hint {
+    display: block;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #8a93a3;
+    margin-top: 2px;
+  }
+  /* STEP16.5(개인정보 수집·이용 동의 체크박스). */
+  .mobile-signup-privacy-field {
+    gap: 4px;
+  }
+  .mobile-signup-privacy-check-wrap {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .mobile-signup-privacy-check-wrap input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin: 1px 0 0;
+    flex-shrink: 0;
+    accent-color: var(--gnmap-blue);
+  }
+  .mobile-signup-privacy-text {
+    font-size: 13px;
+    font-weight: 400;
+    color: #1a2233;
+    line-height: 1.5;
+  }
+  #app #mobile-signup-card #signup-form button[type="submit"]:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
   #mobile-signup-info {
     display: block;
     margin: 16px var(--gnmap-space-4) 0;
