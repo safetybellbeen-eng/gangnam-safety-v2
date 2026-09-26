@@ -10,7 +10,11 @@ const STATUS_VALUES = ['pending', 'approved', 'rejected', 'disabled'];
 const ROLE_VALUES = ['user', 'admin'];
 
 // 관리자가 아니면 조회 시도 자체를 하지 않는다 (RLS도 어차피 막지만 불필요한 요청을 만들지 않음).
+// STEP16.5(모바일 회원관리 UI): 조회 실패를 화면(에러 상태)에서도 구분할 수 있도록
+// state.adminLoadError 플래그를 추가한다 — 기존 PC 동작(실패 시 빈 배열 + console.error)은 그대로 유지.
 export async function loadUsers() {
+  state.adminLoadError = false;
+
   if (!isAdmin()) {
     state.adminUsers = [];
     return state.adminUsers;
@@ -24,6 +28,7 @@ export async function loadUsers() {
   if (error) {
     console.error('회원 목록 조회 실패:', error);
     state.adminUsers = [];
+    state.adminLoadError = true;
     return state.adminUsers;
   }
 
@@ -51,6 +56,25 @@ export async function setUserStatus(userId, status) {
   const row = state.adminUsers.find(u => u.id === userId);
   if (row) row.status = status;
   return { ok: true, message: '변경 완료' };
+}
+
+// STEP16.5 추가: "비밀번호 초기화" 액션. profiles 테이블/RLS를 직접 만지지 않고,
+// service_role이 필요한 실제 비밀번호 변경은 Edge Function(gnmap-v2-reset-password)에서만
+// 수행한다 — 관리자 검증도 그 함수 내부에서 서버 쪽으로 다시 확인한다(UI 숨김만 믿지 않음).
+export async function resetUserPassword(userId) {
+  const { data, error } = await sb.functions.invoke('gnmap-v2-reset-password', {
+    body: { user_id: userId }
+  });
+
+  if (error) {
+    console.error('비밀번호 초기화 실패:', error);
+    return { ok: false, message: '비밀번호 초기화에 실패했습니다.' };
+  }
+  if (!data || data.ok !== true || !data.tempPassword) {
+    console.error('비밀번호 초기화 응답 이상:', data);
+    return { ok: false, message: (data && data.message) || '비밀번호 초기화에 실패했습니다.' };
+  }
+  return { ok: true, tempPassword: data.tempPassword };
 }
 
 export async function setUserRole(userId, role) {
