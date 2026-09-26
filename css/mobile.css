@@ -91,8 +91,23 @@
 #mobile-login-guide,
 #mobile-login-footer,
 #mobile-login-password-toggle,
-#mobile-splash {
+#mobile-splash,
+#mobile-signup-header,
+#mobile-signup-intro,
+#mobile-signup-info,
+#mobile-signup-password-toggle,
+.mobile-required-star,
+.mobile-signup-label-text,
+.mobile-signup-submit-label {
   display: none;
+}
+
+/* 회원가입 필드의 아이콘+input 래퍼: PC에서는 박스를 만들지 않고(display:contents)
+   자식(숨김 아이콘 span + 실제 input)이 label의 flex 항목으로 그대로 승격되어, 기존
+   "<label>텍스트 <input></label>" 구조와 PC 렌더링이 사실상 동일하게 유지된다
+   (#site-filter-row/.site-list-meta와 동일한 원리). */
+.mobile-signup-field-input-wrap {
+  display: contents;
 }
 
 /* STEP15-E.2: 동/위치확인필요를 묶는 순수 wrapper. #site-filter-row와 동일한 원리로
@@ -2055,6 +2070,270 @@
     height: 100%;
     object-fit: cover;
     object-position: center;
+  }
+
+  /* ===================================================================
+     STEP16.5(회원가입) — 모바일 회원가입 화면. 로그인 화면(#view-login/
+     #mobile-login-*)과 완전히 분리된 selector만 사용해 login CSS와
+     충돌하지 않는다. login HERO/카드/스크롤 강제(min-height:100dvh)는
+     그대로 두고, 이 화면은 자연스러운 세로 스크롤을 허용한다(요청사항 17/18:
+     회원가입은 "한 화면에 다 넣기"를 목표로 하지 않는다). */
+  #app #view-signup {
+    max-width: none;
+    margin: 0;
+    padding: 0 0 40px;
+    background: #fff;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+  #app #view-signup > h1 {
+    display: none;
+  }
+  #mobile-signup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: calc(env(safe-area-inset-top, 0px) + 14px) var(--gnmap-space-4) 10px;
+  }
+  #mobile-signup-back {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    margin-left: -8px;
+    background: none;
+    border: none;
+    color: var(--gnmap-navy);
+    cursor: pointer;
+  }
+  #mobile-signup-back .mobile-icon-svg {
+    width: 22px;
+    height: 22px;
+  }
+  #mobile-signup-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+  #mobile-signup-brand img {
+    display: block;
+    height: 22px;
+    width: auto;
+  }
+  #mobile-signup-brand-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gnmap-navy);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
+  }
+  #mobile-signup-intro {
+    display: block;
+    padding: 6px var(--gnmap-space-4) 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
+  }
+  #mobile-signup-intro h1 {
+    margin: 0 0 10px;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--gnmap-navy);
+  }
+  #mobile-signup-intro p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.6;
+    color: #5b6472;
+  }
+  #mobile-signup-card {
+    margin: 20px var(--gnmap-space-4) 0;
+    background: #fff;
+    border: 1px solid #e6e9ef;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(15,42,82,0.05);
+  }
+  #app #mobile-signup-card #signup-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .mobile-signup-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--gnmap-navy);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
+  }
+  .mobile-required-star {
+    display: inline;
+    color: #e0402e;
+  }
+  .mobile-signup-label-text {
+    display: inline;
+  }
+  .signup-label-pc-only {
+    display: none;
+  }
+  .mobile-signup-field-input-wrap {
+    display: flex;
+    position: relative;
+    align-items: center;
+  }
+  .mobile-signup-field-input-wrap > .mobile-icon-svg-wrap {
+    display: flex;
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #8a93a3;
+    pointer-events: none;
+  }
+  .mobile-signup-field-input-wrap .mobile-icon-svg {
+    width: 19px;
+    height: 19px;
+  }
+  .mobile-signup-field-input-wrap input {
+    width: 100%;
+    height: 52px;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 14px;
+    border: 1px solid #e6e9ef;
+    background: #f6f7f9;
+    padding: 0 16px 0 46px;
+    font-size: 14px;
+    font-weight: 400;
+    color: #1a2233;
+  }
+  .mobile-signup-field-input-wrap input::placeholder {
+    color: #a3abb8;
+    font-weight: 400;
+  }
+  .mobile-signup-field-input-wrap input:focus {
+    outline: none;
+    border-color: var(--gnmap-blue);
+    background: #fff;
+  }
+  .mobile-signup-field-input-wrap input#signup-password {
+    padding-right: 48px;
+  }
+  .mobile-signup-field-input-wrap input#signup-password::-webkit-credentials-auto-fill-button,
+  .mobile-signup-field-input-wrap input#signup-password::-webkit-strong-password-auto-fill-button,
+  .mobile-signup-field-input-wrap input#signup-password::-webkit-caps-lock-indicator,
+  .mobile-signup-field-input-wrap input#signup-password::-webkit-contacts-auto-fill-button {
+    visibility: hidden;
+    display: none !important;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
+  }
+  .mobile-signup-field-input-wrap input#signup-password::-ms-reveal,
+  .mobile-signup-field-input-wrap input#signup-password::-ms-clear {
+    display: none;
+  }
+  #mobile-signup-password-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    background: none;
+    border: none;
+    padding: 8px;
+    color: #a3abb8;
+    cursor: pointer;
+  }
+  #mobile-signup-password-toggle.active {
+    color: var(--gnmap-blue);
+  }
+  #mobile-signup-password-toggle .mobile-icon-svg {
+    width: 18px;
+    height: 18px;
+  }
+  #app #mobile-signup-card #signup-form button[type="submit"] {
+    width: 100%;
+    height: 52px;
+    margin-top: 4px;
+    border: none;
+    border-radius: 14px;
+    background: var(--gnmap-blue);
+    color: #fff;
+    font-size: 17px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 8px 18px rgba(15,42,82,0.16);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
+  }
+  #app #mobile-signup-card #signup-form button[type="submit"] .signup-label-pc-only {
+    display: none;
+  }
+  #app #mobile-signup-card #signup-form button[type="submit"] .mobile-signup-submit-label {
+    display: inline;
+  }
+  #app #mobile-signup-card #signup-form button[type="submit"]:active {
+    background: #0f2247;
+  }
+  #mobile-signup-card #signup-error {
+    margin: 12px 2px 0;
+    font-size: 13px;
+  }
+  #mobile-signup-card #signup-error:empty {
+    margin: 0;
+    line-height: 0;
+  }
+  #mobile-signup-info {
+    display: block;
+    margin: 16px var(--gnmap-space-4) 0;
+    background: #eef4fb;
+    border-radius: 14px;
+    padding: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
+  }
+  #mobile-signup-info-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gnmap-navy);
+  }
+  #mobile-signup-info-title .mobile-icon-svg-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--gnmap-blue);
+    color: #fff;
+    flex-shrink: 0;
+  }
+  #mobile-signup-info-title .mobile-icon-svg {
+    width: 13px;
+    height: 13px;
+  }
+  #mobile-signup-info ul {
+    margin: 10px 0 0;
+    padding-left: 18px;
+    list-style: disc;
+  }
+  #mobile-signup-info li {
+    font-size: 13px;
+    line-height: 1.7;
+    color: #5b6472;
+  }
+  #mobile-signup-info li + li {
+    margin-top: 2px;
+  }
+  #view-signup #show-login {
+    display: none;
   }
 }
 
