@@ -672,6 +672,7 @@
          기존 PC 버튼(#btn-admin-panel 등)을 그대로 클릭 위임해 기존 로직만 재사용한다.
          renderMobileMoreMenu()(js/ui.js)가 #mobile-more-content를 채운다. -->
     <div id="mobile-view-more" class="mobile-view">
+      <h2 class="mobile-more-page-title">더보기</h2>
       <div id="mobile-more-content"></div>
     </div>
     <nav id="mobile-bottom-nav">
@@ -705,13 +706,10 @@
         </svg>
         <span>즐겨찾기</span>
       </button>
-      <button type="button" class="mobile-tab-btn" data-tab="alert">
-        <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M18 16v-5a6 6 0 1 0-12 0v5l-1.5 2.5h15L18 16Z"/>
-          <path d="M9.5 20a2.5 2.5 0 0 0 5 0"/>
-        </svg>
-        <span>알림</span>
-      </button>
+      <!-- STEP16.5 후속: 하단 5개 Nav로 확정하면서 "알림" 탭 버튼만 제거한다(요청사항).
+           data-mobile-tab="alert" 상태/CSS/#mobile-view-alert/#supervision-panel 재사용 로직은
+           전혀 건드리지 않았다 — 이제 이 상태로는 상단 헤더 벨(#mobile-header-alert-btn,
+           activateMobileTab('alert'))로만 진입한다(js/app.js 변경 없음). -->
       <button type="button" class="mobile-tab-btn" data-tab="more">
         <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
           <circle cx="5" cy="12" r="1.7"/>
