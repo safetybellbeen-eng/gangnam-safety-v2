@@ -1226,6 +1226,15 @@ export function renderPasswordChangePanel(containerId) {
       const result = await changePassword(current, next);
       if (!result.success) {
         errorEl.textContent = result.message;
+        // STEP16.11: 계정이 잠긴 경우, 잠금이 풀릴 때까지 다시 시도해도 서버 잠금 체크에서
+        // 매번 막히므로(추가 실패 카운트는 쌓이지 않는다) 버튼도 잠가 화면상으로 즉시 알 수
+        // 있게 한다 — 다시 열면(뒤로가기 후 재진입) 정상적으로 다시 시도할 수 있다.
+        if (result.locked) {
+          currentInput.value = '';
+          submitBtn.disabled = true;
+          submitBtn.textContent = '계정 잠김';
+          return;
+        }
         submitBtn.disabled = false;
         submitBtn.textContent = '비밀번호 변경';
         return;
