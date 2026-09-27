@@ -6,7 +6,7 @@ import { initMap, clearMarkers } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
-import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderMobileRouteView, renderMobileMoreMenu } from './ui.js';
+import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu } from './ui.js';
 import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
 
 const VIEWS = [
@@ -112,6 +112,7 @@ function activateMobileTab(tab) {
   // 표시 위치/크기는 css/mobile.css의 #app[data-mobile-tab="alert"] 규칙이 전체화면으로 override한다.
   if (tab === 'alert') {
     renderSupervisionPanel('supervision-panel');
+    renderSupervisionMobileHost();
   }
 
   // STEP15-D. 더보기 탭: 회원관리/엑셀업로드/감독일정/로그아웃 메뉴를 새로 구현하지 않고
@@ -130,6 +131,11 @@ function activateMobileTab(tab) {
       const panelEl = document.getElementById(id);
       if (panelEl) panelEl.style.display = 'none';
     });
+    // STEP16.5(모바일 감독일정관리): 다음에 다시 들어올 때는 항상 목록 화면부터 시작한다(등록/수정
+    // 도중 상태로 남아있지 않도록). 사용자가 보던 월/선택 날짜/필터(supervisionMobileMonthCursor/
+    // supervisionMobileSelectedDate/supervisionMobileQuickFilter)는 그대로 유지한다.
+    state.supervisionMobileView = 'list';
+    state.supervisionMobileSelectedId = null;
   }
 }
 
@@ -485,6 +491,7 @@ function bindEvents() {
     panel.style.display = willOpen ? 'block' : 'none';
     if (willOpen) {
       renderSupervisionPanel('supervision-panel');
+      renderSupervisionMobileHost();
     }
   });
 
