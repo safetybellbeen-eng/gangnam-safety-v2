@@ -12,6 +12,7 @@ import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecove
 import { importSitesToDatabase, previewImportImpact, loadUploadHistory } from './import.js';
 import { loadSupervisions, createSupervision, updateSupervision, deleteSupervision } from './supervision.js';
 import { isAdmin } from './auth.js';
+import { CONFIG } from './config.js';
 
 function displayValue(v) {
   return (v === null || v === undefined || v === '') ? '-' : v;
@@ -759,6 +760,14 @@ const MOBILE_MORE_ICON_PATHS = {
   calendar: ['<rect x="4" y="5" width="16" height="15" rx="2"/>', '<path d="M4 10h16"/>', '<path d="M8 3v4M16 3v4"/>'],
   logout: ['<path d="M10 4H6.5A2.5 2.5 0 0 0 4 6.5v11A2.5 2.5 0 0 0 6.5 20H10"/>', '<path d="M14 12H4.5"/>', '<path d="M11 8.5 14.5 12 11 15.5"/>'],
   chevron: ['<path d="M9 5.5 15 12l-6 6.5"/>'],
+  // STEP16.5 후속(더보기 화면 정비)에서 추가한 아이콘. 기존과 동일한 stroke 스타일을 따른다.
+  gear: ['<circle cx="12" cy="12" r="3"/>', '<path d="M12 3v2.5M12 18.5V21M4.2 4.2l1.8 1.8M18 18l1.8 1.8M3 12h2.5M18.5 12H21M4.2 19.8l1.8-1.8M18 6l1.8-1.8"/>'],
+  lock: ['<rect x="5" y="11" width="14" height="9" rx="2"/>', '<path d="M8 11V7a4 4 0 0 1 8 0v4"/>'],
+  bell: ['<path d="M18 16v-5a6 6 0 1 0-12 0v5l-1.5 2.5h15L18 16Z"/>', '<path d="M9.5 20a2.5 2.5 0 0 0 5 0"/>'],
+  book: ['<path d="M5.5 3H20v16H5.5A1.5 1.5 0 0 1 4 17.5v-13C4 3.7 4.7 3 5.5 3Z"/>', '<path d="M4 17.5A1.5 1.5 0 0 1 5.5 16H20"/>'],
+  question: ['<circle cx="12" cy="12" r="9"/>', '<path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1 .9-1 1.7"/>', '<path d="M12 17h.01"/>'],
+  headset: ['<path d="M4 13v-1a8 8 0 0 1 16 0v1"/>', '<rect x="3" y="13" width="4" height="6" rx="1.5"/>', '<rect x="17" y="13" width="4" height="6" rx="1.5"/>', '<path d="M19 19a4 4 0 0 1-4 3h-2"/>'],
+  info: ['<circle cx="12" cy="12" r="9"/>', '<path d="M12 11v5.5"/>', '<path d="M12 8h.01"/>'],
 };
 
 function buildMobileMoreIcon(name) {
@@ -793,14 +802,22 @@ function buildMobilePanelCloseBtn(panelId) {
   return btn;
 }
 
-// STEP15-D/E.6. 모바일 "더보기" 탭. 회원관리/엑셀업로드/업로드이력/감독일정/로그아웃을 새로
-// 구현하지 않고, 기존 PC 전용 버튼(#btn-admin-panel/#btn-upload-panel/#btn-supervision-panel/
-// #logout-approved)을 그대로 .click()으로 위임한다 — 그 버튼들에 이미 bindEvents()(js/app.js)가
-// 등록해 둔 기존 열기/렌더/권한 검사 로직을 그대로 재사용하고, 여기서는 어떤 데이터 조회나
-// RPC 호출도 직접 하지 않는다. "업로드 이력"도 별도 화면을 새로 만들지 않고 동일한 업로드 패널
-// (이미 상단에 이력을 보여준다)을 그대로 연다. STEP15-E.6: 메뉴를 관리/업무/계정 그룹으로
-// 나누고 행마다 아이콘 + chevron을 붙여 iOS/Android 설정화면과 비슷하게 정돈한다 —
-// isAdmin() 분기(관리자만 회원관리/엑셀업로드/업로드이력 노출)는 기존 그대로다.
+// STEP16.5 후속(더보기 화면 정비): 첨부 TARGET 이미지를 기준으로 재구성한다.
+// - PROFILE CARD: 실제 gnmap_v2_profiles 데이터(name/email/role)만 사용한다. DB에 기관/부서
+//   컬럼이 없으므로 TARGET의 "서울지방고용노동청/산업안전과" 같은 소속 2줄은 만들지 않고,
+//   기존 회원관리 화면과 동일하게 name("{지청} {실명}")에서 지청만 표시용으로 분리해 1줄만 보여준다.
+//   "내 정보 관리" 기능 자체가 프로젝트에 없으므로 카드는 클릭 동작 없이 시각적으로만 TARGET과 맞춘다.
+// - 계정/설정 카드(내 정보 관리/앱 설정/비밀번호 변경/알림 설정), 도움말 카드(이용 가이드/자주
+//   묻는 질문/문의하기)는 전부 미구현 기능이라 새로 만들지 않고, 클릭 핸들러 없는 정적 행으로만
+//   표시한다(완료 보고에서 "미구현"으로 명시).
+// - 관리자 메뉴 카드(회원관리/사업장 데이터 관리)는 기존 그대로 유지한다(admin만 노출, 기존
+//   #btn-admin-panel/#btn-upload-panel 클릭 위임 그대로).
+// - 이전에 있던 "업무 > 감독일정" 행은 제거한다 — 하단 "알림" 탭 제거와 함께 그 기능의 유일한
+//   진입점을 상단 헤더 벨(#mobile-header-alert-btn, 기존 그대로 activateMobileTab('alert') 호출)
+//   하나로 통일한다. supervision-panel/데이터/RPC는 전혀 건드리지 않는다.
+// - 버전 정보는 TARGET의 "v1.0.0"을 하드코딩하지 않고 CONFIG.APP_VERSION(config.js, sw.js의
+//   CACHE_VERSION과 동일한 값)을 그대로 표시한다.
+// - 로그아웃은 기존 #logout-approved 클릭 위임 그대로 재사용한다(새 handler 없음).
 export function renderMobileMoreMenu(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
@@ -808,82 +825,127 @@ export function renderMobileMoreMenu(containerId) {
 
   const profile = state.profile;
   const admin = isAdmin();
+  const { org: profileOrg, name: profileName } = splitOrgName(profile ? profile.name : '');
 
+  // PROFILE CARD — 클릭 가능한 "내 정보 관리" 기능이 없으므로 button이 아닌 순수 표시용 div로 만든다.
   const profileCard = document.createElement('div');
   profileCard.className = 'mobile-more-profile';
 
+  const avatar = document.createElement('div');
+  avatar.className = 'mobile-more-avatar';
+  avatar.appendChild(buildMobileMoreIcon('user'));
+  profileCard.appendChild(avatar);
+
+  const info = document.createElement('div');
+  info.className = 'mobile-more-info';
+
   const nameEl = document.createElement('div');
   nameEl.className = 'mobile-more-name';
-  nameEl.textContent = profile ? displayValue(profile.name) : '-';
+  nameEl.textContent = profile ? displayValue(profileName || profile.name) : '-';
   if (admin) {
     const badge = document.createElement('span');
     badge.className = 'mobile-more-admin-badge';
     badge.textContent = '관리자';
     nameEl.appendChild(badge);
   }
-  profileCard.appendChild(nameEl);
+  info.appendChild(nameEl);
 
-  const emailEl = document.createElement('div');
-  emailEl.className = 'mobile-more-email';
-  emailEl.textContent = profile ? displayValue(profile.email) : '-';
-  profileCard.appendChild(emailEl);
+  // 지청(소속) — 회원가입 시 입력한 값을 name에서 그대로 분리한 것으로, 별도 컬럼이나 부서
+  // 정보를 새로 만들지 않는다. 지청 값이 없으면(예: 초기 시드 관리자) 이 줄 자체를 생략한다.
+  if (profileOrg) {
+    const orgEl = document.createElement('div');
+    orgEl.className = 'mobile-more-org';
+    orgEl.textContent = profileOrg;
+    info.appendChild(orgEl);
+  }
+  profileCard.appendChild(info);
+
+  const profileChevron = document.createElement('span');
+  profileChevron.className = 'mobile-more-item-chevron';
+  profileChevron.appendChild(buildMobileMoreIcon('chevron'));
+  profileCard.appendChild(profileChevron);
 
   container.appendChild(profileCard);
 
-  // 그룹 제목(관리/업무/계정)은 시각적 분류일 뿐, admin 여부에 따라 항목이 비면 그룹 자체를
-  // 그리지 않는다(빈 "관리" 그룹 헤더가 일반 사용자에게 노출되지 않도록).
-  function addMenuGroup(title, items) {
+  // 그룹(카드) 렌더러. item.onClick이 없는 항목은 클릭 핸들러 없는 정적 행으로 그린다
+  // (아직 실제 기능이 없는 미구현 메뉴 — fake 동작을 넣지 않는다).
+  // item.value가 있으면 chevron 대신 우측에 값을 텍스트로 보여준다(예: 버전 정보).
+  function addMenuCard(title, items) {
     if (!items || items.length === 0) return;
 
-    const groupTitle = document.createElement('div');
-    groupTitle.className = 'mobile-more-group-title';
-    groupTitle.textContent = title;
-    container.appendChild(groupTitle);
+    if (title) {
+      const groupTitle = document.createElement('div');
+      groupTitle.className = 'mobile-more-group-title';
+      groupTitle.textContent = title;
+      container.appendChild(groupTitle);
+    }
 
     const group = document.createElement('div');
     group.className = 'mobile-more-menu';
 
     items.forEach(item => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'mobile-more-item' + (item.danger ? ' mobile-more-item-danger' : '');
+      const interactive = typeof item.onClick === 'function';
+      const row = document.createElement(interactive ? 'button' : 'div');
+      if (interactive) row.type = 'button';
+      row.className = 'mobile-more-item'
+        + (item.danger ? ' mobile-more-item-danger' : '')
+        + (interactive ? '' : ' mobile-more-item-static');
 
       const iconWrap = document.createElement('span');
       iconWrap.className = 'mobile-more-item-icon';
       iconWrap.appendChild(buildMobileMoreIcon(item.icon));
-      btn.appendChild(iconWrap);
+      row.appendChild(iconWrap);
 
       const labelEl = document.createElement('span');
       labelEl.className = 'mobile-more-item-label';
       labelEl.textContent = item.label;
-      btn.appendChild(labelEl);
+      row.appendChild(labelEl);
 
-      // 로그아웃은 다음 화면으로 "들어가는" 항목이 아니라 즉시 실행되는 동작이라
-      // drill-down을 뜻하는 chevron(>)을 붙이지 않는다.
-      if (!item.danger) {
+      if (item.value !== undefined) {
+        const valueEl = document.createElement('span');
+        valueEl.className = 'mobile-more-item-value';
+        valueEl.textContent = item.value;
+        row.appendChild(valueEl);
+      } else if (!item.danger) {
+        // 로그아웃은 다음 화면으로 "들어가는" 항목이 아니라 즉시 실행되는 동작이라
+        // drill-down을 뜻하는 chevron(>)을 붙이지 않는다.
         const chevronWrap = document.createElement('span');
         chevronWrap.className = 'mobile-more-item-chevron';
         chevronWrap.appendChild(buildMobileMoreIcon('chevron'));
-        btn.appendChild(chevronWrap);
+        row.appendChild(chevronWrap);
       }
 
-      btn.addEventListener('click', item.onClick);
-      group.appendChild(btn);
+      if (interactive) row.addEventListener('click', item.onClick);
+      group.appendChild(row);
     });
 
     container.appendChild(group);
   }
 
-  addMenuGroup('관리', admin ? [
-    { label: '회원 관리', icon: 'user', onClick: () => document.getElementById('btn-admin-panel').click() },
+  // 계정/설정 — 4개 항목 모두 아직 실제 기능이 없어 정적 행으로만 표시한다(미구현).
+  addMenuCard(null, [
+    { label: '내 정보 관리', icon: 'user' },
+    { label: '앱 설정', icon: 'gear' },
+    { label: '비밀번호 변경', icon: 'lock' },
+    { label: '알림 설정', icon: 'bell' },
+  ]);
+
+  // 도움말 — 3개 항목 모두 아직 실제 기능이 없어 정적 행으로만 표시한다(미구현).
+  addMenuCard(null, [
+    { label: '이용 가이드', icon: 'book' },
+    { label: '자주 묻는 질문', icon: 'question' },
+    { label: '문의하기', icon: 'headset' },
+  ]);
+
+  // 관리자 메뉴 — 기존 회원관리/사업장 데이터 관리 진입점을 그대로 유지한다(admin만 노출).
+  addMenuCard('관리자 메뉴', admin ? [
+    { label: '회원관리', icon: 'user', onClick: () => document.getElementById('btn-admin-panel').click() },
     { label: '사업장 데이터 관리', icon: 'upload', onClick: () => document.getElementById('btn-upload-panel').click() },
   ] : []);
 
-  addMenuGroup('업무', [
-    { label: '감독일정', icon: 'calendar', onClick: () => document.getElementById('btn-supervision-panel').click() },
-  ]);
-
-  addMenuGroup('계정', [
+  // 앱 정보 — 버전 정보(실제 CONFIG.APP_VERSION 값) + 로그아웃(기존 그대로).
+  addMenuCard(null, [
+    { label: '버전 정보', icon: 'info', value: CONFIG.APP_VERSION },
     { label: '로그아웃', icon: 'logout', danger: true, onClick: () => document.getElementById('logout-approved').click() },
   ]);
 }
