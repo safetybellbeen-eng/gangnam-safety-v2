@@ -425,7 +425,13 @@
     align-items: center;
     gap: var(--gnmap-space-2);
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    /* 사용자 피드백: 아이폰 사파리/PWA(홈화면추가)에서만 필터(summary)가 터치에 전혀
+       반응하지 않았다(PC 크롬 개발자도구의 모바일 에뮬레이션은 실제 iOS WebKit 엔진이
+       아니라 재현되지 않았다). -webkit-overflow-scrolling:touch + overflow-x:auto 조합은
+       iOS WebKit에서 자식 요소의 탭(click)을 가로채/삼켜버리는 오래된 알려진 버그가 있다.
+       iOS 13+는 이 속성 없이도 overflow:auto만으로 관성 스크롤을 기본 지원하므로 제거하고,
+       touch-action으로 "가로 스크롤 제스처만" 명시해 탭이 자식 버튼/summary에 정상 전달되게 한다. */
+    touch-action: pan-x;
     scrollbar-width: none;
   }
   #site-filter-row::-webkit-scrollbar {
