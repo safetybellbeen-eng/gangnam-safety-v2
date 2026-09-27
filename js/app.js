@@ -127,7 +127,7 @@ function activateMobileTab(tab) {
   // 패널 자체의 데이터/렌더 로직(admin.js/import.js/supervision.js)은 전혀 건드리지 않으며,
   // 여기서는 기존 열기/닫기 버튼과 동일하게 표시 여부(inline style)만 되돌린다.
   if ((previousTab === 'alert' || previousTab === 'more') && tab !== previousTab) {
-    ['admin-panel', 'upload-panel', 'supervision-panel', 'app-settings-panel', 'password-change-panel', 'notification-settings-panel'].forEach(id => {
+    ['admin-panel', 'upload-panel', 'supervision-panel', 'account-info-panel', 'app-settings-panel', 'password-change-panel', 'notification-settings-panel'].forEach(id => {
       const panelEl = document.getElementById(id);
       if (panelEl) panelEl.style.display = 'none';
     });
