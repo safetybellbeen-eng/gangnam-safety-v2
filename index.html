@@ -546,6 +546,7 @@
          화면이라(TARGET §34 "PC 영향 금지"), admin-panel처럼 매번 전체를 새로 그리는 빈
          컨테이너만 두고, 열기/닫기는 admin-panel/upload-panel과 동일하게 기존 "더보기" 탭
          (data-mobile-tab="more")에 머무른 채 display만 토글한다(js/app.js). -->
+    <div id="account-info-panel" style="display:none"></div>
     <div id="app-settings-panel" style="display:none"></div>
     <div id="password-change-panel" style="display:none"></div>
     <div id="notification-settings-panel" style="display:none"></div>
@@ -683,7 +684,6 @@
          기존 PC 버튼(#btn-admin-panel 등)을 그대로 클릭 위임해 기존 로직만 재사용한다.
          renderMobileMoreMenu()(js/ui.js)가 #mobile-more-content를 채운다. -->
     <div id="mobile-view-more" class="mobile-view">
-      <h2 class="mobile-more-page-title">더보기</h2>
       <div id="mobile-more-content"></div>
     </div>
     <nav id="mobile-bottom-nav">
