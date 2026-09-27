@@ -24,3 +24,20 @@
 #logout-approved { top: 8px; right: 8px; }
 #btn-current-location { top: 70px; left: 0; padding: 4px 12px; }
 #location-message { top: 100px; left: 0; padding: 4px 12px; color: #c0392b; font-size: 12px; }
+
+/* STEP16.19: 현재 위치 표시(js/location.js의 CustomOverlay 콘텐츠). 화면 픽셀 기준 고정
+   크기라 지도를 확대/축소해도 점 크기가 똑같이 유지된다(미터 단위 정확도 원(Circle)은
+   location.js에서 별도로, 더 옅게 유지). 방향(나침반) 원뿔은 방향 정보가 있을 때만 보인다. */
+.gnmap-current-location-marker {
+  pointer-events: none;
+}
+.gnmap-current-location-dot {
+  fill: #1a73e8;
+  stroke: #fff;
+  stroke-width: 3;
+}
+.gnmap-current-location-cone {
+  fill: rgba(26, 115, 232, 0.35);
+  transform-origin: 20px 20px;
+  transition: transform 0.15s linear, opacity 0.15s linear;
+}
