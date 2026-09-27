@@ -1357,9 +1357,10 @@ export function renderNotificationSettingsPanel(containerId) {
 // - PROFILE CARD: 실제 gnmap_v2_profiles 데이터(name/email/role)만 사용한다. DB에 기관/부서
 //   컬럼이 없으므로 TARGET의 "서울지방고용노동청/산업안전과" 같은 소속 2줄은 만들지 않고,
 //   기존 회원관리 화면과 동일하게 name("{지청} {실명}")에서 지청만 표시용으로 분리해 1줄만 보여준다.
-//   "내 정보 관리" 기능 자체가 프로젝트에 없으므로 카드는 클릭 동작 없이 시각적으로만 TARGET과 맞춘다.
-// - 계정/설정 카드(내 정보 관리/앱 설정/비밀번호 변경/알림 설정)는 전부 미구현 기능이라 새로
-//   만들지 않고, 클릭 핸들러 없는 정적 행으로만 표시한다(완료 보고에서 "미구현"으로 명시).
+//   STEP16.10: 카드를 누르면 "내 정보 관리"(#account-info-panel, 읽기전용 계정 정보) 화면으로
+//   들어간다 — 더보기 목록에 있던 정적 "내 정보 관리" 행은 이 카드가 대신하므로 제거했다.
+// - 계정/설정 카드(앱 설정/비밀번호 변경/알림 설정)는 실제 화면과 연결되며, 아직 실제 기능이
+//   없는 항목만 클릭 핸들러 없는 정적 행으로 표시한다.
 // - TARGET에 있던 도움말 카드(이용 가이드/자주 묻는 질문/문의하기)는 사용자 최종 지시에 따라
 //   미구현 표시조차 하지 않고 DOM에서 완전히 제거했다(새 FAQ/문의/가이드 기능 신규 구현 없음).
 //   그 결과 비는 자리에는 관리자 메뉴 카드를 배치해 정보 구조를 프로필 → 기본 설정 → 관리자
@@ -1381,9 +1382,12 @@ export function renderMobileMoreMenu(containerId) {
   const admin = isAdmin();
   const { org: profileOrg, name: profileName } = splitOrgName(profile ? profile.name : '');
 
-  // PROFILE CARD — 클릭 가능한 "내 정보 관리" 기능이 없으므로 button이 아닌 순수 표시용 div로 만든다.
-  const profileCard = document.createElement('div');
+  // PROFILE CARD — STEP16.10: 더보기 목록의 정적 "내 정보 관리" 행을 없애는 대신, 이 카드를
+  // 눌러 같은 화면(#account-info-panel)으로 들어가게 한다(button으로 변경).
+  const profileCard = document.createElement('button');
+  profileCard.type = 'button';
   profileCard.className = 'mobile-more-profile';
+  profileCard.addEventListener('click', () => openMobileOnlyPanel('account-info-panel', renderAccountInfoPanel));
 
   const avatar = document.createElement('div');
   avatar.className = 'mobile-more-avatar';
@@ -1486,7 +1490,7 @@ export function renderMobileMoreMenu(containerId) {
   // 패널과 동일하게 "더보기" 탭(data-mobile-tab="more")에 머무른 채 display만 토글하고,
   // 열 때마다 해당 render 함수를 새로 호출한다(PC 화면이 없는 모바일 전용 신규 패널이라
   // btn-admin-panel처럼 위임할 기존 PC 버튼이 없다 — 여기서 직접 열고 그린다).
-  // "내 정보 관리"는 여전히 실제 기능이 없어 정적 행으로 남긴다(미구현).
+  // STEP16.10: "내 정보 관리"는 정적 행에서 빠지고, 위 프로필 카드를 누르면 바로 열린다.
   function openMobileOnlyPanel(panelId, renderFn) {
     const panel = document.getElementById(panelId);
     if (!panel) return;
@@ -1494,7 +1498,6 @@ export function renderMobileMoreMenu(containerId) {
     renderFn(panelId);
   }
   addMenuCard(null, [
-    { label: '내 정보 관리', icon: 'user' },
     { label: '앱 설정', icon: 'gear', onClick: () => openMobileOnlyPanel('app-settings-panel', renderAppSettingsPanel) },
     { label: '비밀번호 변경', icon: 'lock', onClick: () => openMobileOnlyPanel('password-change-panel', renderPasswordChangePanel) },
     { label: '알림 설정', icon: 'bell', onClick: () => openMobileOnlyPanel('notification-settings-panel', renderNotificationSettingsPanel) },
@@ -1511,6 +1514,39 @@ export function renderMobileMoreMenu(containerId) {
     { label: '버전 정보', icon: 'info', value: CONFIG.APP_VERSION },
     { label: '로그아웃', icon: 'logout', danger: true, onClick: () => document.getElementById('logout-approved').click() },
   ]);
+}
+
+// STEP16.10: "내 정보 관리" — 더보기 목록의 정적(미구현) 행을 없애고, 상단 프로필 카드를
+// 누르면 열리는 화면으로 바꾼다. gnmap_v2_profiles에 실제로 존재하는 값(name/email/role)만
+// 읽기전용으로 보여준다 — 이름/이메일을 직접 수정하는 기능은 이 프로젝트에 없으므로 새로
+// 만들지 않는다(비밀번호만 별도의 "비밀번호 변경" 화면에서 이미 실제로 변경 가능).
+export function renderAccountInfoPanel(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+
+  const { header, backBtn } = buildSettingsSubHeader('내 정보 관리');
+  backBtn.addEventListener('click', () => { document.getElementById(containerId).style.display = 'none'; });
+  container.appendChild(header);
+
+  const subtitle = document.createElement('p');
+  subtitle.className = 'sv-mobile-subtitle';
+  subtitle.style.padding = '0 16px 12px';
+  subtitle.textContent = '등록된 계정 정보를 확인합니다.';
+  container.appendChild(subtitle);
+
+  const profile = state.profile;
+  const admin = isAdmin();
+  const { org: profileOrg, name: profileName } = splitOrgName(profile ? profile.name : '');
+
+  const rows = [
+    { icon: 'user', title: '이름', desc: profile ? displayValue(profileName || profile.name) : '-' },
+  ];
+  if (profileOrg) rows.push({ icon: 'briefcase', title: '소속', desc: profileOrg });
+  rows.push({ icon: 'info', title: '아이디', desc: profile ? displayValue(profile.email) : '-' });
+  rows.push({ icon: 'users', title: '권한', desc: admin ? '관리자' : '일반 사용자' });
+
+  container.appendChild(buildSettingsCard('user', '계정 정보', rows));
 }
 
 let searchDebounceTimer = null;
