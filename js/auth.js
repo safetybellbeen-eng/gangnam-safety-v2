@@ -93,8 +93,10 @@ export async function checkIdExists(id) {
 // 기기 토큰이 아니라 대상 계정의 합성 이메일(아이디)을 키로 서버(gnmap_v2_login_attempts)에서
 // 추적한다 — 브라우저를 바꿔도 동일 계정은 동일하게 잠긴다. Supabase Auth 자체의 내장
 // rate limit과는 별개로, 사용자에게 남은 시도/잠금 해제 시각을 안내하기 위한 용도다.
-export async function checkLoginLock(id) {
-  const email = toAuthEmail(id);
+// 아래 두 함수(*Email*)는 이미 실제 Auth 이메일(합성 이메일 포함)을 알고 있는 호출부용
+// 저수준 버전이다 — checkLoginLock/recordLoginResult(둘 다 순수 "아이디"를 받아 toAuthEmail로
+// 변환)와 changePassword(이미 user.email을 알고 있어 변환이 필요 없음)가 이 두 함수를 공유한다.
+async function checkEmailLock(email) {
   const { data, error } = await sb.rpc('gnmap_v2_check_login_lock', { p_email: email });
   if (error) throw error;
   return {
@@ -103,8 +105,7 @@ export async function checkLoginLock(id) {
   };
 }
 
-async function recordLoginResult(id, success) {
-  const email = toAuthEmail(id);
+async function recordEmailAttempt(email, success) {
   const { data, error } = await sb.rpc('gnmap_v2_record_login_result', { p_email: email, p_success: success });
   if (error) throw error;
   return {
@@ -112,6 +113,24 @@ async function recordLoginResult(id, success) {
     lockedUntil: data ? data.locked_until : null,
     attemptsLeft: data ? data.attempts_left : null,
   };
+}
+
+export async function checkLoginLock(id) {
+  return checkEmailLock(toAuthEmail(id));
+}
+
+async function recordLoginResult(id, success) {
+  return recordEmailAttempt(toAuthEmail(id), success);
+}
+
+// 잠금 해제까지 남은 시간을 사람이 읽을 수 있는 문구로 바꾼다(정확한 초 단위 카운트다운은
+// 만들지 않는다 — 분 단위 안내만으로 충분하고, 서버 시각 기준이라 클라이언트 시계 오차에도
+// 덜 민감하다).
+function formatLockRemaining(lockedUntil) {
+  if (!lockedUntil) return '잠시 후 다시 시도해주세요.';
+  const ms = new Date(lockedUntil).getTime() - Date.now();
+  const mins = Math.max(1, Math.ceil(ms / 60000));
+  return `${mins}분 후 다시 시도해주세요.`;
 }
 
 // signIn()은 이제 lockout 기록까지 함께 처리한다(app.js는 checkLoginLock()으로 시도 전
@@ -205,18 +224,49 @@ const AUTH_ERROR_MAP = [
 // 먼저 시도해 검증한 뒤에만 실제 변경(updateUser)을 수행한다 — TARGET처럼 "현재 비밀번호"를
 // 입력받아놓고 검증 없이 새 비밀번호만 반영하는 일은 하지 않는다. 비밀번호 값 자체는 이 함수
 // 안에서만 쓰이고 어디에도(DB/localStorage/console) 저장/로그하지 않는다.
-// 반환: { success:true } | { success:false, message }
+// 반환: { success:true } | { success:false, message, locked?:true, lockedUntil? }
+//
+// STEP16.11(보안 강화 — 현재 비밀번호 5회 오류 시 잠금). 로그인 화면과 동일한 5회 실패/10분
+// 잠금 정책(gnmap_v2_login_attempts, gnmap_v2_check_login_lock/gnmap_v2_record_login_result)을
+// 새 테이블 없이 그대로 재사용한다 — 계정 이메일을 키로 쓰므로, 로그인 화면에서 틀린 경우와
+// 비밀번호 변경 화면에서 틀린 경우가 같은 계정에 대해 잠금 횟수를 함께 누적한다(같은 계정을
+// 노리는 무차별 대입 시도는 진입 화면이 달라도 동일하게 막아야 한다).
 export async function changePassword(currentPassword, newPassword) {
   const { data: { user } } = await sb.auth.getUser();
   if (!user || !user.email) {
     return { success: false, message: '로그인 상태를 확인할 수 없습니다. 다시 로그인해주세요.' };
   }
 
+  // 0) 이미 잠긴 계정이면 재인증 시도 자체를 서버에 보내지 않는다(잠금 우회/추가 시도 방지).
+  let lockStatus;
+  try { lockStatus = await checkEmailLock(user.email); } catch (e) { lockStatus = { locked: false }; }
+  if (lockStatus.locked) {
+    return {
+      success: false,
+      locked: true,
+      lockedUntil: lockStatus.lockedUntil,
+      message: `현재 비밀번호를 여러 번 잘못 입력하여 계정이 일시적으로 잠겼습니다. ${formatLockRemaining(lockStatus.lockedUntil)}`,
+    };
+  }
+
   // 1) 현재 비밀번호 검증 — 실제 재인증. 실패하면 새 비밀번호로 진행하지 않는다.
   const { error: reauthError } = await sb.auth.signInWithPassword({ email: user.email, password: currentPassword });
   if (reauthError) {
-    return { success: false, message: '현재 비밀번호가 올바르지 않습니다.' };
+    let attempt = null;
+    try { attempt = await recordEmailAttempt(user.email, false); } catch (e) { /* 잠금 기록 실패는 재인증 실패 처리 자체를 막지 않는다 */ }
+    if (attempt && attempt.locked) {
+      return {
+        success: false,
+        locked: true,
+        lockedUntil: attempt.lockedUntil,
+        message: `현재 비밀번호를 5회 잘못 입력하여 계정이 일시적으로 잠겼습니다. ${formatLockRemaining(attempt.lockedUntil)}`,
+      };
+    }
+    const attemptsLeftText = attempt && attempt.attemptsLeft != null ? ` (남은 시도 ${attempt.attemptsLeft}회)` : '';
+    return { success: false, message: `현재 비밀번호가 올바르지 않습니다.${attemptsLeftText}` };
   }
+  // 재인증 성공 시 실패 카운트를 리셋한다(로그인 성공 시와 동일한 정책).
+  try { await recordEmailAttempt(user.email, true); } catch (e) { /* 리셋 실패는 무시 — 다음 시도 때 다시 시도 */ }
 
   // 2) 실제 비밀번호 변경.
   const { error: updateError } = await sb.auth.updateUser({ password: newPassword });
