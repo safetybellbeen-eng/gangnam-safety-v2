@@ -1653,6 +1653,38 @@
     font-weight: bold;
   }
 
+  /* 감독유형 필터(전체/점검/감독) — 상태 quick filter(.sv-mobile-filter-bar)와는 별도 축,
+     사용자 요청으로 분리되었다. 작은 라벨 + chip 조합으로, 위 필터보다 살짝 작게 둔다. */
+  .sv-mobile-type-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 16px 12px;
+    flex-wrap: wrap;
+  }
+  .sv-mobile-type-filter-label {
+    font-size: 12px;
+    color: #888;
+    flex: 0 0 auto;
+  }
+  .sv-mobile-type-filter-chip {
+    flex: 0 1 auto;
+    min-height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-pill);
+    background: #fff;
+    color: #555;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .sv-mobile-type-filter-chip.active {
+    border-color: var(--gnmap-amber);
+    background: var(--gnmap-amber-bg);
+    color: #8a5a00;
+    font-weight: bold;
+  }
+
   /* 선택 날짜 헤더 (2026. 09. 26. (토)   총 2건) */
   .sv-mobile-selected-date-row {
     display: flex;
@@ -1838,7 +1870,8 @@
   .sv-mobile-manager-select-btn.is-placeholder { color: var(--gnmap-text-meta); }
   .sv-mobile-manager-select-btn svg:first-child { width: 18px; height: 18px; flex-shrink: 0; color: var(--gnmap-text-sub); }
   .sv-mobile-manager-select-btn .sv-mobile-card-chevron { margin-left: auto; }
-  .sv-mobile-field-error {
+  .sv-mobile-field-error,
+  .sv-mobile-range-error {
     color: var(--gnmap-red);
     font-size: 12px;
     margin-top: 6px;
