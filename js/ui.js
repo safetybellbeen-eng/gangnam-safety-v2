@@ -11,7 +11,8 @@ import { parseExcelFile } from './excel.js';
 import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, buildLotQueries, runJusoNormalize, buildJusoQuery, runKakaoJusoRecovery, runRoadApproximateRecovery, extractApproximateStructure } from './geocoding.js';
 import { importSitesToDatabase, previewImportImpact, loadUploadHistory } from './import.js';
 import { loadSupervisions, createSupervision, updateSupervision, deleteSupervision } from './supervision.js';
-import { isAdmin } from './auth.js';
+import { isAdmin, changePassword } from './auth.js';
+import { requestCurrentLocation } from './location.js';
 import { CONFIG } from './config.js';
 
 function displayValue(v) {
@@ -765,6 +766,17 @@ const MOBILE_MORE_ICON_PATHS = {
   lock: ['<rect x="5" y="11" width="14" height="9" rx="2"/>', '<path d="M8 11V7a4 4 0 0 1 8 0v4"/>'],
   bell: ['<path d="M18 16v-5a6 6 0 1 0-12 0v5l-1.5 2.5h15L18 16Z"/>', '<path d="M9.5 20a2.5 2.5 0 0 0 5 0"/>'],
   info: ['<circle cx="12" cy="12" r="9"/>', '<path d="M12 11v5.5"/>', '<path d="M12 8h.01"/>'],
+  // STEP16.6(모바일 앱 설정/알림 설정) 추가 아이콘. 기존과 동일한 stroke 스타일, 새 아이콘
+  // 라이브러리 도입 없이 같은 방식(인라인 SVG path)으로만 추가한다.
+  pin: ['<path d="M12 21s7-7.2 7-12A7 7 0 0 0 5 9c0 4.8 7 12 7 12Z"/>', '<circle cx="12" cy="9" r="2.4"/>'],
+  refresh: ['<path d="M4 12a8 8 0 0 1 13.7-5.7L20 8.5"/>', '<path d="M20 4v4.5H15.5"/>', '<path d="M20 12a8 8 0 0 1-13.7 5.7L4 15.5"/>', '<path d="M4 20v-4.5H8.5"/>'],
+  database: ['<ellipse cx="12" cy="6" rx="7" ry="2.8"/>', '<path d="M5 6v6c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V6"/>', '<path d="M5 12v6c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8v-6"/>'],
+  briefcase: ['<rect x="3.5" y="8" width="17" height="11" rx="2"/>', '<path d="M8.5 8V6.5A2.5 2.5 0 0 1 11 4h2a2.5 2.5 0 0 1 2.5 2.5V8"/>', '<path d="M3.5 13h17"/>'],
+  clock: ['<circle cx="12" cy="12" r="9"/>', '<path d="M12 7.5V12l3.2 2"/>'],
+  megaphone: ['<path d="M4 10v4a1.5 1.5 0 0 0 1.5 1.5H7l3.5 4V4.5L7 8.5H5.5A1.5 1.5 0 0 0 4 10Z"/>', '<path d="M13.5 8a4.5 4.5 0 0 1 0 8"/>'],
+  users: ['<circle cx="9" cy="8" r="3"/>', '<path d="M3.5 19c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5"/>', '<circle cx="17" cy="9" r="2.4"/>', '<path d="M15.5 13.3c1.8.4 3 1.9 3 3.7"/>'],
+  eye: ['<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/>', '<circle cx="12" cy="12" r="2.8"/>'],
+  eyeOff: ['<path d="M3 3l18 18"/>', '<path d="M10.6 5.6A10.7 10.7 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a15.2 15.2 0 0 1-3 3.7"/>', '<path d="M6.6 6.6C4.2 8.1 2.5 10.5 2.5 12S6 18.5 12 18.5c1.3 0 2.5-.2 3.6-.6"/>', '<path d="M9.9 10a2.8 2.8 0 0 0 4 4"/>'],
 };
 
 function buildMobileMoreIcon(name) {
@@ -797,6 +809,491 @@ function buildMobilePanelCloseBtn(panelId) {
     if (panel) panel.style.display = 'none';
   });
   return btn;
+}
+
+function buildSettingsSubHeader(title) {
+  // §4: 새 Header component를 만들지 않고 기존 감독일정 모바일 sub-page 헤더
+  // (.sv-mobile-subheader/.sv-mobile-back-btn/.sv-mobile-subheader-title)를 그대로 재사용한다.
+  // "뒤로가기"는 admin/upload 패널의 ×와 달리, 열려 있는 패널(panelId)의 display만 되돌린다.
+  const header = document.createElement('div');
+  header.className = 'sv-mobile-subheader';
+  const backBtn = document.createElement('button');
+  backBtn.type = 'button';
+  backBtn.className = 'sv-mobile-back-btn';
+  backBtn.setAttribute('aria-label', '뒤로가기');
+  backBtn.appendChild(svIcon(SV_ICON_CHEVRON_LEFT));
+  header.appendChild(backBtn);
+  const titleEl = document.createElement('span');
+  titleEl.className = 'sv-mobile-subheader-title';
+  titleEl.textContent = title;
+  header.appendChild(titleEl);
+  return { header, backBtn };
+}
+
+// ============================================================
+// STEP16.6: 모바일 앱 설정/비밀번호 변경/알림 설정 — 로컬(이 기기/브라우저) 설정 저장소.
+// DB 테이블을 새로 만들지 않는다(TARGET 항목들은 계정 간 동기화가 필요한 정보가 아니라
+// "이 기기에서 앱을 어떻게 쓸지"에 대한 환경설정이므로 localStorage로 충분하다는 AUDIT 결론).
+// 키는 프로젝트 namespace 규칙(gnmap_v2_...)을 따른다. 읽기/쓰기 모두 try/catch로 감싸
+// localStorage를 쓸 수 없는 환경(프라이빗 모드 등)에서도 앱이 죽지 않고 기본값으로 동작한다.
+// ============================================================
+const APP_SETTINGS_KEY = 'gnmap_v2_app_settings';
+const NOTIFICATION_SETTINGS_KEY = 'gnmap_v2_notification_settings';
+
+const DEFAULT_APP_SETTINGS = {
+  mapStartLocation: 'gangnam', // 'gangnam' | 'current' — 기존 동작(강남구 중심 고정)을 기본값으로 유지, 규정변경 없음.
+  autoShowLocation: false,     // 지도 진입 시 현재 위치 자동 표시(끄면 기존과 동일하게 버튼 클릭 시에만 표시).
+};
+const DEFAULT_NOTIFICATION_SETTINGS = {
+  all: true,
+  supervision: true,
+  supervisionAdvanceDays: 1, // 0(당일) | 1 | 2 | 3
+  memberApproval: true,      // admin 전용 항목(값 자체는 저장하되, UI는 admin에게만 노출)
+  announcement: true,
+  dataProcessing: true,
+};
+
+function loadAppSettings() {
+  try {
+    const raw = localStorage.getItem(APP_SETTINGS_KEY);
+    return raw ? { ...DEFAULT_APP_SETTINGS, ...JSON.parse(raw) } : { ...DEFAULT_APP_SETTINGS };
+  } catch (e) {
+    return { ...DEFAULT_APP_SETTINGS };
+  }
+}
+function saveAppSettings(patch) {
+  const next = { ...loadAppSettings(), ...patch };
+  try { localStorage.setItem(APP_SETTINGS_KEY, JSON.stringify(next)); } catch (e) { /* 저장 불가 환경은 조용히 무시 — 이번 세션 동안만 적용된 값으로라도 동작 */ }
+  return next;
+}
+function loadNotificationSettings() {
+  try {
+    const raw = localStorage.getItem(NOTIFICATION_SETTINGS_KEY);
+    return raw ? { ...DEFAULT_NOTIFICATION_SETTINGS, ...JSON.parse(raw) } : { ...DEFAULT_NOTIFICATION_SETTINGS };
+  } catch (e) {
+    return { ...DEFAULT_NOTIFICATION_SETTINGS };
+  }
+}
+function saveNotificationSettings(patch) {
+  const next = { ...loadNotificationSettings(), ...patch };
+  try { localStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify(next)); } catch (e) { /* 위와 동일 */ }
+  return next;
+}
+// app.js가 로그인 직후(지도 초기화 전) 지도 시작 위치 설정만 필요할 때 쓰는 조회 전용 함수.
+export function getAppSettings() {
+  return loadAppSettings();
+}
+
+// iOS 스타일 pill 토글 스위치. <input type="checkbox">를 시각적으로 감춘 실제 상태 저장소로
+// 쓰고, 그 옆 <span>을 CSS로 스위치처럼 그린다(새 라이브러리 없이 순수 CSS 컴포넌트 1개 신설 —
+// 프로젝트에 기존 토글 UI가 없어 재사용할 대상이 없었다).
+function buildSettingsToggle(checked, onChange, disabled) {
+  const label = document.createElement('label');
+  label.className = 'settings-toggle' + (disabled ? ' is-disabled' : '');
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.checked = !!checked;
+  input.disabled = !!disabled;
+  input.addEventListener('change', () => onChange(input.checked));
+  const track = document.createElement('span');
+  track.className = 'settings-toggle-track';
+  label.appendChild(input);
+  label.appendChild(track);
+  return label;
+}
+
+// TARGET의 "현재 위치 >" / "1일 전 >" 처럼 값+chevron으로 보이는 버튼.
+function buildSettingsValueBtn(valueText, onClick) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'settings-value-btn';
+  const valueEl = document.createElement('span');
+  valueEl.textContent = valueText;
+  btn.appendChild(valueEl);
+  btn.appendChild(svIcon(SV_ICON_CHEVRON_RIGHT));
+  btn.addEventListener('click', onClick);
+  return btn;
+}
+
+// 카드 하나 + 그 안의 row들. control은 buildSettingsToggle/buildSettingsValueBtn 결과 엘리먼트.
+function buildSettingsCard(iconName, cardTitle, rows) {
+  const card = document.createElement('div');
+  card.className = 'settings-card';
+  const titleRow = document.createElement('div');
+  titleRow.className = 'settings-card-title';
+  titleRow.appendChild(buildMobileMoreIcon(iconName));
+  const titleText = document.createElement('span');
+  titleText.textContent = cardTitle;
+  titleRow.appendChild(titleText);
+  card.appendChild(titleRow);
+
+  rows.forEach(row => {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'settings-row' + (row.disabled ? ' is-disabled' : '');
+    const iconWrap = document.createElement('span');
+    iconWrap.className = 'settings-row-icon';
+    iconWrap.appendChild(buildMobileMoreIcon(row.icon));
+    rowEl.appendChild(iconWrap);
+
+    const textWrap = document.createElement('div');
+    textWrap.className = 'settings-row-text';
+    const titleLine = document.createElement('div');
+    titleLine.className = 'settings-row-title';
+    titleLine.textContent = row.title;
+    if (row.badge) {
+      const badge = document.createElement('span');
+      badge.className = 'settings-row-badge';
+      badge.textContent = row.badge;
+      titleLine.appendChild(badge);
+    }
+    textWrap.appendChild(titleLine);
+    if (row.desc) {
+      const descLine = document.createElement('div');
+      descLine.className = 'settings-row-desc';
+      descLine.textContent = row.desc;
+      textWrap.appendChild(descLine);
+    }
+    rowEl.appendChild(textWrap);
+
+    if (row.control) {
+      const controlWrap = document.createElement('div');
+      controlWrap.className = 'settings-row-control';
+      controlWrap.appendChild(row.control);
+      rowEl.appendChild(controlWrap);
+    }
+    card.appendChild(rowEl);
+  });
+  return card;
+}
+
+// TARGET의 "지도 시작 위치"/"감독일정 사전 알림"처럼 2~4개 중 하나를 고르는 작은 bottom sheet.
+// 기존 담당 감독관 선택 sheet(openSupervisionManagerSheet)와 동일하게 admin-sheet-overlay/
+// admin-sheet를 재사용하고, 검색 input 없는 단순 목록만 얹는다(새 sheet 컴포넌트 신설 없음).
+function openSettingsOptionSheet(title, options, currentValue, onSelect) {
+  const overlay = document.createElement('div');
+  overlay.className = 'admin-sheet-overlay';
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+  const sheet = document.createElement('div');
+  sheet.className = 'admin-sheet';
+  const titleEl = document.createElement('div');
+  titleEl.className = 'admin-sheet-name';
+  titleEl.textContent = title;
+  sheet.appendChild(titleEl);
+
+  options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'settings-sheet-option' + (opt.value === currentValue ? ' active' : '');
+    btn.textContent = opt.label;
+    btn.addEventListener('click', () => {
+      onSelect(opt.value);
+      overlay.remove();
+    });
+    sheet.appendChild(btn);
+  });
+
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+}
+
+// ============================================================
+// A. 앱 설정
+// ============================================================
+export function renderAppSettingsPanel(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+
+  const { header, backBtn } = buildSettingsSubHeader('앱 설정');
+  backBtn.addEventListener('click', () => { document.getElementById(containerId).style.display = 'none'; });
+  container.appendChild(header);
+
+  const subtitle = document.createElement('p');
+  subtitle.className = 'sv-mobile-subtitle';
+  subtitle.style.padding = '0 16px 12px';
+  subtitle.textContent = '산업안전 순찰지도의 사용 환경을 설정합니다.';
+  container.appendChild(subtitle);
+
+  const settings = loadAppSettings();
+  const MAP_START_LABEL = { gangnam: '강남구 기본 위치', current: '현재 위치' };
+
+  const mapStartBtn = buildSettingsValueBtn(MAP_START_LABEL[settings.mapStartLocation], () => {
+    openSettingsOptionSheet('지도 시작 위치', [
+      { value: 'gangnam', label: '강남구 기본 위치' },
+      { value: 'current', label: '현재 위치' },
+    ], settings.mapStartLocation, (value) => {
+      saveAppSettings({ mapStartLocation: value });
+      renderAppSettingsPanel(containerId);
+    });
+  });
+
+  const autoShowToggle = buildSettingsToggle(settings.autoShowLocation, (checked) => {
+    saveAppSettings({ autoShowLocation: checked });
+  });
+
+  const mapCard = buildSettingsCard('pin', '지도 설정', [
+    // 실제로 지도 재초기화가 필요한 설정이라(다음 접속부터 적용), 안내 문구로 명시한다.
+    { icon: 'pin', title: '지도 시작 위치', desc: '앱 실행 시 지도의 초기 위치를 설정합니다. (다음 접속부터 적용)', control: mapStartBtn },
+    { icon: 'pin', title: '현재 위치 자동 표시', desc: '지도 화면에서 내 위치를 자동으로 표시합니다.', control: autoShowToggle },
+  ]);
+  container.appendChild(mapCard);
+
+  // AUDIT 결과(완료 보고 §5 참고): 사업장 데이터는 이미 로그인/앱 실행마다 항상 새로 불러오고
+  // 있어(routeByProfile), 이 토글을 꺼도 실제로 달라지는 동작이 없다. 값 자체는 저장하되(다른
+  // 화면과의 일관성을 위해 TARGET 항목은 유지) 그 사실을 문구에 정직하게 밝힌다 — 끄면 알 수
+  // 없이 계속 최신 데이터를 받아오는데도 "꺼졌다"고 오해하게 만들지 않기 위함이다.
+  const autoRefreshToggle = buildSettingsToggle(true, () => {}, true);
+  const dataCard = buildSettingsCard('database', '데이터 설정', [
+    { icon: 'refresh', title: '앱 실행 시 데이터 자동 새로고침', desc: '현재 항상 최신 사업장 데이터를 불러오는 구조라 끌 수 있는 항목이 없습니다.', control: autoRefreshToggle },
+  ]);
+  container.appendChild(dataCard);
+}
+
+// ============================================================
+// B. 비밀번호 변경
+// ============================================================
+function buildPasswordField(labelText, placeholder) {
+  const field = document.createElement('div');
+  field.className = 'settings-field';
+  field.appendChild(svLabel(labelText, true));
+  const wrap = document.createElement('div');
+  wrap.className = 'settings-password-wrap';
+  const input = document.createElement('input');
+  input.type = 'password';
+  input.placeholder = placeholder;
+  input.autocomplete = 'new-password';
+  wrap.appendChild(input);
+  const toggleBtn = document.createElement('button');
+  toggleBtn.type = 'button';
+  toggleBtn.className = 'settings-password-eye-btn';
+  toggleBtn.setAttribute('aria-label', '비밀번호 표시/숨기기');
+  let showing = false;
+  toggleBtn.appendChild(buildMobileMoreIcon('eye'));
+  toggleBtn.addEventListener('click', () => {
+    showing = !showing;
+    input.type = showing ? 'text' : 'password';
+    toggleBtn.innerHTML = '';
+    toggleBtn.appendChild(buildMobileMoreIcon(showing ? 'eyeOff' : 'eye'));
+    toggleBtn.classList.toggle('active', showing);
+  });
+  wrap.appendChild(toggleBtn);
+  field.appendChild(wrap);
+  return { field, input };
+}
+
+export function renderPasswordChangePanel(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+
+  const { header, backBtn } = buildSettingsSubHeader('비밀번호 변경');
+  backBtn.addEventListener('click', () => { document.getElementById(containerId).style.display = 'none'; });
+  container.appendChild(header);
+
+  const subtitle = document.createElement('p');
+  subtitle.className = 'sv-mobile-subtitle';
+  subtitle.style.padding = '0 16px 12px';
+  subtitle.textContent = '계정 보안을 위해 새로운 비밀번호를 설정해주세요.';
+  container.appendChild(subtitle);
+
+  const noticeCard = document.createElement('div');
+  noticeCard.className = 'settings-notice-card';
+  noticeCard.appendChild(buildMobileMoreIcon('lock'));
+  const noticeText = document.createElement('span');
+  noticeText.textContent = '안전한 계정 사용을 위해 주기적으로 비밀번호를 변경해주세요.';
+  noticeCard.appendChild(noticeText);
+  container.appendChild(noticeCard);
+
+  const form = document.createElement('div');
+  form.className = 'settings-form';
+
+  const { field: currentField, input: currentInput } = buildPasswordField('현재 비밀번호', '현재 비밀번호를 입력해주세요.');
+  const { field: newField, input: newInput } = buildPasswordField('새 비밀번호', '새 비밀번호를 입력해주세요.');
+  const { field: confirmField, input: confirmInput } = buildPasswordField('새 비밀번호 확인', '새 비밀번호를 다시 입력해주세요.');
+  form.appendChild(currentField);
+  form.appendChild(newField);
+  form.appendChild(confirmField);
+
+  const errorEl = document.createElement('p');
+  errorEl.className = 'sv-mobile-field-error';
+  form.appendChild(errorEl);
+
+  const guideCard = document.createElement('div');
+  guideCard.className = 'settings-guide-card';
+  const guideTitle = document.createElement('div');
+  guideTitle.className = 'settings-guide-title';
+  guideTitle.textContent = '비밀번호 설정 안내';
+  guideCard.appendChild(guideTitle);
+  const guideList = document.createElement('ul');
+  // TARGET 안내문구를 실제 아래 validation 규칙과 동일하게 맞춘다(§16 — 안내와 실제 검증이
+  // 달라서는 안 됨). 이 프로젝트/Supabase 쪽에 그 외 별도 password policy가 없음을 auth.js
+  // AUTH_ERROR_MAP("password should be at least" 8자 매핑)로 확인했다.
+  ['영문, 숫자, 특수문자를 조합해주세요.', '8자 이상으로 설정해주세요.', '기존 비밀번호와 다른 비밀번호를 사용해주세요.']
+    .forEach(t => { const li = document.createElement('li'); li.textContent = t; guideList.appendChild(li); });
+  guideCard.appendChild(guideList);
+  form.appendChild(guideCard);
+
+  const submitBtn = document.createElement('button');
+  submitBtn.type = 'button';
+  submitBtn.className = 'sv-mobile-submit-btn';
+  submitBtn.textContent = '비밀번호 변경';
+  form.appendChild(submitBtn);
+  container.appendChild(form);
+
+  function validatePassword(pw) {
+    if (pw.length < 8) return '비밀번호는 8자 이상이어야 합니다.';
+    const hasLetter = /[A-Za-z]/.test(pw);
+    const hasDigit = /[0-9]/.test(pw);
+    const hasSpecial = /[^A-Za-z0-9]/.test(pw);
+    if (!(hasLetter && hasDigit && hasSpecial)) return '영문, 숫자, 특수문자를 모두 포함해주세요.';
+    return null;
+  }
+
+  submitBtn.addEventListener('click', async () => {
+    errorEl.textContent = '';
+    const current = currentInput.value;
+    const next = newInput.value;
+    const confirm = confirmInput.value;
+    if (!current) { errorEl.textContent = '현재 비밀번호를 입력해주세요.'; return; }
+    if (!next) { errorEl.textContent = '새 비밀번호를 입력해주세요.'; return; }
+    if (!confirm) { errorEl.textContent = '새 비밀번호 확인을 입력해주세요.'; return; }
+    const policyError = validatePassword(next);
+    if (policyError) { errorEl.textContent = policyError; return; }
+    if (next !== confirm) { errorEl.textContent = '새 비밀번호와 확인이 일치하지 않습니다.'; return; }
+    if (next === current) { errorEl.textContent = '기존 비밀번호와 다른 비밀번호를 사용해주세요.'; return; }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = '변경 중...';
+    try {
+      const result = await changePassword(current, next);
+      if (!result.success) {
+        errorEl.textContent = result.message;
+        submitBtn.disabled = false;
+        submitBtn.textContent = '비밀번호 변경';
+        return;
+      }
+      currentInput.value = ''; newInput.value = ''; confirmInput.value = '';
+      errorEl.classList.add('settings-success-text');
+      errorEl.textContent = '비밀번호가 변경되었습니다.';
+      submitBtn.disabled = false;
+      submitBtn.textContent = '비밀번호 변경';
+    } catch (err) {
+      console.error('비밀번호 변경 실패:', err);
+      errorEl.textContent = '비밀번호 변경 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+      submitBtn.disabled = false;
+      submitBtn.textContent = '비밀번호 변경';
+    }
+  });
+}
+
+// ============================================================
+// C. 알림 설정
+// ============================================================
+// AUDIT 결과(완료 보고 §9 참고): 이 프로젝트에는 실제 Web Push 인프라(Service Worker push
+// 이벤트 핸들러, VAPID 키, push subscription 저장, 발송 서버/Edge Function)가 전혀 없다
+// (sw.js에 'push'/'notificationclick' 리스너 자체가 없음, 확인됨). 그래서 아래 토글들은
+// "설정값 저장"까지만 하고 실제 알림 발송과는 연결하지 않는다 — TARGET UI만 보고 없는
+// 시스템을 있는 것처럼 구현하지 않는다(§23/§24 원칙).
+export function renderNotificationSettingsPanel(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+
+  const { header, backBtn } = buildSettingsSubHeader('알림 설정');
+  backBtn.addEventListener('click', () => { document.getElementById(containerId).style.display = 'none'; });
+  container.appendChild(header);
+
+  const subtitle = document.createElement('p');
+  subtitle.className = 'sv-mobile-subtitle';
+  subtitle.style.padding = '0 16px 12px';
+  subtitle.textContent = '필요한 업무 알림을 설정합니다.';
+  container.appendChild(subtitle);
+
+  const settings = loadNotificationSettings();
+  const admin = isAdmin();
+
+  // 전체 알림 마스터 토글 — §27: 끄면 하위 항목을 시각적으로만 비활성화하고, 저장된 값 자체는
+  // 그대로 둔다(다시 켜면 이전 선택이 복원되어야 하므로 하위 값을 지우지 않는다).
+  const allToggle = buildSettingsToggle(settings.all, (checked) => {
+    saveNotificationSettings({ all: checked });
+    renderNotificationSettingsPanel(containerId);
+  });
+  const allCard = buildSettingsCard('bell', '', [
+    { icon: 'bell', title: '전체 알림', desc: '산업안전 순찰지도의 모든 알림을 받습니다.', control: allToggle },
+  ]);
+  allCard.querySelector('.settings-card-title').remove(); // 이 카드는 TARGET처럼 제목줄 없이 단일 row만 표시.
+  container.appendChild(allCard);
+
+  const disabled = !settings.all;
+
+  const ADVANCE_LABEL = { 0: '당일', 1: '1일 전', 2: '2일 전', 3: '3일 전' };
+  const advanceBtn = buildSettingsValueBtn(ADVANCE_LABEL[settings.supervisionAdvanceDays] || '1일 전', () => {
+    if (disabled) return;
+    openSettingsOptionSheet('감독일정 사전 알림', [
+      { value: 0, label: '당일' }, { value: 1, label: '1일 전' }, { value: 2, label: '2일 전' }, { value: 3, label: '3일 전' },
+    ], settings.supervisionAdvanceDays, (value) => {
+      saveNotificationSettings({ supervisionAdvanceDays: value });
+      renderNotificationSettingsPanel(containerId);
+    });
+  });
+
+  const workRows = [
+    { icon: 'calendar', title: '감독일정 알림', desc: '예정된 감독일정을 알려드립니다.', disabled, control: buildSettingsToggle(settings.supervision, (c) => saveNotificationSettings({ supervision: c }), disabled) },
+    { icon: 'clock', title: '감독일정 사전 알림', desc: '감독일정 전에 미리 알려드립니다.', disabled, control: advanceBtn },
+  ];
+  // §28: role을 하드코딩하지 않고 isAdmin()(profile.role 기반)으로만 노출 여부를 결정한다.
+  // 일반 사용자에게는 관리자 전용 설정 자체를 아예 보여주지 않는다(§20 "불필요한 관리자 설정은
+  // 표시하지 않는 방향을 우선").
+  if (admin) {
+    workRows.push({ icon: 'users', title: '회원 승인 알림', badge: '관리자', desc: '신규 회원 승인 요청을 알려드립니다.', disabled, control: buildSettingsToggle(settings.memberApproval, (c) => saveNotificationSettings({ memberApproval: c }), disabled) });
+  }
+  container.appendChild(buildSettingsCard('briefcase', '업무 알림', workRows));
+
+  container.appendChild(buildSettingsCard('gear', '시스템 알림', [
+    { icon: 'megaphone', title: '공지사항', desc: '중요한 서비스 안내를 알려드립니다.', disabled, control: buildSettingsToggle(settings.announcement, (c) => saveNotificationSettings({ announcement: c }), disabled) },
+    { icon: 'database', title: '데이터 처리 알림', desc: '사업장 데이터 업로드 및 처리 결과를 알려드립니다.', disabled, control: buildSettingsToggle(settings.dataProcessing, (c) => saveNotificationSettings({ dataProcessing: c }), disabled) },
+  ]));
+
+  // §26: OS 알림 권한. 실제로 존재하는 Notification API 상태만 읽고, 없는 deep-link를
+  // 만들지 않는다 — "브라우저/기기 설정에서 직접 허용해주세요" 안내 텍스트로 대체.
+  const permCard = document.createElement('div');
+  permCard.className = 'settings-notice-card settings-notice-card-column';
+  const permHeader = document.createElement('div');
+  permHeader.className = 'settings-notice-card-header';
+  permHeader.appendChild(buildMobileMoreIcon('info'));
+  const permTitle = document.createElement('span');
+  permTitle.textContent = '알림 안내';
+  permHeader.appendChild(permTitle);
+  permCard.appendChild(permHeader);
+  const permText = document.createElement('p');
+  permText.textContent = '기기의 알림 권한이 꺼져 있으면 앱에서 알림을 설정해도 알림을 받을 수 없습니다.';
+  permCard.appendChild(permText);
+
+  const permBtn = document.createElement('button');
+  permBtn.type = 'button';
+  permBtn.className = 'settings-value-btn settings-permission-btn';
+  const supportsNotification = typeof window !== 'undefined' && 'Notification' in window;
+  function permLabel() {
+    if (!supportsNotification) return '이 브라우저는 알림을 지원하지 않습니다';
+    if (Notification.permission === 'granted') return '허용됨';
+    if (Notification.permission === 'denied') return '기기 설정에서 직접 허용해주세요';
+    return '기기 알림 설정 확인';
+  }
+  const permBtnLabel = document.createElement('span');
+  permBtnLabel.textContent = permLabel();
+  permBtn.appendChild(permBtnLabel);
+  if (supportsNotification && Notification.permission !== 'denied') permBtn.appendChild(svIcon(SV_ICON_CHEVRON_RIGHT));
+  permBtn.disabled = !supportsNotification || Notification.permission === 'denied';
+  permBtn.addEventListener('click', async () => {
+    if (!supportsNotification || Notification.permission !== 'default') return;
+    try {
+      await Notification.requestPermission();
+    } catch (e) { /* 무시 — 브라우저가 권한 요청 자체를 지원하지 않는 경우 */ }
+    permBtnLabel.textContent = permLabel();
+  });
+  permCard.appendChild(permBtn);
+  container.appendChild(permCard);
 }
 
 // STEP16.5 후속(더보기 화면 정비): 첨부 TARGET 이미지를 기준으로 재구성한다.
@@ -928,12 +1425,22 @@ export function renderMobileMoreMenu(containerId) {
     { label: '감독일정관리', icon: 'calendar', onClick: () => document.getElementById('mobile-header-alert-btn').click() },
   ]);
 
-  // 계정/설정 — 4개 항목 모두 아직 실제 기능이 없어 정적 행으로만 표시한다(미구현).
+  // STEP16.6: 앱 설정/비밀번호 변경/알림 설정 3개는 실제 화면과 연결한다(§6). admin/upload
+  // 패널과 동일하게 "더보기" 탭(data-mobile-tab="more")에 머무른 채 display만 토글하고,
+  // 열 때마다 해당 render 함수를 새로 호출한다(PC 화면이 없는 모바일 전용 신규 패널이라
+  // btn-admin-panel처럼 위임할 기존 PC 버튼이 없다 — 여기서 직접 열고 그린다).
+  // "내 정보 관리"는 여전히 실제 기능이 없어 정적 행으로 남긴다(미구현).
+  function openMobileOnlyPanel(panelId, renderFn) {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    panel.style.display = 'block';
+    renderFn(panelId);
+  }
   addMenuCard(null, [
     { label: '내 정보 관리', icon: 'user' },
-    { label: '앱 설정', icon: 'gear' },
-    { label: '비밀번호 변경', icon: 'lock' },
-    { label: '알림 설정', icon: 'bell' },
+    { label: '앱 설정', icon: 'gear', onClick: () => openMobileOnlyPanel('app-settings-panel', renderAppSettingsPanel) },
+    { label: '비밀번호 변경', icon: 'lock', onClick: () => openMobileOnlyPanel('password-change-panel', renderPasswordChangePanel) },
+    { label: '알림 설정', icon: 'bell', onClick: () => openMobileOnlyPanel('notification-settings-panel', renderNotificationSettingsPanel) },
   ]);
 
   // 관리자 메뉴 — 기존 회원관리/사업장 데이터 관리 진입점을 그대로 유지한다(admin만 노출).
