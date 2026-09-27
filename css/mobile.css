@@ -1483,9 +1483,24 @@
     background: #ccc;
   }
 
-  /* STEP15-D/E.6: 더보기 탭 — 로그인 사용자 정보 카드 + 관리/업무/계정 그룹 메뉴.
-     화이트/네이비/정부 블루 톤과 --gnmap-* 토큰을 다른 탭과 동일하게 재사용한다. */
+  /* STEP16.5 후속(더보기 화면 정비): TARGET 이미지 기준 큰 페이지 타이틀. index.html에
+     정적으로 둔 <h2 class="mobile-more-page-title">더보기</h2> 전용 스타일. */
+  .mobile-more-page-title {
+    font-size: 30px;
+    font-weight: 800;
+    color: var(--gnmap-navy);
+    margin: 4px 0 16px;
+    text-align: left;
+  }
+
+  /* STEP15-D/E.6, STEP16.5 후속: 더보기 탭 — 로그인 사용자 정보 카드 + 메뉴 카드들.
+     화이트/네이비/정부 블루 톤과 --gnmap-* 토큰을 다른 탭과 동일하게 재사용한다.
+     PROFILE CARD는 TARGET처럼 좌측 원형 avatar + 중앙 이름/소속 + 우측 chevron 구조로 바꾼다.
+     "내 정보 관리" 기능이 아직 없어 클릭 동작은 없다(완료 보고에서 별도 명시). */
   .mobile-more-profile {
+    display: flex;
+    align-items: center;
+    gap: 14px;
     background: #fff;
     border: 1px solid var(--gnmap-border);
     border-radius: var(--gnmap-radius-md);
@@ -1493,11 +1508,32 @@
     padding: 16px;
     margin-bottom: 20px;
   }
+  .mobile-more-avatar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--gnmap-blue-light);
+    color: var(--gnmap-blue);
+  }
+  .mobile-more-avatar .mobile-more-icon-svg {
+    width: 26px;
+    height: 26px;
+  }
+  .mobile-more-info {
+    flex: 1;
+    min-width: 0;
+  }
   .mobile-more-name {
     font-size: 16px;
     font-weight: bold;
     color: var(--gnmap-navy);
-    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .mobile-more-admin-badge {
     display: inline-block;
@@ -1510,9 +1546,16 @@
     font-weight: bold;
     vertical-align: middle;
   }
-  .mobile-more-email {
+  .mobile-more-org {
+    margin-top: 3px;
     font-size: 13px;
     color: var(--gnmap-text-sub);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mobile-more-profile .mobile-more-item-chevron {
+    flex-shrink: 0;
   }
 
   /* STEP15-E.6: 그룹 제목([관리]/[업무]/[계정])은 시각적 분류용 라벨일 뿐, 클릭 대상이 아니다. */
@@ -1590,6 +1633,24 @@
   }
   .mobile-more-item-danger .mobile-more-item-icon {
     color: #c0392b;
+  }
+  /* STEP16.5 후속: 아직 실제 기능이 없는 메뉴 행(내 정보 관리/앱 설정/비밀번호 변경/알림 설정/
+     이용 가이드/자주 묻는 질문/문의하기)은 <button>이 아닌 <div>로 그려지므로 클릭 가능한
+     것처럼 보이지 않게 포인터 커서를 기본값으로 되돌린다. 시각적 배치(아이콘/라벨/chevron)는
+     TARGET과 동일하게 유지한다. */
+  .mobile-more-item-static {
+    cursor: default;
+  }
+  /* STEP16.5 후속: "버전 정보"처럼 drill-down이 아니라 값만 보여주는 행의 우측 텍스트. */
+  .mobile-more-item-value {
+    flex-shrink: 0;
+    font-size: 13px;
+    color: var(--gnmap-text-meta);
+  }
+  /* 카드 사이 간격 — 메뉴 카드가 여러 개(계정/설정, 도움말, 관리자 메뉴, 앱 정보)로 늘어나면서
+     그룹 제목이 없는 카드끼리도 일정한 간격을 유지해야 한다. */
+  .mobile-more-menu + .mobile-more-menu {
+    margin-top: 20px;
   }
 
   /* ============================================================
