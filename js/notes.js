@@ -15,7 +15,7 @@ export async function loadNotes() {
 
   const { data, error } = await sb
     .from('gnmap_v2_site_notes')
-    .select('id, site_id, content, updated_at')
+    .select('id, site_id, content, created_at, updated_at')
     .eq('user_id', state.user.id);
 
   if (error) {
@@ -48,7 +48,7 @@ export async function saveNote(siteId, content) {
     const { data, error } = await sb
       .from('gnmap_v2_site_notes')
       .insert({ user_id: state.user.id, site_id: siteId, content: trimmed })
-      .select('id, site_id, content, updated_at')
+      .select('id, site_id, content, created_at, updated_at')
       .single();
 
     if (error) {
@@ -64,7 +64,7 @@ export async function saveNote(siteId, content) {
     .update({ content: trimmed })
     .eq('user_id', state.user.id)
     .eq('site_id', siteId)
-    .select('id, site_id, content, updated_at')
+    .select('id, site_id, content, created_at, updated_at')
     .single();
 
   if (error) {

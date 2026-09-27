@@ -15,8 +15,13 @@ export const state = {
   siteAccidentReportFilter: 'all', // 사용자 요청: "산재표" 필터(gnmap_v2_sites.accident_report_count 기준). 'all' | 'yes' | 'no'.
   favoriteSiteIds: new Set(), // 현재 로그인 사용자가 즐겨찾기한 site id 집합
   favoriteInFlight: new Set(), // 토글 요청이 진행 중인 site id (rapid click 중복 방지)
-  siteNotes: new Map(),   // siteId -> gnmap_v2_site_notes 행 (id/site_id/content/updated_at). 없으면 키가 없음.
+  siteNotes: new Map(),   // siteId -> gnmap_v2_site_notes 행 (id/site_id/content/created_at/updated_at). 없으면 키가 없음.
   noteInFlight: new Set(), // 저장/삭제 요청이 진행 중인 site id (동시 요청 중복 방지)
+  // 모바일 "더보기 > 현장 메모" 화면 전용 상태(STEP16.23). 기존 site-detail 메모 CRUD/데이터는
+  // 그대로 두고, 이 화면은 조회/검색/필터/작성 진입점만 새로 추가한다.
+  siteNotesFilter: 'all',        // 'all' | 'recent-created' | 'recent-updated'
+  siteNotesSearchQuery: '',      // 현장명/메모 내용 검색어
+  siteNotesWriteSiteId: null,    // "현장 메모 작성" 화면에서 현재 선택된 site id (미선택 시 null)
   currentLocation: null,     // { lat, lng } 사용자가 버튼을 눌러 가져온 현재 위치. 자동 추적 없음.
   currentLocationMarker: null, // 현재 위치 표시 객체 (사업장 marker와 분리 관리, location.js 전용)
   locationRequestInFlight: false, // Geolocation 요청 진행 중 여부 (버튼 중복 클릭 방지)

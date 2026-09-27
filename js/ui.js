@@ -264,6 +264,458 @@ function closeNoteModal() {
   const overlay = document.getElementById('site-note-modal-overlay');
   if (overlay) overlay.remove();
   document.removeEventListener('keydown', handleNoteModalKeydown);
+  // STEP16.23: "더보기 > 현장 메모" 목록에서 카드를 눌러 이 모달로 열람/수정/삭제한 경우,
+  // 모달을 닫을 때 목록(전체 건수/미리보기/날짜/"수정됨" 배지)도 최신 상태로 다시 그린다.
+  // 목록 패널이 열려있지 않으면(예: 현장 상세에서 연 경우) 아무 일도 하지 않는다.
+  const notesPanel = document.getElementById('site-notes-panel');
+  if (notesPanel && notesPanel.style.display !== 'none') {
+    renderSiteNotesPanel('site-notes-panel');
+  }
+}
+
+// ============================================================
+// STEP16.23: 더보기 > "현장 메모" — 기존 현장별 개인 메모(gnmap_v2_site_notes)를 한곳에서
+// 조회/검색/필터하고, 새 메모 작성 진입점을 제공하는 모바일 전용 화면.
+// - 데이터/CRUD는 전부 notes.js(getNote/saveNote/deleteNote)와 state.siteNotes를 그대로
+//   재사용한다. 이 화면에서 만드는 것은 "조회 UI"뿐이며, 새 테이블/새 CRUD 로직은 없다.
+// - 카드를 누르면 기존 개인 메모 팝업(openNoteModal, 현장 상세와 완전히 동일한 UI/로직)을
+//   그대로 연다 — 새로운 상세/수정 화면을 중복으로 만들지 않는다.
+// - "+"로 여는 작성 화면은 gnmap_v2_site_notes가 UNIQUE(user_id, site_id)라서 이미 메모가
+//   있는 현장을 고르면 그 메모 내용을 그대로 불러와 보여주고, 저장 시 saveNote()의 기존
+//   insert-or-update 로직에 맡긴다 — 여기서 별도로 중복 INSERT 여부를 분기하지 않는다.
+// ============================================================
+
+// state.siteNotes(Map) + state.sites를 조인해 표시용 배열로 만든다. 참조하는 site가
+// 목록에 없으면(이론상 FK RESTRICT라 발생하지 않지만) 조용히 제외한다.
+function getSiteNotesJoined() {
+  const rows = [];
+  state.siteNotes.forEach((note, siteId) => {
+    const site = state.sites.find(s => s.id === siteId);
+    if (!site) return;
+    rows.push({ ...note, site });
+  });
+  return rows;
+}
+
+function openSiteNotesPanel() {
+  const panel = document.getElementById('site-notes-panel');
+  if (!panel) return;
+  panel.style.display = 'block';
+  renderSiteNotesPanel('site-notes-panel');
+}
+
+function renderSiteNotesPanel(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+  container.appendChild(buildMobilePanelCloseBtn(containerId));
+
+  const header = document.createElement('div');
+  header.className = 'sv-mobile-header';
+  const titleWrap = document.createElement('div');
+  titleWrap.className = 'sv-mobile-header-titlewrap';
+  const titleEl = document.createElement('h2');
+  titleEl.className = 'sv-mobile-title';
+  titleEl.textContent = '현장 메모';
+  titleWrap.appendChild(titleEl);
+  const subtitleEl = document.createElement('p');
+  subtitleEl.className = 'sv-mobile-subtitle';
+  subtitleEl.textContent = '현장에서 작성한 메모를 한곳에서 관리합니다.';
+  titleWrap.appendChild(subtitleEl);
+  header.appendChild(titleWrap);
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'sv-mobile-add-btn';
+  addBtn.setAttribute('aria-label', '현장 메모 작성');
+  addBtn.appendChild(svIcon(SV_ICON_PLUS));
+  addBtn.addEventListener('click', () => openSiteNotesWritePanel(null));
+  header.appendChild(addBtn);
+  container.appendChild(header);
+
+  const allNotes = getSiteNotesJoined();
+
+  const summary = document.createElement('div');
+  summary.className = 'site-notes-summary';
+  const summaryLabel = document.createElement('span');
+  summaryLabel.className = 'site-notes-summary-label';
+  summaryLabel.appendChild(svIcon(SV_ICON_DOC));
+  const summaryLabelText = document.createElement('span');
+  summaryLabelText.textContent = '전체 메모';
+  summaryLabel.appendChild(summaryLabelText);
+  summary.appendChild(summaryLabel);
+  const summaryCount = document.createElement('span');
+  summaryCount.className = 'site-notes-summary-count';
+  summaryCount.textContent = `${allNotes.length}건`;
+  summary.appendChild(summaryCount);
+  container.appendChild(summary);
+
+  const searchWrap = document.createElement('div');
+  searchWrap.className = 'site-notes-search-wrap';
+  const searchIcon = document.createElement('span');
+  searchIcon.className = 'site-notes-search-icon';
+  searchIcon.appendChild(svIcon(SV_ICON_SEARCH));
+  searchWrap.appendChild(searchIcon);
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.className = 'site-notes-search-input';
+  searchInput.placeholder = '현장명 또는 메모 내용을 검색하세요.';
+  searchInput.value = state.siteNotesSearchQuery;
+  searchInput.addEventListener('input', () => {
+    state.siteNotesSearchQuery = searchInput.value;
+    renderSiteNotesList();
+  });
+  searchWrap.appendChild(searchInput);
+  container.appendChild(searchWrap);
+
+  const filterRow = document.createElement('div');
+  filterRow.className = 'site-notes-filter-row';
+  const filters = [
+    { value: 'all', label: '전체' },
+    { value: 'recent-created', label: '최근 작성' },
+    { value: 'recent-updated', label: '최근 수정' },
+  ];
+  filters.forEach(f => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'site-notes-filter-chip' + (state.siteNotesFilter === f.value ? ' active' : '');
+    chip.textContent = f.label;
+    chip.addEventListener('click', () => {
+      state.siteNotesFilter = f.value;
+      renderSiteNotesPanel(containerId); // 칩 활성 표시도 함께 갱신해야 하므로 목록만이 아니라 전체를 다시 그린다.
+    });
+    filterRow.appendChild(chip);
+  });
+  container.appendChild(filterRow);
+
+  const listWrap = document.createElement('div');
+  listWrap.id = 'site-notes-list';
+  listWrap.className = 'site-notes-list';
+  container.appendChild(listWrap);
+
+  // 검색/정렬만 바뀔 때는 목록 부분만 다시 그린다(검색 input 포커스 유지).
+  function renderSiteNotesList() {
+    const listEl = document.getElementById('site-notes-list');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+
+    const query = (state.siteNotesSearchQuery || '').trim();
+    let rows = allNotes.filter(n => {
+      if (!query) return true;
+      const name = n.site.site_name || n.site.company_name || '';
+      return name.includes(query) || (n.content || '').includes(query);
+    });
+
+    if (state.siteNotesFilter === 'recent-created') {
+      rows = rows.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    } else {
+      // '전체'/'최근 수정' 모두 최신 수정순 — "전체"의 기본 정렬 기준으로도 자연스럽다.
+      rows = rows.slice().sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+    }
+
+    if (rows.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'sv-mobile-empty';
+      const emptyIcon = svIcon(SV_ICON_DOC);
+      emptyIcon.style.width = '32px';
+      emptyIcon.style.height = '32px';
+      empty.appendChild(emptyIcon);
+      if (allNotes.length === 0) {
+        const line1 = document.createElement('p');
+        line1.textContent = '작성된 현장 메모가 없습니다.';
+        empty.appendChild(line1);
+        const line2 = document.createElement('p');
+        line2.textContent = '현장에서 확인한 내용을 메모로 남겨보세요.';
+        empty.appendChild(line2);
+        const cta = document.createElement('button');
+        cta.type = 'button';
+        cta.className = 'sv-mobile-empty-cta';
+        cta.appendChild(svIcon(SV_ICON_PLUS));
+        const ctaText = document.createElement('span');
+        ctaText.textContent = '현장 메모 작성';
+        cta.appendChild(ctaText);
+        cta.addEventListener('click', () => openSiteNotesWritePanel(null));
+        empty.appendChild(cta);
+      } else {
+        const line1 = document.createElement('p');
+        line1.textContent = '검색 결과가 없습니다.';
+        empty.appendChild(line1);
+      }
+      listEl.appendChild(empty);
+      return;
+    }
+
+    rows.forEach(n => listEl.appendChild(buildSiteNoteCard(n)));
+  }
+
+  renderSiteNotesList();
+}
+
+// 메모 미리보기 2줄 말줄임 + 날짜 + "수정됨"(updated_at이 created_at보다 1초 이상 뒤일 때만) 배지.
+// 카드를 누르면 새 상세/수정 화면을 만들지 않고 기존 개인 메모 팝업(openNoteModal)을 그대로 연다.
+function buildSiteNoteCard(n) {
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = 'sv-mobile-card site-notes-card';
+  card.addEventListener('click', () => openNoteModal(n.site.id));
+
+  const top = document.createElement('div');
+  top.className = 'sv-mobile-card-top';
+  const icon = document.createElement('span');
+  icon.className = 'site-notes-card-icon';
+  icon.appendChild(svIcon(SV_ICON_DOC));
+  top.appendChild(icon);
+  card.appendChild(top);
+
+  const title = document.createElement('div');
+  title.className = 'sv-mobile-card-title';
+  title.textContent = n.site.site_name || n.site.company_name || '-';
+  card.appendChild(title);
+
+  const preview = document.createElement('div');
+  preview.className = 'site-notes-card-preview';
+  preview.textContent = n.content || '';
+  card.appendChild(preview);
+
+  const metaRow = document.createElement('div');
+  metaRow.className = 'sv-mobile-card-meta-row';
+  const dateEl = document.createElement('span');
+  dateEl.textContent = formatUploadDateTime(n.updated_at);
+  metaRow.appendChild(dateEl);
+
+  const created = n.created_at ? new Date(n.created_at).getTime() : NaN;
+  const updated = n.updated_at ? new Date(n.updated_at).getTime() : NaN;
+  if (!Number.isNaN(created) && !Number.isNaN(updated) && updated - created > 1000) {
+    const badge = document.createElement('span');
+    badge.className = 'site-notes-modified-badge';
+    badge.textContent = '수정됨';
+    metaRow.appendChild(badge);
+  }
+  card.appendChild(metaRow);
+
+  const chevron = document.createElement('span');
+  chevron.className = 'sv-mobile-card-chevron';
+  chevron.appendChild(svIcon(SV_ICON_CHEVRON_RIGHT));
+  card.appendChild(chevron);
+
+  return card;
+}
+
+// ============================================================
+// "현장 메모 작성" — 새 메모 작성(현장 미선택 상태로 진입) 전용 화면. 이미 메모가 있는 현장을
+// 고르면(UNIQUE(user_id, site_id)) 그 메모를 그대로 불러와 보여주고, 저장은 saveNote()의
+// 기존 insert-or-update 로직에 맡긴다(이 화면이 insert/update를 직접 분기하지 않는다).
+// ============================================================
+function openSiteNotesWritePanel(siteId) {
+  state.siteNotesWriteSiteId = siteId;
+  const listPanel = document.getElementById('site-notes-panel');
+  if (listPanel) listPanel.style.display = 'none';
+  const writePanel = document.getElementById('site-notes-write-panel');
+  if (!writePanel) return;
+  writePanel.style.display = 'block';
+  renderSiteNotesWritePanel('site-notes-write-panel');
+}
+
+function closeSiteNotesWritePanel() {
+  const writePanel = document.getElementById('site-notes-write-panel');
+  if (writePanel) writePanel.style.display = 'none';
+  state.siteNotesWriteSiteId = null;
+  openSiteNotesPanel(); // 목록으로 복귀 + 최신 데이터로 다시 렌더(방금 저장한 메모 즉시 반영).
+}
+
+function renderSiteNotesWritePanel(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+
+  const { header, backBtn } = buildSettingsSubHeader('현장 메모 작성');
+  backBtn.addEventListener('click', () => closeSiteNotesWritePanel());
+  container.appendChild(header);
+
+  const form = document.createElement('div');
+  form.className = 'sv-mobile-field';
+
+  // 현장 선택
+  const siteField = document.createElement('div');
+  siteField.appendChild(svLabel('현장 선택', true));
+  const selectedSite = state.siteNotesWriteSiteId
+    ? state.sites.find(s => s.id === state.siteNotesWriteSiteId)
+    : null;
+  const selectBtn = document.createElement('button');
+  selectBtn.type = 'button';
+  selectBtn.className = 'site-notes-select-field';
+  const selectIcon = document.createElement('span');
+  selectIcon.className = 'site-notes-select-field-icon';
+  selectIcon.appendChild(svIcon(SV_ICON_BUILDING));
+  selectBtn.appendChild(selectIcon);
+  const selectText = document.createElement('span');
+  selectText.className = 'site-notes-select-field-text' + (selectedSite ? '' : ' is-placeholder');
+  selectText.textContent = selectedSite
+    ? (selectedSite.site_name || selectedSite.company_name || '-')
+    : '현장을 선택해주세요.';
+  selectBtn.appendChild(selectText);
+  const selectChevron = document.createElement('span');
+  selectChevron.className = 'site-notes-select-field-chevron';
+  selectChevron.appendChild(svIcon(SV_ICON_CHEVRON_RIGHT));
+  selectBtn.appendChild(selectChevron);
+  selectBtn.addEventListener('click', () => {
+    openSiteNoteSitePickerSheet((site) => {
+      state.siteNotesWriteSiteId = site.id;
+      renderSiteNotesWritePanel(containerId);
+    });
+  });
+  siteField.appendChild(selectBtn);
+
+  const existingNote = selectedSite ? getNote(selectedSite.id) : null;
+  if (existingNote) {
+    const hint = document.createElement('p');
+    hint.className = 'site-notes-existing-hint';
+    hint.textContent = '이미 작성된 메모가 있어 불러왔습니다. 내용을 수정하고 저장할 수 있습니다.';
+    siteField.appendChild(hint);
+  }
+  form.appendChild(siteField);
+
+  // 메모 입력
+  const noteField = document.createElement('div');
+  noteField.appendChild(svLabel('메모', true));
+  const textarea = document.createElement('textarea');
+  textarea.id = 'site-notes-write-textarea';
+  textarea.className = 'site-notes-textarea';
+  textarea.maxLength = 1000;
+  textarea.placeholder = '현장에서 확인한 내용이나 추가 확인이 필요한 사항을\n입력해주세요.';
+  textarea.value = existingNote ? existingNote.content : '';
+  noteField.appendChild(textarea);
+  const counter = document.createElement('div');
+  counter.className = 'site-notes-char-counter';
+  counter.textContent = `${textarea.value.length} / 1000`;
+  textarea.addEventListener('input', () => {
+    counter.textContent = `${textarea.value.length} / 1000`;
+    updateSaveBtnState();
+  });
+  noteField.appendChild(counter);
+  form.appendChild(noteField);
+
+  container.appendChild(form);
+
+  // 안내 카드 — 기존 앱 설정/알림 설정 화면과 동일한 안내 카드 컴포넌트를 재사용한다.
+  const guideCard = document.createElement('div');
+  // 사용자 확정 시안: 이 안내 카드는 옅은 파란색(Light Blue) 배경이어야 한다. 기존
+  // .settings-notice-card-column 변형은 배경을 회색(--gnmap-bg-soft)으로 바꾸는 다른 화면
+  // (알림 설정의 "알림 안내") 전용 스타일이라, 여기서는 그 변형 대신 파란 배경을 유지하는
+  // 새 modifier(.site-notes-guide-card)를 하나 추가해 세로 배치(아이콘+제목 / 목록)만 가져온다.
+  guideCard.className = 'settings-notice-card site-notes-guide-card';
+  const guideHeader = document.createElement('div');
+  guideHeader.className = 'settings-notice-card-header';
+  guideHeader.appendChild(buildMobileMoreIcon('info'));
+  const guideTitle = document.createElement('span');
+  guideTitle.textContent = '현장 메모 안내';
+  guideHeader.appendChild(guideTitle);
+  guideCard.appendChild(guideHeader);
+  const guideList = document.createElement('ul');
+  guideList.className = 'site-notes-guide-list';
+  [
+    '메모는 선택한 현장에 저장됩니다.',
+    '현장 상세 화면에서도 동일한 메모를 확인할 수 있습니다.',
+    '저장된 메모는 현장 메모 메뉴에서 다시 수정할 수 있습니다.',
+  ].forEach(text => {
+    const li = document.createElement('li');
+    li.textContent = text;
+    guideList.appendChild(li);
+  });
+  guideCard.appendChild(guideList);
+  container.appendChild(guideCard);
+
+  // 저장 버튼
+  const saveBtnWrap = document.createElement('div');
+  saveBtnWrap.className = 'site-notes-save-btn-wrap';
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button';
+  saveBtn.className = 'upload-mobile-primary-btn';
+  saveBtn.textContent = '메모 저장';
+  function updateSaveBtnState() {
+    const hasSite = !!state.siteNotesWriteSiteId;
+    const hasContent = textarea.value.trim().length > 0;
+    saveBtn.disabled = !(hasSite && hasContent);
+  }
+  updateSaveBtnState();
+  saveBtn.addEventListener('click', async () => {
+    if (saveBtn.disabled) return;
+    const siteId = state.siteNotesWriteSiteId;
+    saveBtn.disabled = true;
+    try {
+      const success = await saveNote(siteId, textarea.value);
+      if (success) {
+        window.alert('메모가 저장되었습니다.');
+        closeSiteNotesWritePanel();
+      } else {
+        window.alert('메모 저장에 실패했습니다. 다시 시도해주세요.');
+        saveBtn.disabled = false;
+      }
+    } catch (err) {
+      console.error('현장 메모 저장 실패:', err);
+      window.alert('메모 저장에 실패했습니다. 다시 시도해주세요.');
+      saveBtn.disabled = false;
+    }
+  });
+  saveBtnWrap.appendChild(saveBtn);
+  container.appendChild(saveBtnWrap);
+}
+
+// "현장 선택" bottom sheet(현장 메모 작성 전용, 단일 선택) — 기존 openSupervisionManagerSheet
+// (담당 감독관 선택)와 완전히 동일한 admin-sheet-overlay/admin-sheet/검색+목록 패턴을 재사용한다
+// (새 sheet 컴포넌트 신설 없음). 경로탭의 다중선택용 openSitePickerSheet(완료 버튼/체크박스)와는
+// 용도가 달라 별도 이름을 쓴다. state.sites(loadActiveSites로 이미 로드된 원본 목록)를 그대로
+// 쓰고, 새 조회를 만들지 않는다.
+function openSiteNoteSitePickerSheet(onSelect) {
+  const overlay = document.createElement('div');
+  overlay.className = 'admin-sheet-overlay';
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+  const sheet = document.createElement('div');
+  sheet.className = 'admin-sheet';
+  const titleEl = document.createElement('div');
+  titleEl.className = 'admin-sheet-name';
+  titleEl.textContent = '현장 선택';
+  sheet.appendChild(titleEl);
+
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.className = 'sv-manager-sheet-search';
+  searchInput.placeholder = '현장명 검색';
+  sheet.appendChild(searchInput);
+
+  const listWrap = document.createElement('div');
+  sheet.appendChild(listWrap);
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+
+  function renderOptions(query) {
+    listWrap.innerHTML = '';
+    const q = (query || '').trim();
+    const sites = state.sites || [];
+    const filtered = q
+      ? sites.filter(s => (s.site_name || '').includes(q) || (s.company_name || '').includes(q))
+      : sites;
+    if (filtered.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'sv-manager-empty';
+      empty.textContent = '검색 결과가 없습니다.';
+      listWrap.appendChild(empty);
+      return;
+    }
+    filtered.forEach(s => {
+      const opt = document.createElement('button');
+      opt.type = 'button';
+      opt.className = 'sv-manager-option';
+      opt.textContent = s.site_name || s.company_name || '-';
+      opt.addEventListener('click', () => {
+        onSelect(s);
+        overlay.remove();
+      });
+      listWrap.appendChild(opt);
+    });
+  }
+  renderOptions('');
+  searchInput.addEventListener('input', () => renderOptions(searchInput.value));
 }
 
 // 목록/마커 클릭이 공통으로 호출하는 선택 함수.
@@ -1658,6 +2110,8 @@ const MOBILE_MORE_ICON_PATHS = {
   users: ['<circle cx="9" cy="8" r="3"/>', '<path d="M3.5 19c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5"/>', '<circle cx="17" cy="9" r="2.4"/>', '<path d="M15.5 13.3c1.8.4 3 1.9 3 3.7"/>'],
   eye: ['<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/>', '<circle cx="12" cy="12" r="2.8"/>'],
   eyeOff: ['<path d="M3 3l18 18"/>', '<path d="M10.6 5.6A10.7 10.7 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a15.2 15.2 0 0 1-3 3.7"/>', '<path d="M6.6 6.6C4.2 8.1 2.5 10.5 2.5 12S6 18.5 12 18.5c1.3 0 2.5-.2 3.6-.6"/>', '<path d="M9.9 10a2.8 2.8 0 0 0 4 4"/>'],
+  // STEP16.23(더보기 > 현장 메모) 추가 아이콘. 기존과 동일한 stroke 스타일.
+  doc: ['<path d="M7 3.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19V5A1.5 1.5 0 0 1 7 3.5Z"/>', '<path d="M14 3.5V8h4"/>', '<path d="M9 13h6M9 16.5h5"/>'],
 };
 
 function buildMobileMoreIcon(name) {
@@ -2374,6 +2828,13 @@ export function renderMobileMoreMenu(containerId) {
   // 진입점을 더보기 화면에도 추가한 것으로, 새 로직 없이 기존 클릭을 위임한다.
   addMenuCard(null, [
     { label: '감독일정관리', icon: 'calendar', onClick: () => document.getElementById('mobile-header-alert-btn').click() },
+  ]);
+
+  // STEP16.23: "현장 메모" — 기존 현장 상세의 개인 메모(gnmap_v2_site_notes, notes.js CRUD)를
+  // 한곳에서 조회/작성/수정하는 통합 화면. 관리자 전용이 아니라 일반 승인 사용자도 노출된다
+  // (RLS도 본인 것만 CRUD하도록 이미 열려 있음 — 새 정책 불필요).
+  addMenuCard(null, [
+    { label: '현장 메모', icon: 'doc', onClick: () => openSiteNotesPanel() },
   ]);
 
   // STEP16.6: 앱 설정/비밀번호 변경/알림 설정 3개는 실제 화면과 연결한다(§6). admin/upload
@@ -3725,6 +4186,10 @@ const SV_ICON_CHEVRON_LEFT = ['<path d="M15 5.5 9 12l6 6.5"/>'];
 const SV_ICON_CHEVRON_RIGHT = ['<path d="M9 5.5 15 12l-6 6.5"/>'];
 const SV_ICON_CALENDAR = ['<rect x="4" y="5" width="16" height="15" rx="2"/>', '<path d="M4 10h16"/>', '<path d="M8 3v4M16 3v4"/>'];
 const SV_ICON_USER = ['<circle cx="12" cy="8" r="3.4"/>', '<path d="M5 20c0-4 3.2-6.5 7-6.5s7 2.5 7 6.5"/>'];
+// STEP16.23(더보기 > 현장 메모) 추가 아이콘.
+const SV_ICON_DOC = ['<path d="M7 3.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19V5A1.5 1.5 0 0 1 7 3.5Z"/>', '<path d="M14 3.5V8h4"/>', '<path d="M9 13h6M9 16.5h5"/>'];
+const SV_ICON_BUILDING = ['<rect x="6" y="4" width="12" height="16" rx="1.2"/>', '<path d="M9 8h1.4M13.6 8H15M9 12h1.4M13.6 12H15M9 16h1.4M13.6 16H15"/>'];
+const SV_ICON_SEARCH = ['<circle cx="11" cy="11" r="6.5"/>', '<path d="m20 20-3.5-3.5"/>'];
 
 function svIcon(paths) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
