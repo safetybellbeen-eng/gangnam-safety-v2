@@ -662,7 +662,9 @@ export function renderDetail(site) {
   // 사용자 요청: 메인 지도(모바일)에서는 메모를 지도 위 상세 패널에서 직접 작성/열람하지 않고
   // 위 "메모" 버튼으로 현장 탭으로 넘어가서 작성/열람한다. 그 외(PC 전체, 모바일 현장/즐겨찾기
   // 탭)는 기존과 동일하게 인라인 메모 섹션을 그대로 보여준다(로직 변경 없음).
-  if (!(isMobileViewport() && state.mobileActiveTab === 'map')) {
+  // STEP16.18: "경로" 탭(방문 순서/경로 보기 포함)에서 여는 상세보기도 "지도" 탭과 동일하게
+  // 인라인 개인 메모는 숨기고, 위 "메모" 버튼으로 "현장" 탭에 가서 작성/열람하게 한다.
+  if (!(isMobileViewport() && (state.mobileActiveTab === 'map' || state.mobileActiveTab === 'route'))) {
     renderNoteSection(panel, site.id);
   }
 
@@ -1244,11 +1246,11 @@ export function renderMobileRouteView(containerId) {
   startCard.appendChild(startRow);
   container.appendChild(startCard);
 
-  // + 방문 현장 추가
+  // + 현장 검색 (STEP16.18: "방문 현장 추가"에서 문구 변경. 기능/시트는 동일.)
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
   addBtn.className = 'route-add-site-btn';
-  addBtn.textContent = '+ 방문 현장 추가';
+  addBtn.textContent = '+ 현장 검색';
   addBtn.addEventListener('click', () => {
     openSitePickerSheet((newIds) => {
       applyRoutePlanSelection(newIds);
@@ -1275,17 +1277,19 @@ export function renderMobileRouteView(containerId) {
     });
   }
 
-  // 방문 순서 만들기(선택 현장과 출발지가 모두 있어야 활성화).
+  // 경로 보기(선택 현장과 출발지가 모두 있어야 활성화).
   // STEP16.16: 출발지 없이 방문 순서/경로 상세로 넘어가면 미니맵이 임시로 첫 현장 좌표를
   // 중심으로 쓰는데, 그 상태로 진행하는 건 사용자가 "안 정해도 되는구나"로 오해하기 쉬워
   // 아예 진행 자체를 막고 이유를 안내한다.
   // STEP16.17: "방문 순서 만들기"(주 동작)를 "전체 삭제"(부 동작)보다 위로 올려 우선순위를 명확히 한다.
+  // STEP16.18: "방문 순서 만들기" → "경로 보기"로 문구 변경. 중간 단계였던 "방문 순서"
+  // 화면(#route-order-panel)은 더 이상 경유하지 않고 바로 "경로 상세"(경로 보기) 화면으로 연다.
   const ctaBtn = document.createElement('button');
   ctaBtn.type = 'button';
   ctaBtn.className = 'route-cta-btn';
-  ctaBtn.textContent = '방문 순서 만들기';
+  ctaBtn.textContent = '경로 보기';
   ctaBtn.disabled = selectedSites.length === 0 || !state.currentLocation;
-  ctaBtn.addEventListener('click', () => openRouteOrderPanel());
+  ctaBtn.addEventListener('click', () => openRouteDetailPanel());
   container.appendChild(ctaBtn);
 
   if (selectedSites.length > 0 && !state.currentLocation) {
@@ -1371,12 +1375,23 @@ export async function renderRouteOrderPanel(containerId) {
   await setupRouteMiniMap('route-order-map', selectedSites);
 }
 
-// ③ 경로 상세 — #route-detail-panel(전체화면 패널). 지도 + 세로 타임라인 + 현장별
-// "지도에서 보기"/"길찾기". 거리/시간/"경로 다시 계산"은 없다(승인된 축소 범위 — 실제 도로
-// 경로 데이터가 없어 다시 계산할 대상 자체가 없음).
+// ③ 경로 상세("경로 보기") — #route-detail-panel(전체화면 패널). 지도 + 세로 타임라인 +
+// 현장별 "지도에서 보기"/"길찾기". 거리/시간/"경로 다시 계산"은 없다(승인된 축소 범위 —
+// 실제 도로 경로 데이터가 없어 다시 계산할 대상 자체가 없음).
+// STEP16.18: 여기서 다루는 목록(routeDetailViewSiteIds)은 열릴 때 state.routePlanSiteIds를
+// 복사한 "이번 보기 세션" 전용 스냅샷이다 — 경로 보기 화면에서 X로 삭제하거나 순서를 바꿔도
+// "경로" 기본 탭의 선택 목록(state.routePlanSiteIds)에는 영향을 주지 않는다. 다시 열 때마다
+// 기본 탭의 최신 목록으로 새로 복사된다.
+let routeDetailViewSiteIds = null;
+
+function sitesFromIds(ids) {
+  return ids.map(id => state.sites.find(s => s.id === id)).filter(Boolean);
+}
+
 export function openRouteDetailPanel() {
   const panel = document.getElementById('route-detail-panel');
   if (!panel) return;
+  routeDetailViewSiteIds = [...state.routePlanSiteIds];
   panel.style.display = 'block';
   renderRouteDetailPanel('route-detail-panel');
 }
@@ -1480,7 +1495,12 @@ export async function renderRouteDetailPanel(containerId) {
   backBtn.addEventListener('click', () => { container.style.display = 'none'; });
   container.appendChild(header);
 
-  const selectedSites = getRoutePlanSites();
+  // STEP16.18: 다른 경로로 이 패널이 직접 열린 경우(예: 새로고침 복원)를 대비한 안전장치.
+  // 정상 진입은 openRouteDetailPanel()이 이미 스냅샷을 채워둔 뒤 호출한다.
+  if (!routeDetailViewSiteIds) {
+    routeDetailViewSiteIds = [...state.routePlanSiteIds];
+  }
+  const selectedSites = sitesFromIds(routeDetailViewSiteIds);
 
   if (selectedSites.length === 0) {
     const msg = document.createElement('p');
@@ -1504,14 +1524,15 @@ export async function renderRouteDetailPanel(containerId) {
   timeline.className = 'route-timeline';
   selectedSites.forEach((site, index) => {
     timeline.appendChild(buildRouteTimelineStop(site, index, selectedSites.length, () => {
-      state.routePlanSiteIds = state.routePlanSiteIds.filter(id => id !== site.id);
+      // STEP16.18: 경로 보기 세션 목록에서만 제거한다(state.routePlanSiteIds는 그대로 둔다).
+      routeDetailViewSiteIds = routeDetailViewSiteIds.filter(id => id !== site.id);
       renderRouteDetailPanel(containerId);
     }));
   });
   container.appendChild(timeline);
 
   attachDragReorder(timeline, '.route-drag-handle', (newOrderIds) => {
-    state.routePlanSiteIds = mapDragOrderToIds(newOrderIds, selectedSites);
+    routeDetailViewSiteIds = mapDragOrderToIds(newOrderIds, selectedSites);
     renderRouteDetailPanel(containerId);
   });
 
