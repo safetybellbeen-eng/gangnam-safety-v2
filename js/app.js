@@ -293,6 +293,7 @@ async function handleLogout() {
   state.noteInFlight = new Set();
   state.currentLocation = null;
   state.locationRequestInFlight = false;
+  state.routeStartMode = null;
   state.adminUsers = [];
   state.adminUserInFlight = new Set();
   state.adminMessage = '';

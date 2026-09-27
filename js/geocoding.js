@@ -67,10 +67,13 @@ export async function reverseGeocode(lat, lng) {
 // STEP 11G. Kakao keyword search 호출. Edge Function의 mode:'keyword' 경로를 사용한다.
 // 반환값: { success:true, candidates:[{placeName, addressName, roadAddressName, lat, lng}, ...] } | { success:false, reason }
 // 이 함수는 후보 목록만 가져온다 — 어떤 좌표도 여기서 확정/적용하지 않는다.
+// STEP16.14: 관리자 전용 엑셀업로드 매칭뿐 아니라, 경로 탭의 "출발지를 주소로 검색"에서도
+// 이 함수를 그대로 재사용한다(export). Edge Function 쪽 mode:'keyword' 권한도 이때 admin
+// 전용에서 approved 사용자 전체로 함께 완화했다.
 //
 // STEP 11G-LIVE-DEBUG: 운영에서 keyword 요청이 전부 ERROR로 나오는 원인을 확인하기 위한 최소 계측.
 // console에는 query와 reason(및 에러 종류 이름)만 남기고, JWT/API key/Authorization/원본 응답 body는 절대 출력하지 않는다.
-async function geocodeKeyword(query) {
+export async function geocodeKeyword(query) {
   try {
     const { data, error } = await sb.functions.invoke('gnmap-v2-geocode', {
       body: { mode: 'keyword', query },

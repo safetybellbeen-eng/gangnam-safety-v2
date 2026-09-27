@@ -8,7 +8,7 @@ import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
 import { loadUsers, setUserStatus, setUserRole, resetUserPassword, deleteRejectedProfile } from './admin.js';
 import { parseExcelFile } from './excel.js';
-import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, buildLotQueries, runJusoNormalize, buildJusoQuery, runKakaoJusoRecovery, runRoadApproximateRecovery, extractApproximateStructure, reverseGeocode } from './geocoding.js';
+import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, buildLotQueries, runJusoNormalize, buildJusoQuery, runKakaoJusoRecovery, runRoadApproximateRecovery, extractApproximateStructure, reverseGeocode, geocodeKeyword } from './geocoding.js';
 import { importSitesToDatabase, previewImportImpact, loadUploadHistory } from './import.js';
 import { loadSupervisions, createSupervision, updateSupervision, deleteSupervision } from './supervision.js';
 import { isAdmin, changePassword } from './auth.js';
@@ -1006,12 +1006,109 @@ async function handleRouteLocationRequest(containerId) {
     return;
   }
 
+  state.routeStartMode = 'gps';
   state.currentLocationAddress = null; // 역지오코딩 완료 전까지 "주소 확인 중" 표시
   renderMobileRouteView(containerId);
 
   const geoResult = await reverseGeocode(state.currentLocation.lat, state.currentLocation.lng);
   state.currentLocationAddress = geoResult.success ? geoResult.address : null;
   renderMobileRouteView(containerId);
+}
+
+// STEP16.14. "출발지" 카드의 "주소로 검색" 버튼. 기존 admin-sheet-overlay/admin-sheet(방문 현장
+// 선택 sheet와 동일한 뼈대) 위에, geocodeKeyword(기존 Edge Function mode:'keyword', 관리자 전용
+// 엑셀업로드 매칭에 쓰던 것을 그대로 재사용)로 후보를 받아 목록으로 보여준다. 자동으로 1건을
+// 확정하지 않고, 사용자가 직접 고른 후보의 좌표/주소만 그대로 출발지에 반영한다(가짜 데이터 금지, §31).
+function openRouteAddressSearchSheet(containerId) {
+  const overlay = document.createElement('div');
+  overlay.className = 'admin-sheet-overlay';
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+  const sheet = document.createElement('div');
+  sheet.className = 'admin-sheet route-addr-search-sheet';
+  const titleEl = document.createElement('div');
+  titleEl.className = 'admin-sheet-name';
+  titleEl.textContent = '출발지 주소 검색';
+  sheet.appendChild(titleEl);
+
+  const searchRow = document.createElement('div');
+  searchRow.className = 'route-addr-search-row';
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.className = 'sv-manager-sheet-search';
+  searchInput.placeholder = '예: 테헤란로 152, 강남구청';
+  searchRow.appendChild(searchInput);
+  const searchBtn = document.createElement('button');
+  searchBtn.type = 'button';
+  searchBtn.className = 'route-addr-search-btn';
+  searchBtn.textContent = '검색';
+  searchRow.appendChild(searchBtn);
+  sheet.appendChild(searchRow);
+
+  const resultWrap = document.createElement('div');
+  resultWrap.className = 'route-picker-list';
+  sheet.appendChild(resultWrap);
+
+  let searching = false;
+  async function runSearch() {
+    const q = searchInput.value.trim();
+    if (!q || searching) return;
+    searching = true;
+    searchBtn.disabled = true;
+    resultWrap.innerHTML = '';
+    const loading = document.createElement('p');
+    loading.className = 'sv-manager-empty';
+    loading.textContent = '검색 중...';
+    resultWrap.appendChild(loading);
+
+    const result = await geocodeKeyword(q);
+    searching = false;
+    searchBtn.disabled = false;
+    resultWrap.innerHTML = '';
+
+    if (!result || !result.success || !Array.isArray(result.candidates) || result.candidates.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'sv-manager-empty';
+      empty.textContent = '검색 결과가 없습니다. 다른 주소나 건물명으로 검색해보세요.';
+      resultWrap.appendChild(empty);
+      return;
+    }
+
+    result.candidates.forEach(c => {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'route-addr-candidate-row';
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'route-picker-row-name';
+      nameEl.textContent = c.placeName || c.roadAddressName || c.addressName || '-';
+      row.appendChild(nameEl);
+
+      const addrEl = document.createElement('div');
+      addrEl.className = 'route-picker-row-addr';
+      addrEl.textContent = c.roadAddressName || c.addressName || '';
+      row.appendChild(addrEl);
+
+      row.addEventListener('click', () => {
+        state.currentLocation = { lat: c.lat, lng: c.lng };
+        state.currentLocationAddress = c.roadAddressName || c.addressName || c.placeName || null;
+        state.routeStartMode = 'manual';
+        overlay.remove();
+        renderMobileRouteView(containerId);
+      });
+
+      resultWrap.appendChild(row);
+    });
+  }
+
+  searchBtn.addEventListener('click', runSearch);
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); runSearch(); }
+  });
+
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+  searchInput.focus();
 }
 
 // ① 경로 만들기 — 하단 탭 "경로"의 첫 화면(#mobile-route-content).
@@ -1052,7 +1149,7 @@ export function renderMobileRouteView(containerId) {
   if (state.currentLocation) {
     const label = document.createElement('div');
     label.className = 'route-start-label';
-    label.textContent = '현재 위치';
+    label.textContent = state.routeStartMode === 'manual' ? '입력한 주소' : '현재 위치';
     startText.appendChild(label);
     const addr = document.createElement('div');
     addr.className = 'route-start-address';
@@ -1061,10 +1158,13 @@ export function renderMobileRouteView(containerId) {
   } else {
     const label = document.createElement('div');
     label.className = 'route-start-label';
-    label.textContent = '현재 위치를 아직 가져오지 않았습니다.';
+    label.textContent = '출발지를 아직 정하지 않았습니다.';
     startText.appendChild(label);
   }
   startRow.appendChild(startText);
+
+  const startBtnGroup = document.createElement('div');
+  startBtnGroup.className = 'route-start-btn-group';
 
   const startBtn = document.createElement('button');
   startBtn.type = 'button';
@@ -1072,7 +1172,16 @@ export function renderMobileRouteView(containerId) {
   startBtn.textContent = state.currentLocation ? '위치 변경' : '현재 위치 가져오기';
   startBtn.disabled = state.locationRequestInFlight;
   startBtn.addEventListener('click', () => handleRouteLocationRequest(containerId));
-  startRow.appendChild(startBtn);
+  startBtnGroup.appendChild(startBtn);
+
+  const addrSearchBtn = document.createElement('button');
+  addrSearchBtn.type = 'button';
+  addrSearchBtn.className = 'route-start-btn route-start-btn-secondary';
+  addrSearchBtn.textContent = '주소로 검색';
+  addrSearchBtn.addEventListener('click', () => openRouteAddressSearchSheet(containerId));
+  startBtnGroup.appendChild(addrSearchBtn);
+
+  startRow.appendChild(startBtnGroup);
   startCard.appendChild(startRow);
   container.appendChild(startCard);
 

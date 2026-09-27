@@ -77,5 +77,7 @@ export const state = {
   routePlanSiteIds: [],        // 방문할 현장으로 선택한 gnmap_v2_sites.id 배열. 순서 = 선택/드래그 순서.
   routeMobileView: 'plan',     // '경로' 탭 내부 화면: 'plan'(경로 만들기, #mobile-route-content) |
                                 // 'order'(방문 순서, #route-order-panel) | 'detail'(경로 상세, #route-detail-panel)
-  currentLocationAddress: null // 역지오코딩으로 얻은 현재 위치 주소 문자열. 아직 조회 안 했거나 실패하면 null(가짜 주소 금지).
+  currentLocationAddress: null, // 역지오코딩으로 얻은 현재 위치 주소 문자열. 아직 조회 안 했거나 실패하면 null(가짜 주소 금지).
+  routeStartMode: null          // STEP16.14: 경로 출발지(state.currentLocation)의 출처. 'gps'(현재 위치 버튼) |
+                                 // 'manual'(주소 검색으로 선택) | null(아직 출발지를 정하지 않음). 표시 라벨 분기에만 쓴다.
 };
