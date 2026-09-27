@@ -301,7 +301,18 @@
      영역이 남는 부작용이 있었다(로그인 화면 개편 중 발견). 근본 원인(showView()가 활성 뷰에
      불필요하게 'block'을 강제하던 것)을 js/app.js에서 고쳐 !important 없이도 정상 동작하므로
      제거한다 — display 속성 자체의 의도(모바일에서 flex column)는 그대로 유지. */
-  #view-approved {
+  /* STEP16.12(더보기 화면 스크롤 안 되던 문제 수정): 이 규칙의 padding-bottom(하단 고정
+     nav 높이만큼 여백을 남겨 flex 영역이 nav 밑으로 안 깔리게 하려던 의도)이 실제로는
+     한 번도 적용되지 못하고 있었다 — map.css의 "#app #view-approved { padding: 0; ... }"
+     (STEP4, PC/지도 전용 규칙)가 selector 특이도(ID 2개)로 이 규칙(ID 1개)을 항상 이겨
+     padding-bottom을 0으로 되돌리기 때문이다(선언 순서와 무관하게 특이도가 이김).
+     그 결과 "더보기" 탭처럼 콘텐츠 길이가 화면 높이에 가까운 화면에서는, 스크롤 컨테이너
+     (.mobile-view)가 남은 공간을 nav 뒤까지 포함해 계산해버려 실제로는 조금만 스크롤되고
+     맨 아래 항목(로그아웃 등)이 고정 nav에 가려진 채 더 이상 스크롤되지 않는 문제가 있었다.
+     이 규칙의 selector를 map.css와 동일한 특이도("#app #view-approved")로 맞춰 이 파일이
+     index.html에서 map.css보다 뒤에 로드되는 순서(특이도가 같을 때만 의미 있음)로 확실히
+     이기게 한다 — padding 자체(top/left/right)는 그대로 0으로 두고 bottom만 다시 살린다. */
+  #app #view-approved {
     display: flex;
     flex-direction: column;
     height: 100vh;
