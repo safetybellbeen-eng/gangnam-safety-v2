@@ -122,7 +122,10 @@ function loadKakaoSdk() {
 
 // approved 사용자에게만 호출되어야 한다 (app.js에서 상태 분기 후 호출).
 // state.map이 이미 있으면 재생성하지 않는다 (중복 초기화 방지).
-export async function initMap(containerId) {
+// startCenter: STEP16.6(모바일 앱 설정 "지도 시작 위치"). { lat, lng }가 주어지면 강남구 기본
+// 좌표 대신 그 위치를 초기 중심으로 쓴다. 생략하거나 유효하지 않으면 기존 동작(GANGNAM_CENTER)
+// 그대로 — 기존 호출부(startCenter 없이 호출)의 동작은 전혀 바뀌지 않는다.
+export async function initMap(containerId, startCenter) {
   if (state.map) return state.map;
 
   await loadKakaoSdk();
@@ -130,8 +133,14 @@ export async function initMap(containerId) {
   const container = document.getElementById(containerId);
   if (!container) throw new Error(`지도 컨테이너를 찾을 수 없습니다: ${containerId}`);
 
+  const validOverride = startCenter
+    && Number.isFinite(startCenter.lat) && Number.isFinite(startCenter.lng)
+    && startCenter.lat >= -90 && startCenter.lat <= 90
+    && startCenter.lng >= -180 && startCenter.lng <= 180;
+  const center = validOverride ? startCenter : GANGNAM_CENTER;
+
   state.map = new kakao.maps.Map(container, {
-    center: new kakao.maps.LatLng(GANGNAM_CENTER.lat, GANGNAM_CENTER.lng),
+    center: new kakao.maps.LatLng(center.lat, center.lng),
     level: DEFAULT_LEVEL
   });
 
