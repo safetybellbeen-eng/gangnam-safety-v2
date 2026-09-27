@@ -218,6 +218,54 @@ function renderNoteSection(panel, siteId) {
   panel.appendChild(noteActions);
 }
 
+// 사용자 요청(STEP16.22): 모바일에서는 상세 패널에 메모를 바로 보여주지 않고, "메모" 버튼을
+// 눌렀을 때만 팝업(모달)으로 작성/열람/수정/삭제한다. 저장/삭제 로직(saveNote/deleteNote)은
+// renderNoteSection을 그대로 재사용해 새로 만들지 않는다 — 모달 본문 컨테이너를 그 함수에
+// panel 대신 넘길 뿐이다. 배경 클릭/×/Escape로 닫히며, 매번 새로 만들고 닫을 때 제거한다
+// (지도 위 CustomOverlay처럼 상태를 남겨둘 필요가 없는 일회성 UI).
+function openNoteModal(siteId) {
+  closeNoteModal(); // 혹시 이미 열려있던 모달이 있으면 먼저 정리(중복 방지)
+
+  const overlay = document.createElement('div');
+  overlay.id = 'site-note-modal-overlay';
+  overlay.className = 'site-note-modal-overlay';
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeNoteModal();
+  });
+
+  const content = document.createElement('div');
+  content.className = 'site-note-modal-content';
+
+  const header = document.createElement('div');
+  header.className = 'site-note-modal-header';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'site-note-modal-close';
+  closeBtn.setAttribute('aria-label', '닫기');
+  closeBtn.textContent = '×';
+  closeBtn.addEventListener('click', closeNoteModal);
+  header.appendChild(closeBtn);
+  content.appendChild(header);
+
+  renderNoteSection(content, siteId); // 제목/textarea/저장/삭제를 그대로 채워 넣는다.
+
+  overlay.appendChild(content);
+  document.body.appendChild(overlay);
+
+  document.addEventListener('keydown', handleNoteModalKeydown);
+}
+
+function handleNoteModalKeydown(e) {
+  if (e.key === 'Escape') closeNoteModal();
+}
+
+function closeNoteModal() {
+  const overlay = document.getElementById('site-note-modal-overlay');
+  if (overlay) overlay.remove();
+  document.removeEventListener('keydown', handleNoteModalKeydown);
+}
+
 // 목록/마커 클릭이 공통으로 호출하는 선택 함수.
 // 선택 상태 갱신 → 지도 이동 → 목록 active class 갱신 → scrollIntoView → 상세 패널 렌더까지 한 번에 처리한다.
 export function selectSite(siteId) {
@@ -368,6 +416,32 @@ export function renderSiteList(containerId) {
       }
 
       if (meta.childNodes.length > 0) item.appendChild(meta);
+
+      // 사용자 요청: 목록 카드에서도 공사금액/공사기간/점검/산재표를 바로 볼 수 있게 한다
+      // (상세 패널의 2x2 표와 같은 포매터를 재사용 — formatAmountKRW/formatPeriodKR/formatCount).
+      // DB 원본 값은 그대로 두고 표시 문자열만 만든다(검색/정렬/저장 로직에는 관여하지 않음).
+      const summary = document.createElement('div');
+      summary.className = 'site-list-summary';
+      const summaryRows = [
+        ['공사금액', isMobileViewport() ? formatAmountKRW(site.amount) : displayValue(site.amount)],
+        ['공사기간', formatPeriodKR(site.period_start, site.period_end)],
+        ['점검', formatCount(site.supervision_count, '회')],
+        ['산재표', formatCount(site.accident_report_count, '건')]
+      ];
+      summaryRows.forEach(([label, value]) => {
+        const cell = document.createElement('div');
+        cell.className = 'site-list-summary-item';
+        const labelEl = document.createElement('span');
+        labelEl.className = 'site-list-summary-label';
+        labelEl.textContent = label;
+        const valueEl = document.createElement('span');
+        valueEl.className = 'site-list-summary-value';
+        valueEl.textContent = value;
+        cell.appendChild(labelEl);
+        cell.appendChild(valueEl);
+        summary.appendChild(cell);
+      });
+      item.appendChild(summary);
 
       item.addEventListener('click', () => selectSite(site.id));
 
@@ -643,30 +717,42 @@ export function renderDetail(site) {
     });
     actions.appendChild(routeAddBtn);
 
-    // 메모: 메인 지도에서는 메모를 작성/열람하지 않고, "현장" 탭으로 넘어가 그곳에서 작성/열람한다.
-    // closeDetail()이 selectedSiteId를 비운 뒤이므로, 탭 전환 후 selectSite()를 다시 호출해
-    // 같은 사업장의 상세(메모 포함)를 현장 탭에서 다시 연다.
+    // 사용자 요청(STEP16.22): 메모는 더 이상 탭을 이동시키지 않고, 어느 탭에서 열든 팝업으로
+    // 작성/열람/수정/삭제한다(openNoteModal, 아래 renderNoteSection 재사용).
     const noteBtn = document.createElement('button');
     noteBtn.type = 'button';
     noteBtn.className = 'site-detail-action-btn site-detail-btn-secondary';
     noteBtn.textContent = '메모';
-    noteBtn.addEventListener('click', () => {
-      const siteId = site.id;
-      const siteTabBtn = document.querySelector('.mobile-tab-btn[data-tab="site"]');
-      if (siteTabBtn) siteTabBtn.click();
-      selectSite(siteId);
-    });
+    noteBtn.addEventListener('click', () => openNoteModal(site.id));
     actions.appendChild(noteBtn);
+
+    // 사용자 요청(STEP16.22): "현장"/"즐겨찾기" 탭에서 여는 상세정보에는 "위치보기"를 추가한다
+    // (지도/경로 탭은 이미 지도 위에서 보고 있거나 요청 대상이 아니므로 제외). 눌러서 "지도"
+    // 탭으로 전환한 뒤 같은 사업장을 다시 선택해(selectSite) 핀 위치로 이동/강조한다.
+    if (state.mobileActiveTab === 'site' || state.mobileActiveTab === 'favorite') {
+      const locateBtn = document.createElement('button');
+      locateBtn.type = 'button';
+      locateBtn.className = 'site-detail-action-btn site-detail-btn-secondary';
+      locateBtn.textContent = '위치보기';
+      locateBtn.disabled = !hasValidCoord;
+      if (hasValidCoord) {
+        locateBtn.addEventListener('click', () => {
+          const siteId = site.id;
+          const mapTabBtn = document.querySelector('.mobile-tab-btn[data-tab="map"]');
+          if (mapTabBtn) mapTabBtn.click();
+          selectSite(siteId);
+        });
+      }
+      actions.appendChild(locateBtn);
+    }
   }
 
   panel.appendChild(actions);
 
-  // 사용자 요청: 메인 지도(모바일)에서는 메모를 지도 위 상세 패널에서 직접 작성/열람하지 않고
-  // 위 "메모" 버튼으로 현장 탭으로 넘어가서 작성/열람한다. 그 외(PC 전체, 모바일 현장/즐겨찾기
-  // 탭)는 기존과 동일하게 인라인 메모 섹션을 그대로 보여준다(로직 변경 없음).
-  // STEP16.18: "경로" 탭(방문 순서/경로 보기 포함)에서 여는 상세보기도 "지도" 탭과 동일하게
-  // 인라인 개인 메모는 숨기고, 위 "메모" 버튼으로 "현장" 탭에 가서 작성/열람하게 한다.
-  if (!(isMobileViewport() && (state.mobileActiveTab === 'map' || state.mobileActiveTab === 'route'))) {
+  // 사용자 요청(STEP16.22): 모바일에서는 어느 탭(지도/경로/현장/즐겨찾기)에서 열든 상세 패널에
+  // 인라인 메모를 더 이상 바로 보여주지 않는다 — 아래 "메모" 버튼을 눌러야 팝업으로 작성/열람/
+  // 수정/삭제한다(openNoteModal). PC는 기존과 동일하게 인라인 메모 섹션을 그대로 보여준다.
+  if (!isMobileViewport()) {
     renderNoteSection(panel, site.id);
   }
 
@@ -691,6 +777,7 @@ export function renderDetail(site) {
 }
 
 export function closeDetail() {
+  closeNoteModal(); // 상세를 닫을 때 메모 팝업이 열려 있었다면 함께 정리(고아 상태 방지)
   const panel = document.getElementById('site-detail-panel');
   panel.style.display = 'none';
   panel.style.transform = ''; // 스와이프로 닫힌 경우 남아있는 드래그 이동값 초기화(§ app.js 스와이프 핸들러)
@@ -2377,7 +2464,10 @@ function updateDongFilterLabel() {
 // 완전히 동일하며, 이 함수 하나로 세 필터에 공통 적용해 중복 코드 없이 항상 같은 동작을 보장한다.
 // detailsId: <details> id (예: 'site-amount-filter'), stateKey: state의 해당 필터 키,
 // labels: { value: 라벨텍스트 } 맵('all' 포함 — 미선택 시 필터명 그대로 표시).
-function bindRadioFilterDetails(detailsId, stateKey, containerId, labels) {
+// neutralValue: "필터 없음"에 해당하는 값(강조색 표시 기준). 관할/금액/점검/산재표는 'all'이지만,
+// 정렬(sortMode)은 기존 로직(js/sites.js getFilteredSortedSites)이 'default'를 기준값으로 쓰므로
+// 호출부에서 'default'를 넘길 수 있게 한다(생략하면 기존과 동일하게 'all').
+function bindRadioFilterDetails(detailsId, stateKey, containerId, labels, neutralValue = 'all') {
   const detailsEl = document.getElementById(detailsId);
   if (!detailsEl) return;
   const labelEl = document.getElementById(`${detailsId}-label`);
@@ -2385,13 +2475,13 @@ function bindRadioFilterDetails(detailsId, stateKey, containerId, labels) {
   if (!labelEl) return;
 
   function updateLabel() {
-    const value = state[stateKey] || 'all';
-    labelEl.textContent = labels[value] || labels.all;
-    detailsEl.dataset.active = String(value !== 'all');
+    const value = state[stateKey] || neutralValue;
+    labelEl.textContent = labels[value] || labels[neutralValue];
+    detailsEl.dataset.active = String(value !== neutralValue);
   }
 
   detailsEl.querySelectorAll('input[type="radio"]').forEach(radio => {
-    radio.checked = radio.value === (state[stateKey] || 'all');
+    radio.checked = radio.value === (state[stateKey] || neutralValue);
     radio.addEventListener('change', () => {
       if (!radio.checked) return;
       state[stateKey] = radio.value;
@@ -2481,7 +2571,6 @@ export function bindSearchAndSort(containerId) {
   searchSortEventsbound = true;
 
   const searchInput = document.getElementById('site-search-input');
-  const sortSelect = document.getElementById('site-sort-select');
   const dongFilterEl = document.getElementById('site-dong-filter');
   const dongFilterClearBtn = document.getElementById('site-dong-filter-clear');
   const searchClearBtn = document.getElementById('site-search-clear-btn');
@@ -2505,11 +2594,6 @@ export function bindSearchAndSort(containerId) {
       renderSiteList(containerId); // 검색어만 비우고 관할/금액/점검/산재표/즐겨찾기/정렬은 그대로 유지된다.
     });
   }
-
-  sortSelect.addEventListener('change', () => {
-    state.sortMode = sortSelect.value;
-    renderSiteList(containerId);
-  });
 
   // 사용자 요청: "전체" 버튼은 관할 선택을 한 번에 초기화한다(개별 체크박스 이벤트는
   // renderDongOptions()가 각자 바인딩).
@@ -2565,6 +2649,18 @@ export function bindSearchAndSort(containerId) {
     yes: '산재표 유',
     no: '산재표 무',
   });
+  // 사용자 요청: "기본순서" 정렬도 나머지 4개 필터와 동일한 details+radio 팝오버로 바꾼다 —
+  // 기존 <select>는 브라우저가 선택된 값이 아니라 가장 긴 옵션 문자열 기준으로 폭을 잡아
+  // "기본순서"처럼 짧은 라벨일 때도 불필요하게 넓어 보이는 문제가 있었다(관할/금액 등과 동일 원인).
+  bindRadioFilterDetails('site-sort-filter', 'sortMode', containerId, {
+    default: '기본순서',
+    'name-asc': '사업장명 가나다순',
+    'company-asc': '업체명 가나다순',
+    'amount-desc': '공사금액 높은순',
+    'amount-asc': '공사금액 낮은순',
+    deadline: '공사기간 임박순',
+    favorite: '즐겨찾기 우선',
+  }, 'default');
 
   // STEP14.5-B. "즐겨찾기만 보기" — 토글형 버튼. 다시 누르면 해제되어 기존 필터 결과로 복귀.
   if (favoriteFilterBtn) {
