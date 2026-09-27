@@ -2483,6 +2483,19 @@ function bindRadioFilterDetails(detailsId, stateKey, containerId, labels, neutra
     detailsEl.dataset.active = String(value !== neutralValue);
   }
 
+  // 사용자 피드백: 실제 모바일 기기에서 이 summary를 탭해도 패널이 전혀 열리지 않는 경우가
+  // 보고됐다. summary를 pill 버튼처럼 보이게 하려고 display/appearance를 덮어썼는데(css/
+  // mobile.css), 일부 모바일 브라우저/웹뷰는 <summary>의 기본 display가 바뀌면 네이티브
+  // 클릭-토글 동작 자체가 깨지는 경우가 있다(같은 줄의 일반 <button>인 "즐겨찾기"는 항상
+  // 반응하는데 <details> 필터들만 반응이 없었던 것과 일치). 그래서 네이티브 토글에 기대지
+  // 않고 summary의 기본 동작을 막은 뒤 detailsEl.open을 직접 켜고 끈다 — 모든 브라우저에서
+  // 동일하게 동작한다. open을 스크립트로 바꿔도 'toggle' 이벤트는 그대로 발생하므로 아래
+  // 위치 계산 로직은 손대지 않아도 된다.
+  labelEl.addEventListener('click', (e) => {
+    e.preventDefault();
+    detailsEl.open = !detailsEl.open;
+  });
+
   detailsEl.querySelectorAll('input[type="radio"]').forEach(radio => {
     radio.checked = radio.value === (state[stateKey] || neutralValue);
     radio.addEventListener('change', () => {
@@ -2613,6 +2626,18 @@ export function bindSearchAndSort(containerId) {
 
   // details/summary는 바깥 클릭 시 자동으로 닫히지 않으므로, 패널 바깥을 클릭하면 닫아준다.
   if (dongFilterEl) {
+    // 사용자 피드백: 실제 모바일 기기에서 "관할" summary를 탭해도 반응이 없었다 — pill
+    // 스타일을 위해 summary의 display/appearance를 덮어쓴 게 일부 모바일 브라우저에서 네이티브
+    // 클릭-토글을 깨뜨리는 것으로 보인다(bindRadioFilterDetails의 나머지 3개 필터와 동일한
+    // 원인/동일한 수정). 네이티브 토글에 기대지 않고 직접 open을 켜고 끈다.
+    const dongFilterLabelEl = document.getElementById('site-dong-filter-label');
+    if (dongFilterLabelEl) {
+      dongFilterLabelEl.addEventListener('click', (e) => {
+        e.preventDefault();
+        dongFilterEl.open = !dongFilterEl.open;
+      });
+    }
+
     document.addEventListener('click', (e) => {
       if (dongFilterEl.open && !dongFilterEl.contains(e.target)) {
         dongFilterEl.open = false;

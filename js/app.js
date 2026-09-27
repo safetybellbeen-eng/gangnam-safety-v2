@@ -335,12 +335,10 @@ async function handleLogout() {
   if (supervisionBtn) supervisionBtn.style.display = 'none';
   state.supervisionFilter = 'all';
   const searchInput = document.getElementById('site-search-input');
-  const sortSelect = document.getElementById('site-sort-select');
   const dongFilterOptions = document.getElementById('site-dong-filter-options');
   const dongFilterEl = document.getElementById('site-dong-filter');
   const locationMsg = document.getElementById('location-message');
   if (searchInput) searchInput.value = '';
-  if (sortSelect) sortSelect.value = 'default';
   if (dongFilterOptions) dongFilterOptions.innerHTML = ''; // renderDongOptions()가 다음 로그인 때 다시 채운다.
   if (dongFilterEl) dongFilterEl.open = false;
   const dongFilterLabel = document.getElementById('site-dong-filter-label');
@@ -363,6 +361,18 @@ async function handleLogout() {
     const labelEl = document.getElementById(`${detailsId}-label`);
     if (labelEl) labelEl.textContent = defaultLabel;
   });
+  // 사용자 요청(STEP16.22): "기본순서" 정렬도 위 3개와 동일한 details+radio가 됐다(이전
+  // <select id="site-sort-select"> 참조는 그 엘리먼트가 사라져 아무 효과가 없던 죽은 코드였다).
+  // neutralValue가 'all'이 아니라 'default'라 위 forEach와 값만 다르게 별도 처리한다.
+  const sortFilterEl = document.getElementById('site-sort-filter');
+  if (sortFilterEl) {
+    sortFilterEl.open = false;
+    sortFilterEl.dataset.active = 'false';
+    const defaultRadio = sortFilterEl.querySelector('input[type="radio"][value="default"]');
+    if (defaultRadio) defaultRadio.checked = true;
+    const sortLabelEl = document.getElementById('site-sort-filter-label');
+    if (sortLabelEl) sortLabelEl.textContent = '기본순서';
+  }
   if (locationMsg) locationMsg.textContent = '';
   // STEP14.5-B. 즐겨찾기만보기 토글과 검색 지우기(×) 버튼 표시 상태 초기화.
   state.favoriteOnly = false;
