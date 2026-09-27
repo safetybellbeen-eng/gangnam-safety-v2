@@ -440,7 +440,6 @@
      여백이 생기는 문제가 있었는데, summary는 항상 자기 텍스트 폭만큼만 차지해 이 문제가
      사라진다(요청 1번: 글자 수에 맞게 딱 맞게). */
   .site-select-filter-label,
-  #site-sort-select,
   #site-favorite-filter-btn {
     flex: 0 0 auto;
     width: auto;
@@ -595,9 +594,9 @@
     color: var(--gnmap-blue);
     font-weight: var(--gnmap-fw-semibold);
   }
-  /* 사용자 요청: 메인 지도 탭에서는 "정렬"을 숨기고, 현장 탭에서만 보이게 한다(select 자체와
-     옵션 목록/이벤트는 그대로 유지 — 지도 탭에서만 CSS로 안 보이게 할 뿐). */
-  #app[data-mobile-tab="map"] #site-sort-select {
+  /* 사용자 요청: 메인 지도 탭에서는 "정렬"을 숨기고, 현장 탭에서만 보이게 한다(details/옵션
+     목록/이벤트는 그대로 유지 — 지도 탭에서만 CSS로 안 보이게 할 뿐). */
+  #app[data-mobile-tab="map"] #site-sort-filter {
     display: none;
   }
   /* 사용자 요청: toggle 그룹(즐겨찾기/점검/산재표) 앞에 얇은 구분선을 두어 "조건 선택"과
@@ -762,6 +761,37 @@
     color: #c0392b;
     font-size: 11px;
     font-weight: bold;
+  }
+  /* 사용자 요청: 목록 카드에서 공사금액/공사기간/점검/산재표를 바로 확인할 수 있게 한다.
+     상세 패널의 2x2 표(.site-detail-meta)와 같은 2열 grid를 쓰되, 카드 안에 들어가는
+     보조정보라 폰트/여백을 더 작게 압축한다. */
+  .site-list-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--gnmap-border);
+  }
+  .site-list-summary-item {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    min-width: 0;
+  }
+  .site-list-summary-label {
+    flex: 0 0 auto;
+    font-size: 11px;
+    color: var(--gnmap-text-sub);
+  }
+  .site-list-summary-value {
+    flex: 1;
+    font-size: 12px;
+    color: var(--gnmap-text-primary);
+    font-weight: var(--gnmap-fw-semibold);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* STEP15-E.1: 상세 패널(bottom sheet) 상단의 위치정확도 배지. 값은 renderDetail()(js/ui.js)이
@@ -1109,6 +1139,48 @@
   }
   .site-detail-note-actions .site-detail-action-btn {
     min-height: 36px;
+  }
+
+  /* 사용자 요청(STEP16.22): 메모를 상세 패널에 바로 두지 않고 "메모" 버튼을 누르면 뜨는
+     팝업으로 뺀다(js/ui.js openNoteModal). 내용(제목/textarea/저장/삭제)은 기존
+     .site-detail-section-title/.site-detail-note-textarea/.site-detail-note-actions를 그대로
+     재사용하므로 여기서는 오버레이/카드/닫기 버튼만 새로 정의한다. */
+  .site-note-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    background: rgba(15, 23, 42, 0.45);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .site-note-modal-content {
+    width: 100%;
+    max-width: 480px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-sizing: border-box;
+    background: #fff;
+    border-radius: 16px 16px 0 0;
+    padding: var(--gnmap-space-4) var(--gnmap-space-4) calc(var(--gnmap-space-4) + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.2);
+  }
+  .site-note-modal-header {
+    display: flex;
+    justify-content: flex-end;
+  }
+  .site-note-modal-close {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    line-height: 1;
+    color: var(--gnmap-text-sub);
+    background: none;
+    border: none;
+    cursor: pointer;
   }
 
   .mobile-view {
