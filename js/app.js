@@ -2,7 +2,7 @@
 // 지도/사업장 등 실제 기능은 이후 STEP에서 추가한다 (CLAUDE.md 12절: 대규모 UI 금지).
 import { state } from './state.js';
 import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, verifySignupCode, checkIdExists, checkLoginLock, translateAuthError } from './auth.js';
-import { initMap, clearMarkers } from './map.js';
+import { initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
@@ -242,9 +242,16 @@ function routeByProfile() {
       // GANGNAM_CENTER로 자동 폴백하므로 지도 초기화 자체가 지연/실패하지 않는다.
       resolvePreferredMapStartCenter()
         .then((startCenter) => initMap('map-container', startCenter))
-        .then(() => Promise.all([loadActiveSites(), loadFavorites(), loadNotes()]))
-        .then(([sites]) => {
+        // STEP16.20: renderGangnamBoundaries()(경계선 그리기, 내부에서 경계 GeoJSON을 fetch)를
+        // 사업장 조회와 병렬로 실행한다 — 서로 의존하지 않고, 둘 다 끝난 뒤 assignDongToSites()가
+        // 이미 로드된 경계 데이터를 재사용(캐시된 Promise)해 즉시 판정할 수 있게 하기 위함이다.
+        .then(() => Promise.all([loadActiveSites(), loadFavorites(), loadNotes(), renderGangnamBoundaries()]))
+        .then(async ([sites]) => {
           state.sites = sites;
+          // STEP16.20: gnmap_v2_sites.dong이 전부 NULL이라(§map.js 상단 설명), 좌표 기준으로
+          // 강남구 14개 법정동에 배정한다. 이 값으로 기존 "관할" 체크박스 필터(renderDongOptions/
+          // getDongOptions, js/sites.js)와 목록/지도 마커가 함께 동작한다 — 새 필터 UI를 만들지 않는다.
+          await assignDongToSites(state.sites);
           // STEP16.16: 경로 탭에서 저장해둔 선택 현장/출발지를 복원한다. 반드시 아래
           // activateMobileTab()보다 먼저 호출해야 한다 — 그 안에서 route 탭이면 바로
           // renderMobileRouteView()를 그리는데, 그 렌더 함수가 시작할 때 현재 state를

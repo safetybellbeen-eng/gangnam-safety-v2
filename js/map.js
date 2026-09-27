@@ -10,6 +10,222 @@ const DEFAULT_LEVEL = 6;
 let sdkLoadPromise = null;
 let clusterer = null; // STEP14.5-B 2차. 마커 클러스터러 인스턴스(지도당 1개, 재사용).
 
+// ============================================================
+// STEP16.20: 강남구 경계선(1차) + 법정동 경계선(2차, 압구정/신사/청담/논현/삼성/역삼/대치/개포/
+// 일원/수서/자곡/세곡/율현/도곡 14개) 표시, 사업장의 소속 동 판정(좌표 기준), 줌 레벨에 따른
+// 핀/동 라벨 전환(밀집도 완화).
+//
+// 데이터 출처: southkorea/seoul-maps(Apache-2.0, https://github.com/southkorea/seoul-maps)의
+// JUSO 2015 자료에서 강남구(SIG_CD/EMD_CD 접두 11680)만 추려 assets/data/에 저장했다
+// (assets/data/gangnam-boundary.geojson=구 1개, gangnam-dong-boundary.geojson=동 14개).
+// 법정동 단위이며 행정동(역삼1동/역삼2동 등) 세분화는 하지 않는다(사용자 확인).
+//
+// gnmap_v2_sites.dong 컬럼은 현재 전부 NULL이라(Excel import가 아직 이 값을 채우지 않음),
+// DB 값을 신뢰하지 못하고 좌표(lat/lng)로 직접 판정한다. DB에 실제 값이 채워지는 날을 대비해
+// 이미 값이 있는 사업장은 덮어쓰지 않는다(assignDongToSites 참고). 이 판정은 화면 표시/필터
+// 용도로만 쓰고, DB에는 절대 다시 쓰지 않는다(사업장 데이터 수정 금지 원칙 유지).
+let boundariesPromise = null;
+let guPolygons = [];
+let dongPolygonsData = []; // [{ name, polygon }]
+let dongLabelOverlays = new Map(); // name -> CustomOverlay
+let zoomListenerBound = false;
+const PIN_ZOOM_THRESHOLD = DEFAULT_LEVEL; // 이 레벨(기본 시작 배율) 이상으로 축소되면 핀 대신 동 이름+개수만 보여준다.
+
+// 단일 ring(닫힌 좌표 목록, [lng,lat][])에 대한 ray-casting 판정.
+function rayCastRing(lng, lat, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1];
+    const xj = ring[j][0], yj = ring[j][1];
+    const intersect = ((yi > lat) !== (yj > lat)) &&
+      (lng < (xj - xi) * (lat - yi) / (yj - yi + Number.EPSILON) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+// rings[0]=외곽선, rings[1..]=구멍(있으면 그 안은 제외). 강남구 동 경계에는 실질적으로
+// 구멍이 없지만 GeoJSON 스펙을 안전하게 그대로 따른다.
+function pointInPolygonRings(lng, lat, rings) {
+  if (!rings || rings.length === 0 || !rayCastRing(lng, lat, rings[0])) return false;
+  for (let i = 1; i < rings.length; i++) {
+    if (rayCastRing(lng, lat, rings[i])) return false;
+  }
+  return true;
+}
+
+function pointInGeometry(lng, lat, geometry) {
+  if (!geometry) return false;
+  if (geometry.type === 'Polygon') return pointInPolygonRings(lng, lat, geometry.coordinates);
+  if (geometry.type === 'MultiPolygon') return geometry.coordinates.some(rings => pointInPolygonRings(lng, lat, rings));
+  return false;
+}
+
+function ringCentroid(ring) {
+  let sx = 0, sy = 0;
+  ring.forEach(([x, y]) => { sx += x; sy += y; });
+  return { lng: sx / ring.length, lat: sy / ring.length };
+}
+
+// 라벨을 붙일 대표 좌표. 정확한 폴리곤 중심(무게중심)까지는 필요 없어 외곽선 꼭짓점의
+// 단순 평균으로 근사한다(라벨 위치 용도로 충분). MultiPolygon이면 꼭짓점이 가장 많은
+// (대체로 가장 넓은) 조각을 대표로 쓴다.
+function geometryCentroid(geometry) {
+  if (!geometry) return null;
+  if (geometry.type === 'Polygon') return ringCentroid(geometry.coordinates[0]);
+  if (geometry.type === 'MultiPolygon') {
+    let best = geometry.coordinates[0][0];
+    geometry.coordinates.forEach(rings => { if (rings[0].length > best.length) best = rings[0]; });
+    return ringCentroid(best);
+  }
+  return null;
+}
+
+function ringToPath(ring) {
+  return ring.map(([lng, lat]) => new kakao.maps.LatLng(lat, lng));
+}
+
+// kakao.maps.Polygon 1개는 구멍을 표현할 수 있지만(각 ring을 그대로 넘기면 됨), 여기서는
+// 시각적으로 구멍을 낼 이유가 없어 각 폴리곤의 외곽선만 그린다.
+function geometryToPaths(geometry) {
+  if (!geometry) return [];
+  if (geometry.type === 'Polygon') return [ringToPath(geometry.coordinates[0])];
+  if (geometry.type === 'MultiPolygon') return geometry.coordinates.map(rings => ringToPath(rings[0]));
+  return [];
+}
+
+function loadBoundaries() {
+  if (boundariesPromise) return boundariesPromise;
+  boundariesPromise = Promise.all([
+    fetch('assets/data/gangnam-boundary.geojson').then(r => (r.ok ? r.json() : null)).catch(() => null),
+    fetch('assets/data/gangnam-dong-boundary.geojson').then(r => (r.ok ? r.json() : null)).catch(() => null)
+  ]).then(([gu, dong]) => ({ gu, dong }));
+  return boundariesPromise;
+}
+
+// gnmap_v2_sites.dong이 비어 있는 사업장을, 좌표 기준으로 강남구 14개 법정동 중 하나에
+// 배정한다(화면 표시/필터 전용 파생값 — DB에는 쓰지 않는다). 이미 dong 값이 있으면 그대로 둔다.
+export async function assignDongToSites(sites) {
+  if (!Array.isArray(sites) || sites.length === 0) return sites;
+  const { dong } = await loadBoundaries();
+  if (!dong || !Array.isArray(dong.features)) return sites;
+
+  sites.forEach(site => {
+    if (site.dong !== null && site.dong !== undefined && site.dong !== '') return;
+    const lat = Number(site.lat);
+    const lng = Number(site.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const match = dong.features.find(f => pointInGeometry(lng, lat, f.geometry));
+    if (match) site.dong = match.properties.name;
+  });
+  return sites;
+}
+
+function buildDongLabelContent(name, count) {
+  const div = document.createElement('div');
+  div.className = 'gnmap-dong-label';
+  div.textContent = count > 0 ? `${name} ${count}` : name;
+  return div;
+}
+
+// renderMarkers()가 호출될 때마다(검색/필터 변경 포함) 현재 화면에 표시 중인 사업장 기준으로
+// 동 라벨의 개수 표기를 갱신한다. 라벨을 지도에 붙이거나 뗄지는 이 함수가 아니라
+// updateBoundaryDisplayForZoom()이 줌 레벨을 보고 결정한다.
+function updateDongCounts(sites) {
+  if (dongLabelOverlays.size === 0) return;
+  const counts = new Map();
+  (sites || []).forEach(site => {
+    if (!site.dong) return;
+    counts.set(site.dong, (counts.get(site.dong) || 0) + 1);
+  });
+  dongLabelOverlays.forEach((overlay, name) => {
+    overlay.setContent(buildDongLabelContent(name, counts.get(name) || 0));
+  });
+}
+
+// 사용자 피드백: 관할 현장이 많아 지도를 기본 배율로 보면 핀이 너무 빽빽해 복잡하다 —
+// 기본 배율(PIN_ZOOM_THRESHOLD) 이상으로 축소된 상태에서는 개별 핀(클러스터러 포함)을
+// 지도에서 떼고, 대신 동 경계 안에 "동이름 개수" 라벨만 보여준다. 사용자가 특정 동을
+// 확인하려고 확대하면(레벨이 작아지면) 다시 핀이 나타난다. 경계선 자체(구/동 폴리곤)는
+// 줌과 무관하게 항상 보인다.
+function updateBoundaryDisplayForZoom() {
+  if (!state.map) return;
+  const zoomedOut = state.map.getLevel() >= PIN_ZOOM_THRESHOLD;
+
+  if (clusterer) {
+    clusterer.setMap(zoomedOut ? null : state.map);
+  }
+  dongLabelOverlays.forEach(overlay => {
+    overlay.setMap(zoomedOut ? state.map : null);
+  });
+}
+
+// 강남구 경계(1차) + 법정동 14개 경계(2차)를 지도에 그린다. 여러 번 호출돼도 중복 생성하지
+// 않는다(이미 그려져 있으면 건너뜀). state.map이 준비된 뒤(initMap 이후)에만 호출해야 한다.
+export async function renderGangnamBoundaries() {
+  if (!state.map) return;
+
+  let gu, dong;
+  try {
+    ({ gu, dong } = await loadBoundaries());
+  } catch (err) {
+    console.error('경계 데이터 로드 실패:', err);
+    return; // 경계 없이도 지도/마커 등 기존 기능은 그대로 동작해야 한다.
+  }
+
+  if (gu && Array.isArray(gu.features) && guPolygons.length === 0) {
+    gu.features.forEach(f => {
+      geometryToPaths(f.geometry).forEach(path => {
+        const polygon = new kakao.maps.Polygon({
+          path,
+          strokeWeight: 2,
+          strokeColor: '#16326b',
+          strokeOpacity: 0.7,
+          fillOpacity: 0
+        });
+        polygon.setMap(state.map);
+        guPolygons.push(polygon);
+      });
+    });
+  }
+
+  if (dong && Array.isArray(dong.features) && dongPolygonsData.length === 0) {
+    dong.features.forEach(f => {
+      const name = f.properties.name;
+      geometryToPaths(f.geometry).forEach(path => {
+        const polygon = new kakao.maps.Polygon({
+          path,
+          strokeWeight: 1,
+          strokeColor: '#5b8def',
+          strokeOpacity: 0.6,
+          fillColor: '#5b8def',
+          fillOpacity: 0.03
+        });
+        polygon.setMap(state.map);
+        dongPolygonsData.push({ name, polygon });
+      });
+
+      const centroid = geometryCentroid(f.geometry);
+      if (centroid && !dongLabelOverlays.has(name)) {
+        const overlay = new kakao.maps.CustomOverlay({
+          position: new kakao.maps.LatLng(centroid.lat, centroid.lng),
+          content: buildDongLabelContent(name, 0),
+          xAnchor: 0.5,
+          yAnchor: 0.5,
+          zIndex: 5
+        });
+        dongLabelOverlays.set(name, overlay); // map에 붙이는 건 updateBoundaryDisplayForZoom()이 줌 보고 결정.
+      }
+    });
+  }
+
+  if (!zoomListenerBound) {
+    kakao.maps.event.addListener(state.map, 'zoom_changed', updateBoundaryDisplayForZoom);
+    zoomListenerBound = true;
+  }
+  updateBoundaryDisplayForZoom();
+}
+
 // STEP15-E.1-2: location_quality별 마커 색상. 상세 패널(#site-detail-panel)의
 // site-detail-quality-* 배지(js/ui.js)와 완전히 같은 색을 재사용해 "핀 색"과 "상세 배지 색"이
 // 어긋나지 않게 한다. MANUAL(관리자 직접 확인)은 EXACT와 동일하게 "정확"(초록)으로 취급한다.
@@ -243,6 +459,11 @@ export function renderMarkers(sites, onMarkerClick) {
   // 검색/필터가 바뀌어 마커가 전부 새로 만들어져도(위 clearMarkers()+새 Marker), 현재
   // 선택된 사업장(state.selectedSiteId)이 새 목록에도 있으면 선택 강조를 다시 입힌다.
   highlightSelectedMarker();
+
+  // STEP16.20: 검색/필터 결과가 바뀔 때마다 동 라벨의 "OO동 N" 개수 표기도 함께 갱신한다.
+  // 라벨을 지도에 보이거나 숨기는 결정은 줌 레벨(updateBoundaryDisplayForZoom)의 몫이라 여기선
+  // sites가 비어도(마커가 0개여도) 항상 호출해 카운트를 0으로 정확히 반영한다.
+  updateDongCounts(sites || []);
 }
 
 export function clearMarkers() {
