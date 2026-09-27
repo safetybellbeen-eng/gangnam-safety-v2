@@ -10,7 +10,10 @@
 // 다른 origin/다른 앱의 캐시는 건드리지 않는다(Cache Storage 자체가 origin별로 격리되어 있고,
 // 여기서도 이름 prefix로 한 번 더 스스로 범위를 제한한다).
 const CACHE_PREFIX = 'gnmap-v2-shell-';
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7'; // STEP16.21 배포 후 "필터가 안 열린다" 문의 — index.html/css/mobile.css/
+// css/map.css가 install 시 미리 캐시되는 app shell이라(위 APP_SHELL_URLS), 여러 STEP 동안 이
+// 값을 올리지 않아 예전 index.html/CSS가 그대로 남아있었을 가능성이 있다. 버전을 올려 이전
+// 캐시를 정리(activate 핸들러)하고 최신 shell을 다시 받게 한다.
 const CACHE_NAME = CACHE_PREFIX + CACHE_VERSION;
 
 // install 시 미리 캐시하는 "앱 셸"은 자주 바뀌지 않는 최소 정적 파일만 둔다(HTML/manifest/CSS/icon).
