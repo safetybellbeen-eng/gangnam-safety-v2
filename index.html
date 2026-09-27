@@ -542,6 +542,13 @@
            결정한다(PC 로직/DOM 불변, supervision.js의 CRUD 함수만 그대로 재사용). -->
       <div id="supervision-mobile-host"></div>
     </div>
+    <!-- STEP16.6(모바일 앱 설정/비밀번호 변경/알림 설정). PC 화면이 없는 모바일 전용 신규
+         화면이라(TARGET §34 "PC 영향 금지"), admin-panel처럼 매번 전체를 새로 그리는 빈
+         컨테이너만 두고, 열기/닫기는 admin-panel/upload-panel과 동일하게 기존 "더보기" 탭
+         (data-mobile-tab="more")에 머무른 채 display만 토글한다(js/app.js). -->
+    <div id="app-settings-panel" style="display:none"></div>
+    <div id="password-change-panel" style="display:none"></div>
+    <div id="notification-settings-panel" style="display:none"></div>
     <div id="site-list-panel">
       <div id="site-search-bar">
         <div id="site-search-input-wrap">
