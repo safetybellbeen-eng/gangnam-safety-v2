@@ -2265,10 +2265,12 @@ function svOverlapsMonth(sv, year, month) {
   const monthEnd = svFormatYMD(new Date(year, month + 1, 0));
   return sv.start_date <= monthEnd && sv.end_date >= monthStart;
 }
-function svMatchesQuickFilter(sv, filter) {
-  if (filter === 'all') return true;
-  if (filter === 'done') return computeSupervisionStatus(sv.start_date, sv.end_date) === 'done';
-  return sv.supervision_type === filter; // 'inspection' | 'supervision'
+// statusFilter('all'|'scheduled'|'ongoing'|'done')와 typeFilter('all'|'inspection'|'supervision')는
+// 서로 독립된 두 축이며 AND로 결합된다(사용자 요청: 상태 quick filter와 감독유형 필터를 분리).
+function svMatchesFilters(sv, statusFilter, typeFilter) {
+  if (statusFilter !== 'all' && computeSupervisionStatus(sv.start_date, sv.end_date) !== statusFilter) return false;
+  if (typeFilter !== 'all' && sv.supervision_type !== typeFilter) return false;
+  return true;
 }
 // 캘린더 dot/bar 색 우선순위: 완료(초록) > 감독(amber) > 점검(파랑) > 유형 미지정(회색).
 // (사용자 최종 결정 §7: status=done이면 유형과 무관하게 항상 초록.)
@@ -2409,15 +2411,19 @@ function renderSupervisionMobileList(view, rows) {
   monthBar.appendChild(todayBtn);
   view.appendChild(monthBar);
 
-  const quickFilter = state.supervisionMobileQuickFilter;
-  // 필터 chip의 카운트는 "현재 표시 중인 달"(§13) 기준 — quickFilter 선택과 무관하게 매번 4개 다 계산.
+  const statusFilter = state.supervisionMobileStatusFilter;
+  const typeFilter = state.supervisionMobileTypeFilter;
+  // 필터 chip의 카운트는 "현재 표시 중인 달"(§13) 기준 — 선택 상태와 무관하게 매번 다 계산.
   const monthRows = rows.filter(sv => svOverlapsMonth(sv, year, month));
   const countAll = monthRows.length;
+  const countOngoing = monthRows.filter(sv => computeSupervisionStatus(sv.start_date, sv.end_date) === 'ongoing').length;
+  const countScheduled = monthRows.filter(sv => computeSupervisionStatus(sv.start_date, sv.end_date) === 'scheduled').length;
+  const countDone = monthRows.filter(sv => computeSupervisionStatus(sv.start_date, sv.end_date) === 'done').length;
+  const countTypeAll = monthRows.length;
   const countInspection = monthRows.filter(sv => sv.supervision_type === 'inspection').length;
   const countSupervision = monthRows.filter(sv => sv.supervision_type === 'supervision').length;
-  const countDone = monthRows.filter(sv => computeSupervisionStatus(sv.start_date, sv.end_date) === 'done').length;
 
-  const filteredRows = rows.filter(sv => svMatchesQuickFilter(sv, quickFilter));
+  const filteredRows = rows.filter(sv => svMatchesFilters(sv, statusFilter, typeFilter));
 
   const calendarWrap = document.createElement('div');
   calendarWrap.className = 'sv-mobile-calendar';
@@ -2490,25 +2496,50 @@ function renderSupervisionMobileList(view, rows) {
   });
   view.appendChild(legend);
 
+  // 상태 quick filter(진행/예정/완료/전체) — 사용자 요청으로 감독유형 필터와 분리된 별도 축.
   const filterBar = document.createElement('div');
   filterBar.className = 'sv-mobile-filter-bar';
   [
-    ['all', `전체 (${countAll})`],
-    ['inspection', `점검 (${countInspection})`],
-    ['supervision', `감독 (${countSupervision})`],
+    ['ongoing', `진행 (${countOngoing})`],
+    ['scheduled', `예정 (${countScheduled})`],
     ['done', `완료 (${countDone})`],
+    ['all', `전체 (${countAll})`],
   ].forEach(([key, label]) => {
     const chip = document.createElement('button');
     chip.type = 'button';
-    chip.className = 'sv-mobile-filter-chip' + (quickFilter === key ? ' active' : '');
+    chip.className = 'sv-mobile-filter-chip' + (statusFilter === key ? ' active' : '');
     chip.textContent = label;
     chip.addEventListener('click', () => {
-      state.supervisionMobileQuickFilter = key;
+      state.supervisionMobileStatusFilter = key;
       rerender();
     });
     filterBar.appendChild(chip);
   });
   view.appendChild(filterBar);
+
+  // 감독유형 필터(전체/점검/감독) — 상태 quick filter와 별개로 AND 결합된다.
+  const typeFilterBar = document.createElement('div');
+  typeFilterBar.className = 'sv-mobile-type-filter-bar';
+  const typeFilterLabel = document.createElement('span');
+  typeFilterLabel.className = 'sv-mobile-type-filter-label';
+  typeFilterLabel.textContent = '감독유형';
+  typeFilterBar.appendChild(typeFilterLabel);
+  [
+    ['all', `전체 (${countTypeAll})`],
+    ['inspection', `점검 (${countInspection})`],
+    ['supervision', `감독 (${countSupervision})`],
+  ].forEach(([key, label]) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'sv-mobile-type-filter-chip' + (typeFilter === key ? ' active' : '');
+    chip.textContent = label;
+    chip.addEventListener('click', () => {
+      state.supervisionMobileTypeFilter = key;
+      rerender();
+    });
+    typeFilterBar.appendChild(chip);
+  });
+  view.appendChild(typeFilterBar);
 
   const dateRow = document.createElement('div');
   dateRow.className = 'sv-mobile-selected-date-row';
@@ -2725,14 +2756,41 @@ function renderSupervisionMobileForm(view, rows) {
   sep.textContent = '~';
   const endInput = document.createElement('input');
   endInput.type = 'date';
-  endInput.min = SUPERVISION_MIN_DATE;
+  endInput.min = existing ? existing.start_date : SUPERVISION_MIN_DATE;
   endInput.max = SUPERVISION_MAX_DATE;
   endInput.value = existing ? existing.end_date : '';
   rangeWrap.appendChild(startInput);
   rangeWrap.appendChild(sep);
   rangeWrap.appendChild(endInput);
   periodField.appendChild(rangeWrap);
+  const rangeErrorEl = document.createElement('p');
+  rangeErrorEl.className = 'sv-mobile-range-error';
+  periodField.appendChild(rangeErrorEl);
   form.appendChild(periodField);
+
+  // 사용자 요청(추가 반영): 제출 시점 검증(§ 종료일<시작일 금지)에 더해, 시작일을 고르는 즉시
+  // 종료일 date picker의 선택 가능 범위 자체를 시작일 이후로 좁히고, 이미 골라둔 종료일이
+  // 시작일보다 빨라지면 그 자리에서 비우고 안내한다 — 제출 전에 역전을 원천적으로 막는다.
+  startInput.addEventListener('change', () => {
+    rangeErrorEl.textContent = '';
+    if (startInput.value) {
+      endInput.min = startInput.value;
+      if (endInput.value && endInput.value < startInput.value) {
+        endInput.value = '';
+        rangeErrorEl.textContent = '시작일이 변경되어 종료일이 초기화되었습니다. 종료일을 다시 선택해주세요.';
+      }
+    } else {
+      endInput.min = SUPERVISION_MIN_DATE;
+    }
+  });
+  endInput.addEventListener('change', () => {
+    if (startInput.value && endInput.value && endInput.value < startInput.value) {
+      rangeErrorEl.textContent = '종료일은 시작일보다 빠를 수 없습니다.';
+      endInput.value = '';
+    } else {
+      rangeErrorEl.textContent = '';
+    }
+  });
 
   const typeField = document.createElement('div');
   typeField.className = 'sv-mobile-field';
@@ -2954,6 +3012,11 @@ function renderSupervisionMobileDetail(view, rows) {
     deleteBtn.addEventListener('click', async () => {
       // §31: 즉시 삭제 금지, confirm 후에만 기존 deleteSupervision() 재사용.
       if (!window.confirm('이 감독일정을 삭제하시겠습니까?')) return;
+      // 사용자 요청(추가 반영): 완료된 감독 기록은 실적/이력 자료로서 가치가 크므로,
+      // 삭제 시 일반 confirm 외에 완료 건임을 명시한 2차 경고를 한 번 더 띄운다(DB/RLS 변경 없음, 프론트 확인 절차만 강화).
+      if (liveStatus === 'done') {
+        if (!window.confirm('이미 완료된 감독 기록입니다. 삭제하면 복구할 수 없습니다.\n정말 삭제하시겠습니까?')) return;
+      }
       deleteBtn.disabled = true;
       const result = await deleteSupervision(sv.id);
       if (!result.success) {
