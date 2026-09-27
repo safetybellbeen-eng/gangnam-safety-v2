@@ -2113,6 +2113,8 @@
   #app[data-mobile-tab="more"] #app-settings-panel,
   #app[data-mobile-tab="more"] #password-change-panel,
   #app[data-mobile-tab="more"] #notification-settings-panel,
+  #app[data-mobile-tab="more"] #site-notes-panel,
+  #app[data-mobile-tab="more"] #site-notes-write-panel,
   #app[data-mobile-tab="route"] #route-order-panel,
   #app[data-mobile-tab="route"] #route-detail-panel {
     position: fixed;
@@ -4982,6 +4984,161 @@
     line-height: 1.6;
   }
   .settings-success-text { color: var(--gnmap-green) !important; }
+
+  /* STEP16.23: 더보기 > 현장 메모(목록/작성) 전용. 나머지 컴포넌트(카드/안내카드/저장버튼/
+     bottom sheet/빈 상태 등)는 기존 .sv-mobile-*/.settings-notice-card/.upload-mobile-primary-btn/
+     .admin-sheet* 클래스를 그대로 재사용하고, 여기서는 이 화면에만 필요한 것만 추가한다. */
+  .site-notes-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 0 16px 12px;
+    padding: 12px 14px;
+    background: var(--gnmap-blue-light);
+    border-radius: var(--gnmap-radius-md);
+  }
+  .site-notes-summary-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: var(--gnmap-fw-semibold);
+    color: var(--gnmap-navy);
+  }
+  .site-notes-summary-label svg { width: 18px; height: 18px; color: var(--gnmap-blue); }
+  .site-notes-summary-count {
+    font-size: 15px;
+    font-weight: var(--gnmap-fw-bold);
+    color: var(--gnmap-blue);
+  }
+  .site-notes-search-wrap {
+    position: relative;
+    margin: 0 16px 12px;
+  }
+  .site-notes-search-icon {
+    position: absolute;
+    top: 50%;
+    left: 12px;
+    transform: translateY(-50%);
+    color: var(--gnmap-text-sub);
+    display: flex;
+  }
+  .site-notes-search-icon svg { width: 18px; height: 18px; }
+  .site-notes-search-input {
+    width: 100%;
+    height: 42px;
+    box-sizing: border-box;
+    padding: 0 12px 0 38px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-md);
+    background: var(--gnmap-bg-soft);
+    font-size: var(--gnmap-fs-body);
+    color: var(--gnmap-text-primary);
+  }
+  .site-notes-search-input:focus {
+    outline: none;
+    border-color: var(--gnmap-blue);
+    background: #fff;
+    box-shadow: var(--gnmap-focus-ring);
+  }
+  .site-notes-filter-row {
+    display: flex;
+    gap: 8px;
+    margin: 0 16px 14px;
+  }
+  .site-notes-filter-chip {
+    flex: 1;
+    min-height: 34px;
+    border: none;
+    border-radius: var(--gnmap-radius-pill);
+    background: var(--gnmap-bg-soft);
+    color: var(--gnmap-text-sub);
+    font-size: 13px;
+    font-weight: var(--gnmap-fw-semibold);
+  }
+  .site-notes-filter-chip.active {
+    background: var(--gnmap-blue);
+    color: #fff;
+  }
+  .site-notes-list {
+    padding: 0 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .site-notes-card-icon { color: var(--gnmap-blue); }
+  .site-notes-card-icon svg { width: 18px; height: 18px; }
+  .site-notes-card-preview {
+    font-size: 13px;
+    color: var(--gnmap-text-sub);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: 6px;
+  }
+  .site-notes-modified-badge {
+    padding: 2px 8px;
+    border-radius: var(--gnmap-radius-pill);
+    background: var(--gnmap-blue-light);
+    color: var(--gnmap-blue);
+    font-size: 11px;
+    font-weight: var(--gnmap-fw-semibold);
+  }
+  .site-notes-select-field {
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 0 14px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-sm);
+    background: #fff;
+    font-size: 14px;
+    color: var(--gnmap-text-primary);
+  }
+  .site-notes-select-field-icon { flex-shrink: 0; color: var(--gnmap-text-sub); display: flex; }
+  .site-notes-select-field-icon svg { width: 18px; height: 18px; }
+  .site-notes-select-field-text { flex: 1; text-align: left; }
+  .site-notes-select-field-text.is-placeholder { color: var(--gnmap-text-sub); }
+  .site-notes-select-field-chevron { flex-shrink: 0; color: var(--gnmap-text-sub); display: flex; }
+  .site-notes-select-field-chevron svg { width: 16px; height: 16px; }
+  .site-notes-existing-hint { font-size: 12px; color: var(--gnmap-blue); margin: 6px 2px 0; }
+  .site-notes-textarea {
+    min-height: 200px;
+    padding: 12px;
+    resize: vertical;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+  .site-notes-char-counter {
+    text-align: right;
+    font-size: 12px;
+    color: var(--gnmap-text-sub);
+    margin-top: 4px;
+  }
+  /* .settings-notice-card 기본(파란 배경)은 유지하되, 아이콘+제목/목록을 세로로 쌓는다
+     (기존 .settings-notice-card-column은 배경을 회색으로 바꾸는 다른 화면 전용이라 재사용하지
+     않는다 — 시안이 이 카드는 파란 배경을 요구한다). */
+  .site-notes-guide-card {
+    display: block;
+  }
+  .site-notes-guide-list {
+    margin: 0;
+    padding-left: 18px;
+  }
+  .site-notes-guide-list li {
+    font-size: 12px;
+    color: var(--gnmap-text-sub);
+    line-height: 1.6;
+  }
+  .site-notes-save-btn-wrap {
+    padding: 4px 16px 20px;
+  }
 }
 
 /* [STEP16.5 FINAL-3] 짧은 실효 viewport 전용 압축. HERO는 aspect-ratio(67/100)로 폭에
