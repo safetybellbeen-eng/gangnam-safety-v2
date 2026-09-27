@@ -1053,7 +1053,7 @@ export function renderAppSettingsPanel(containerId) {
 // ============================================================
 // B. 비밀번호 변경
 // ============================================================
-function buildPasswordField(labelText, placeholder) {
+function buildPasswordField(labelText, placeholder, options = {}) {
   const field = document.createElement('div');
   field.className = 'settings-field';
   field.appendChild(svLabel(labelText, true));
@@ -1079,7 +1079,31 @@ function buildPasswordField(labelText, placeholder) {
   });
   wrap.appendChild(toggleBtn);
   field.appendChild(wrap);
-  return { field, input };
+
+  // 회원가입 화면(#signup-password-rules / #signup-password-match-msg, app.js)과 완전히
+  // 동일한 클래스(mobile-signup-rules / mobile-signup-match-msg)를 그대로 재사용해, 새
+  // 컴포넌트를 만들지 않고도 동일한 라이브 체크리스트·일치표시 UI를 보여준다.
+  let rulesEl = null;
+  let matchMsgEl = null;
+  if (options.withRules) {
+    rulesEl = document.createElement('ul');
+    rulesEl.className = 'mobile-signup-rules';
+    [['length', '8~20자'], ['letter', '영문 포함'], ['digit', '숫자 포함'], ['special', '특수문자 포함']]
+      .forEach(([rule, text]) => {
+        const li = document.createElement('li');
+        li.dataset.rule = rule;
+        li.textContent = text;
+        rulesEl.appendChild(li);
+      });
+    field.appendChild(rulesEl);
+  }
+  if (options.withMatchMsg) {
+    matchMsgEl = document.createElement('span');
+    matchMsgEl.className = 'mobile-signup-match-msg';
+    matchMsgEl.setAttribute('aria-live', 'polite');
+    field.appendChild(matchMsgEl);
+  }
+  return { field, input, rulesEl, matchMsgEl };
 }
 
 export function renderPasswordChangePanel(containerId) {
@@ -1109,11 +1133,45 @@ export function renderPasswordChangePanel(containerId) {
   form.className = 'settings-form';
 
   const { field: currentField, input: currentInput } = buildPasswordField('현재 비밀번호', '현재 비밀번호를 입력해주세요.');
-  const { field: newField, input: newInput } = buildPasswordField('새 비밀번호', '새 비밀번호를 입력해주세요.');
-  const { field: confirmField, input: confirmInput } = buildPasswordField('새 비밀번호 확인', '새 비밀번호를 다시 입력해주세요.');
+  const { field: newField, input: newInput, rulesEl: newPwRulesEl } = buildPasswordField('새 비밀번호', '새 비밀번호를 입력해주세요.', { withRules: true });
+  const { field: confirmField, input: confirmInput, matchMsgEl: confirmMatchMsgEl } = buildPasswordField('새 비밀번호 확인', '새 비밀번호를 다시 입력해주세요.', { withMatchMsg: true });
   form.appendChild(currentField);
   form.appendChild(newField);
   form.appendChild(confirmField);
+
+  // STEP16.9(회원가입과 동일한 라이브 검증). app.js의 signup 라이브 체크리스트/일치표시
+  // 로직(RULES 판정식, is-met/is-match 클래스 토글)을 그대로 재사용한다 — 새 비밀번호
+  // 규칙 안내는 이제 이 라이브 체크리스트가 대신하므로, 아래 정적 안내카드는 체크리스트가
+  // 다루지 않는 "기존 비밀번호와 다른 비밀번호" 항목만 남긴다.
+  const PW_RULES = {
+    length: (v) => v.length >= 8 && v.length <= 20,
+    letter: (v) => /[A-Za-z]/.test(v),
+    digit: (v) => /\d/.test(v),
+    special: (v) => /[^A-Za-z0-9]/.test(v),
+  };
+  if (newPwRulesEl) {
+    newInput.addEventListener('input', () => {
+      const value = newInput.value;
+      newPwRulesEl.querySelectorAll('li[data-rule]').forEach((li) => {
+        const rule = PW_RULES[li.dataset.rule];
+        li.classList.toggle('is-met', !!(rule && rule(value)));
+      });
+    });
+  }
+  if (confirmMatchMsgEl) {
+    const updateMatchMsg = () => {
+      if (!confirmInput.value) {
+        confirmMatchMsgEl.textContent = '';
+        confirmMatchMsgEl.className = 'mobile-signup-match-msg';
+        return;
+      }
+      const match = newInput.value === confirmInput.value;
+      confirmMatchMsgEl.textContent = match ? '비밀번호가 일치합니다.' : '비밀번호가 일치하지 않습니다.';
+      confirmMatchMsgEl.className = 'mobile-signup-match-msg ' + (match ? 'is-match' : 'is-mismatch');
+    };
+    newInput.addEventListener('input', updateMatchMsg);
+    confirmInput.addEventListener('input', updateMatchMsg);
+  }
 
   const errorEl = document.createElement('p');
   errorEl.className = 'sv-mobile-field-error';
@@ -1126,10 +1184,9 @@ export function renderPasswordChangePanel(containerId) {
   guideTitle.textContent = '비밀번호 설정 안내';
   guideCard.appendChild(guideTitle);
   const guideList = document.createElement('ul');
-  // TARGET 안내문구를 실제 아래 validation 규칙과 동일하게 맞춘다(§16 — 안내와 실제 검증이
-  // 달라서는 안 됨). 이 프로젝트/Supabase 쪽에 그 외 별도 password policy가 없음을 auth.js
-  // AUTH_ERROR_MAP("password should be at least" 8자 매핑)로 확인했다.
-  ['영문, 숫자, 특수문자를 조합해주세요.', '8자 이상으로 설정해주세요.', '기존 비밀번호와 다른 비밀번호를 사용해주세요.']
+  // 영문/숫자/특수문자/8~20자 안내는 위 새 비밀번호 라이브 체크리스트가 대신하므로(회원가입과
+  // 동일한 방식), 여기서는 체크리스트가 다루지 않는 항목만 남긴다.
+  ['기존 비밀번호와 다른 비밀번호를 사용해주세요.']
     .forEach(t => { const li = document.createElement('li'); li.textContent = t; guideList.appendChild(li); });
   guideCard.appendChild(guideList);
   form.appendChild(guideCard);
