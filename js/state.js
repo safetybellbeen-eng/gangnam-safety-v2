@@ -57,5 +57,12 @@ export const state = {
   // (더 이상 화면 어디에서도 트리거되지 않음). location_quality 값 자체나 목록 카드의
   // "위치확인필요" 배지(site-list-review-badge)는 이 필터와 무관하게 그대로 유지된다.
   mobileActiveTab: 'map',             // STEP15-B. 모바일 하단 탭 현재 선택값: 'map'|'site'|'route'|'favorite'|'alert'|'more'. PC 화면에서는 사용하지 않음.
-  uploadMobileTab: 'file'             // 모바일 "사업장 데이터 관리" 화면 내부 탭: 'file'(파일 업로드) | 'history'(업로드 이력). PC 화면에서는 사용하지 않음.
+  uploadMobileTab: 'file',            // 모바일 "사업장 데이터 관리" 화면 내부 탭: 'file'(파일 업로드) | 'history'(업로드 이력). PC 화면에서는 사용하지 않음.
+  // STEP16.5(모바일 감독일정관리): 아래 필드는 전부 화면 표시/탐색 상태일 뿐이며, DB/RLS와 무관하다.
+  supervisionMobileView: 'list',       // 'list' | 'form' | 'detail'. PC 화면에서는 사용하지 않음.
+  supervisionMobileFormOrigin: 'list', // form 화면의 '뒤로가기' 대상: 'list'(신규 등록) | 'detail'(상세에서 수정 진입)
+  supervisionMobileMonthCursor: null,  // { year, month(0-11) } 표시 중인 달. null이면 렌더 시 오늘 기준으로 초기화.
+  supervisionMobileSelectedDate: null, // 'YYYY-MM-DD'. null이면 렌더 시 오늘 날짜로 초기화.
+  supervisionMobileQuickFilter: 'all', // 'all' | 'inspection' | 'supervision' | 'done' (목록 상단 필터 chip, 프론트 표시만)
+  supervisionMobileSelectedId: null     // 상세/수정 화면 대상 gnmap_v2_supervisions.id
 };
