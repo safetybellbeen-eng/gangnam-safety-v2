@@ -2107,7 +2107,6 @@
     color: var(--gnmap-navy);
     margin-bottom: var(--gnmap-space-2);
   }
-  .route-summary-card,
   .route-start-card {
     background: #fff;
     border: 1px solid var(--gnmap-border);
@@ -2115,10 +2114,6 @@
     box-shadow: var(--gnmap-shadow-sm);
     padding: var(--gnmap-space-4);
     margin-bottom: var(--gnmap-space-3);
-  }
-  .route-summary-count {
-    font-size: var(--gnmap-fs-body);
-    color: var(--gnmap-text-sub);
   }
   .route-start-row {
     display: flex;
@@ -2240,6 +2235,8 @@
     margin-top: 2px;
   }
   .route-site-text { flex: 1; min-width: 0; }
+  /* STEP16.15: 현장명/주소를 누르면 기존 상세보기(site-detail-panel)가 뜬다는 것을 알려준다. */
+  .route-site-text-clickable { cursor: pointer; }
   .route-site-name {
     font-size: var(--gnmap-fs-body);
     font-weight: var(--gnmap-fw-semibold);
