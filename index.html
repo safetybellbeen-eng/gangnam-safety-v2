@@ -537,6 +537,10 @@
         <button type="button" id="btn-sv-cancel">취소</button>
         <p id="supervision-form-error"></p>
       </div>
+      <!-- STEP16.5(모바일 감독일정관리) TARGET UI 전용 컨테이너. 위 PC 마크업(#supervision-filter-bar/
+           #supervision-form 등)은 그대로 두고, css/mobile.css가 화면 폭에 따라 어느 쪽을 보일지만
+           결정한다(PC 로직/DOM 불변, supervision.js의 CRUD 함수만 그대로 재사용). -->
+      <div id="supervision-mobile-host"></div>
     </div>
     <div id="site-list-panel">
       <div id="site-search-bar">
