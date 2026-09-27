@@ -2008,6 +2008,7 @@
   #app[data-mobile-tab="more"] #admin-panel,
   #app[data-mobile-tab="more"] #upload-panel,
   #app[data-mobile-tab="more"] #supervision-panel,
+  #app[data-mobile-tab="more"] #account-info-panel,
   #app[data-mobile-tab="more"] #app-settings-panel,
   #app[data-mobile-tab="more"] #password-change-panel,
   #app[data-mobile-tab="more"] #notification-settings-panel {
@@ -2075,30 +2076,29 @@
     background: #ccc;
   }
 
-  /* STEP16.5 후속(더보기 화면 정비): TARGET 이미지 기준 큰 페이지 타이틀. index.html에
-     정적으로 둔 <h2 class="mobile-more-page-title">더보기</h2> 전용 스타일. */
-  .mobile-more-page-title {
-    font-size: 30px;
-    font-weight: 800;
-    color: var(--gnmap-navy);
-    margin: 4px 0 16px;
-    text-align: left;
-  }
-
   /* STEP15-D/E.6, STEP16.5 후속: 더보기 탭 — 로그인 사용자 정보 카드 + 메뉴 카드들.
      화이트/네이비/정부 블루 톤과 --gnmap-* 토큰을 다른 탭과 동일하게 재사용한다.
      PROFILE CARD는 TARGET처럼 좌측 원형 avatar + 중앙 이름/소속 + 우측 chevron 구조로 바꾼다.
-     "내 정보 관리" 기능이 아직 없어 클릭 동작은 없다(완료 보고에서 별도 명시). */
+     STEP16.10: 프로필 카드를 누르면 "내 정보 관리"(#account-info-panel)로 들어가는 실제
+     버튼으로 바뀌었다(더보기 목록의 정적 "내 정보 관리" 행은 제거하고 이 카드가 그 역할을
+     대신한다) — <button> 요소이므로 기본 버튼 스타일(테두리/정렬)을 초기화한다. */
   .mobile-more-profile {
     display: flex;
     align-items: center;
     gap: 14px;
+    width: 100%;
     background: #fff;
     border: 1px solid var(--gnmap-border);
     border-radius: var(--gnmap-radius-md);
     box-shadow: var(--gnmap-shadow-sm);
     padding: 16px;
     margin-bottom: 20px;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .mobile-more-profile:active {
+    background: #f7f9fc;
   }
   .mobile-more-avatar {
     flex-shrink: 0;
