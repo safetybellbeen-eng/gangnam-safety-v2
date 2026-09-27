@@ -779,6 +779,11 @@
     gap: 4px;
     min-width: 0;
   }
+  /* 사용자 피드백: 공사기간("YYYY.MM.DD ~ YYYY.MM.DD")은 2열 폭(1fr)에서 종료일이 잘려
+     보였다. 이 항목만 2열 grid의 전체 폭(1 / -1)을 쓰게 해서 잘리지 않게 한다. */
+  .site-list-summary-item--wide {
+    grid-column: 1 / -1;
+  }
   .site-list-summary-label {
     flex: 0 0 auto;
     font-size: 11px;
