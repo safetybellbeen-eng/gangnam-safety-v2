@@ -3,7 +3,9 @@
 // RLS: SELECT는 approved 전체, INSERT/UPDATE/DELETE는 admin만 — 이 파일은 그 위에서 얇게만 감싼다.
 import { sb } from './api.js';
 
-const SUPERVISION_COLUMNS = 'id, title, manager_name, start_date, end_date, status, created_by, created_at, updated_at';
+// supervision_type('inspection'|'supervision'|null) — STEP16.5: status(예정/진행중/완료, 날짜로 자동
+// 계산)와 완전히 별개인 "감독 유형(점검/감독)" 축. 기존 행은 NULL 허용, 신규 등록부터 프론트에서 필수값.
+const SUPERVISION_COLUMNS = 'id, title, manager_name, start_date, end_date, status, supervision_type, created_by, created_at, updated_at';
 
 // 전체 감독일정을 조회한다. 실패해도 예외를 던지지 않고 빈 배열을 반환한다 —
 // 다른 기능(지도/사업장 목록 등)을 막지 않기 위함(notes.js/favorites.js와 동일한 방어 패턴).
@@ -32,6 +34,7 @@ export async function createSupervision(fields) {
       start_date: fields.start_date,
       end_date: fields.end_date,
       status: fields.status,
+      supervision_type: fields.supervision_type ?? null,
     })
     .select(SUPERVISION_COLUMNS)
     .single();
@@ -53,6 +56,7 @@ export async function updateSupervision(id, fields) {
       start_date: fields.start_date,
       end_date: fields.end_date,
       status: fields.status,
+      supervision_type: fields.supervision_type ?? null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)
