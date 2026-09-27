@@ -550,6 +550,11 @@
     <div id="app-settings-panel" style="display:none"></div>
     <div id="password-change-panel" style="display:none"></div>
     <div id="notification-settings-panel" style="display:none"></div>
+    <!-- STEP16.13(모바일 "경로" 탭 — 방문 순서/경로 상세). "경로" 탭(data-mobile-tab="route")에
+         머무른 채 열리는 전체화면 패널. 위 account-info-panel 등과 동일한 패턴(display 토글만,
+         js/app.js가 탭 이탈 시 닫는다). -->
+    <div id="route-order-panel" style="display:none"></div>
+    <div id="route-detail-panel" style="display:none"></div>
     <div id="site-list-panel">
       <div id="site-search-bar">
         <div id="site-search-input-wrap">
@@ -664,13 +669,15 @@
     <!-- STEP15-B: 모바일(≤768px) 전용 하단 탭 골격. PC에서는 css/mobile.css가 항상 숨김 처리한다.
          지도/현장/즐겨찾기는 기존 DOM(map-container/site-list-panel)을 그대로 재사용하고,
          경로/알림/더보기는 이번 STEP에서는 최소 placeholder만 둔다(실제 연결은 STEP15-D 이후). -->
-    <!-- STEP15-D: 경로 탭. 다중 경유지 등 새 경로 기능은 만들지 않고, 기존 사업장 상세의
-         "길찾기"(buildKakaoDirectionsUrl)만 재사용해 현재 선택된 사업장 하나에 대해 보여준다.
-         안내 문구는 정적 텍스트, 선택 사업장 유무에 따른 실제 내용은 #mobile-route-content에
-         renderMobileRouteView()(js/ui.js)가 채운다. -->
+    <!-- STEP16.13: 경로 탭 — "경로 만들기"(현재 위치+방문 현장 선택) 화면. 여기서 "방문 순서
+         만들기"를 누르면 #route-order-panel(방문 순서)이, 각 현장 카드/상세에서 "경로 상세"로
+         들어가면 #route-detail-panel이 이 탭에 머무른 채(전체화면 오버레이) 열린다. 다중 경유지
+         자동 최적화/실제 도로 경로/거리·시간 계산은 하지 않는다(승인된 축소 범위, §STOP리포트 참고) —
+         사용자가 정한(또는 드래그로 바꾼) 순서와 개별 목적지 카카오맵 길찾기 링크만 제공한다.
+         실제 내용은 renderMobileRouteView()(js/ui.js)가 채운다. -->
     <div id="mobile-view-route" class="mobile-view">
       <h2 class="mobile-view-title">경로</h2>
-      <p class="mobile-view-guide">현장에서 사업장을 선택하면 카카오맵 길찾기를 이용할 수 있습니다.</p>
+      <p class="mobile-view-guide">방문할 현장을 선택하고 순서를 정해보세요.</p>
       <div id="mobile-route-content"></div>
     </div>
     <!-- STEP15-D: 알림 탭. 별도 알림 DB가 없으므로 기존 gnmap_v2_supervisions 감독일정 패널
