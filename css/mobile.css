@@ -2152,6 +2152,17 @@
     font-weight: var(--gnmap-fw-semibold);
   }
   .route-start-btn:disabled { opacity: 0.5; }
+  /* STEP16.14: 출발지 버튼 2개(현재 위치 / 주소로 검색)를 세로로 쌓는 그룹. */
+  .route-start-btn-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gnmap-space-2);
+    flex-shrink: 0;
+  }
+  .route-start-btn-secondary {
+    border-color: var(--gnmap-border);
+    color: var(--gnmap-text-sub);
+  }
   .route-start-error {
     color: var(--gnmap-red);
     background: var(--gnmap-red-bg);
@@ -2415,6 +2426,37 @@
     font-weight: var(--gnmap-fw-bold);
     margin-top: var(--gnmap-space-3);
   }
+
+  /* STEP16.14: 출발지 "주소로 검색" sheet — admin-sheet-overlay/admin-sheet(기존)와
+     route-picker-list(기존) 뼈대를 그대로 재사용하고, 검색창+검색버튼 줄과 후보 행만 전용 스타일. */
+  .route-addr-search-row {
+    display: flex;
+    gap: var(--gnmap-space-2);
+    align-items: center;
+  }
+  .route-addr-search-row .sv-manager-sheet-search { flex: 1; min-width: 0; }
+  .route-addr-search-btn {
+    flex-shrink: 0;
+    min-height: var(--gnmap-tap-min);
+    padding: 0 var(--gnmap-space-3);
+    border: none;
+    border-radius: var(--gnmap-radius-sm);
+    background: var(--gnmap-blue);
+    color: #fff;
+    font-size: var(--gnmap-fs-secondary);
+    font-weight: var(--gnmap-fw-semibold);
+  }
+  .route-addr-search-btn:disabled { opacity: 0.5; }
+  .route-addr-candidate-row {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--gnmap-border);
+    padding: var(--gnmap-space-2) 0;
+  }
+  .route-addr-candidate-row:last-child { border-bottom: none; }
 
   /* STEP15-D/E.6, STEP16.5 후속: 더보기 탭 — 로그인 사용자 정보 카드 + 메뉴 카드들.
      화이트/네이비/정부 블루 톤과 --gnmap-* 토큰을 다른 탭과 동일하게 재사용한다.
