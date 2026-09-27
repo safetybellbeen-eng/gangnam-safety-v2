@@ -827,6 +827,11 @@ function buildRouteSiteCard(site, index, onDelete) {
 
   const textWrap = document.createElement('div');
   textWrap.className = 'route-site-text';
+  // STEP16.15: 현장명/주소 영역을 누르면 기존 site-detail-panel(즐겨찾기 탭 등에서 쓰는
+  // selectSite()와 동일한 상세보기)이 뜨도록 한다. 드래그 손잡이(.route-drag-handle)와
+  // 삭제(×) 버튼은 이 textWrap 바깥의 형제 요소라 클릭 영역이 겹치지 않는다.
+  textWrap.classList.add('route-site-text-clickable');
+  textWrap.addEventListener('click', () => selectSite(site.id));
   const nameEl = document.createElement('div');
   nameEl.className = 'route-site-name';
   nameEl.textContent = site.site_name || site.company_name || '-';
@@ -1118,21 +1123,6 @@ export function renderMobileRouteView(containerId) {
   container.innerHTML = '';
 
   const selectedSites = getRoutePlanSites();
-
-  // 오늘의 경로
-  const summaryCard = document.createElement('div');
-  summaryCard.className = 'route-summary-card';
-  const summaryTitle = document.createElement('div');
-  summaryTitle.className = 'route-card-title';
-  summaryTitle.textContent = '오늘의 경로';
-  summaryCard.appendChild(summaryTitle);
-  const summaryCount = document.createElement('div');
-  summaryCount.className = 'route-summary-count';
-  summaryCount.textContent = selectedSites.length > 0
-    ? `방문 현장 ${selectedSites.length}곳 선택됨`
-    : '아직 선택한 현장이 없습니다.';
-  summaryCard.appendChild(summaryCount);
-  container.appendChild(summaryCard);
 
   // 출발지
   const startCard = document.createElement('div');
