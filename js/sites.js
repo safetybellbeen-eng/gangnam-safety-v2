@@ -109,13 +109,20 @@ function compareBySort(a, b, sortMode) {
   }
 }
 
+// STEP16.21: map.js가 강남구 14개 법정동 어디에도 안 들어가는(경계 밖 좌표) 사업장에
+// 붙이는 값과 반드시 같은 문자열이어야 한다 — 값만 맞으면 되므로 여기서는 import 없이
+// 리터럴로 맞춰 순환참조를 피한다(js/map.js의 OTHER_DONG_LABEL 참고).
+const OTHER_DONG_LABEL = '그외';
+
 // state.sites에 실제 존재하는 dong 값만 중복 제거 + 정렬해서 반환한다. select 옵션 채우기용.
+// "그외"(관할 밖)는 가나다순에 섞이지 않도록 항상 목록 맨 끝에 붙인다.
 export function getDongOptions() {
   const dongs = state.sites
     .map(s => (typeof s.dong === 'string' ? s.dong.trim() : s.dong))
     .filter(d => d !== null && d !== undefined && d !== '');
   const unique = [...new Set(dongs)];
-  return unique.sort((a, b) => a.localeCompare(b, 'ko'));
+  const real = unique.filter(d => d !== OTHER_DONG_LABEL).sort((a, b) => a.localeCompare(b, 'ko'));
+  return unique.includes(OTHER_DONG_LABEL) ? [...real, OTHER_DONG_LABEL] : real;
 }
 
 // state.sites를 원본 그대로 두고, 복사본에서 검색 → 관할(동) → 금액 → 점검 → 산재표 →

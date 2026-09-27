@@ -28,8 +28,23 @@ let boundariesPromise = null;
 let guPolygons = [];
 let dongPolygonsData = []; // [{ name, polygon }]
 let dongLabelOverlays = new Map(); // name -> CustomOverlay
+let dongLabelContentByName = new Map(); // name -> label div (setContent로 통째로 갈아끼우면 클릭 리스너가 날아가 setContent 대신 textContent만 갱신)
+let dongBoundsByName = new Map(); // name -> kakao.maps.LatLngBounds (라벨 클릭 시 그 동으로 확대하는 용도)
 let zoomListenerBound = false;
 const PIN_ZOOM_THRESHOLD = DEFAULT_LEVEL; // 이 레벨(기본 시작 배율) 이상으로 축소되면 핀 대신 동 이름+개수만 보여준다.
+
+// 사용자 요청: 강남구 14개 법정동 중 어디에도 속하지 않는(=경계 밖 좌표) 사업장도 그냥
+// 숨기지 않고 "그외"로 분류해 목록/관할 필터에서 확인할 수 있게 한다. js/sites.js의
+// getDongOptions()/matchesDongs()는 이 문자열을 다른 동 이름과 똑같이(단순 문자열 비교) 다루므로
+// 별도 처리 없이 그대로 필터링된다 — 값만 이 상수와 동일하게 맞추면 된다.
+const OTHER_DONG_LABEL = '그외';
+
+// 실제 카카오맵 SDK의 kakao.maps.MarkerClusterer에는 setMap() 메서드가 없다(공식 문서 기준
+// addMarker(s)/removeMarker(s)/clear()/redraw() 등만 제공). 이전 버전에서 clusterer.setMap(null)로
+// 핀을 숨기려 한 것은 실제 SDK에서 조용히 실패해(TypeError) "축소해도 핀이 안 사라진다"는 버그의
+// 원인이었다 — clear()로 완전히 비우고 addMarkers()로 다시 채우는 방식으로 대체한다.
+let lastValidMarkers = [];
+let clustererShown = true;
 
 // 단일 ring(닫힌 좌표 목록, [lng,lat][])에 대한 ray-casting 판정.
 function rayCastRing(lng, lat, ring) {
@@ -116,7 +131,9 @@ export async function assignDongToSites(sites) {
     const lng = Number(site.lng);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
     const match = dong.features.find(f => pointInGeometry(lng, lat, f.geometry));
-    if (match) site.dong = match.properties.name;
+    // 좌표는 있지만(=유효) 14개 동 어디에도 안 들어가면(예: 잘못된 지오코딩으로 강남구 밖 좌표)
+    // null로 남기지 않고 "그외"로 표시한다 — 목록/관할 필터에서 확인 가능해야 하기 때문(사용자 요청).
+    site.dong = match ? match.properties.name : OTHER_DONG_LABEL;
   });
   return sites;
 }
@@ -131,16 +148,34 @@ function buildDongLabelContent(name, count) {
 // renderMarkers()가 호출될 때마다(검색/필터 변경 포함) 현재 화면에 표시 중인 사업장 기준으로
 // 동 라벨의 개수 표기를 갱신한다. 라벨을 지도에 붙이거나 뗄지는 이 함수가 아니라
 // updateBoundaryDisplayForZoom()이 줌 레벨을 보고 결정한다.
+// STEP16.21: overlay.setContent()로 div를 통째로 새로 갈아끼우면 그 div에 달아둔 클릭
+// 리스너(동 이름 클릭 → 확대, focusOnDong)가 매번 사라진다. 그래서 여기서는 새 div를 만들지
+// 않고, 처음 만들 때 저장해둔 기존 div(dongLabelContentByName)의 textContent만 바꾼다.
 function updateDongCounts(sites) {
-  if (dongLabelOverlays.size === 0) return;
+  if (dongLabelContentByName.size === 0) return;
   const counts = new Map();
   (sites || []).forEach(site => {
     if (!site.dong) return;
     counts.set(site.dong, (counts.get(site.dong) || 0) + 1);
   });
-  dongLabelOverlays.forEach((overlay, name) => {
-    overlay.setContent(buildDongLabelContent(name, counts.get(name) || 0));
+  dongLabelContentByName.forEach((div, name) => {
+    const count = counts.get(name) || 0;
+    div.textContent = count > 0 ? `${name} ${count}` : name;
   });
+}
+
+// 실제 kakao.maps.MarkerClusterer에는 setMap()이 없어(위 주석 참고), clear()로 클러스터러를
+// 완전히 비우는 방식으로 "숨김"을, addMarkers()로 마지막 렌더 결과를 다시 채우는 방식으로
+// "표시"를 구현한다. 중복 addMarkers 호출로 같은 마커가 겹쳐 쌓이지 않도록 clustererShown
+// 플래그로 현재 상태를 추적해, 실제로 상태가 바뀔 때만 clear/addMarkers를 호출한다.
+function setClustererShown(shown) {
+  if (!clusterer || shown === clustererShown) return;
+  if (shown) {
+    clusterer.addMarkers(lastValidMarkers);
+  } else {
+    clusterer.clear();
+  }
+  clustererShown = shown;
 }
 
 // 사용자 피드백: 관할 현장이 많아 지도를 기본 배율로 보면 핀이 너무 빽빽해 복잡하다 —
@@ -148,16 +183,28 @@ function updateDongCounts(sites) {
 // 지도에서 떼고, 대신 동 경계 안에 "동이름 개수" 라벨만 보여준다. 사용자가 특정 동을
 // 확인하려고 확대하면(레벨이 작아지면) 다시 핀이 나타난다. 경계선 자체(구/동 폴리곤)는
 // 줌과 무관하게 항상 보인다.
+// STEP16.21: 사용자가 "관할" 필터로 특정 동을 이미 골라놓은 상태라면(state.selectedDongs가
+// 비어있지 않으면) 이미 결과가 좁혀져 있어 복잡할 이유가 없으므로, 줌과 무관하게 핀을
+// 항상 보여준다(축소해도 사라지지 않음). 필터가 없는 기본 상태에서만 줌 기준 전환을 적용한다.
 function updateBoundaryDisplayForZoom() {
   if (!state.map) return;
-  const zoomedOut = state.map.getLevel() >= PIN_ZOOM_THRESHOLD;
+  const filterActive = Array.isArray(state.selectedDongs) && state.selectedDongs.length > 0;
+  const zoomedOut = !filterActive && state.map.getLevel() >= PIN_ZOOM_THRESHOLD;
 
-  if (clusterer) {
-    clusterer.setMap(zoomedOut ? null : state.map);
-  }
+  setClustererShown(!zoomedOut);
   dongLabelOverlays.forEach(overlay => {
     overlay.setMap(zoomedOut ? state.map : null);
   });
+}
+
+// 동 라벨(예: "신사동 63") 클릭 시 그 동 경계 전체가 화면에 들어오도록 확대/이동한다.
+// setBounds가 발생시키는 zoom_changed 이벤트로 updateBoundaryDisplayForZoom()이 자동 호출돼,
+// 확대된 레벨이 PIN_ZOOM_THRESHOLD 미만이 되면 핀도 함께 다시 나타난다(별도 처리 불필요).
+function focusOnDong(name) {
+  if (!state.map) return;
+  const bounds = dongBoundsByName.get(name);
+  if (!bounds) return;
+  state.map.setBounds(bounds, 24, 24, 24, 24);
 }
 
 // 강남구 경계(1차) + 법정동 14개 경계(2차)를 지도에 그린다. 여러 번 호출돼도 중복 생성하지
@@ -192,24 +239,34 @@ export async function renderGangnamBoundaries() {
   if (dong && Array.isArray(dong.features) && dongPolygonsData.length === 0) {
     dong.features.forEach(f => {
       const name = f.properties.name;
+      const bounds = new kakao.maps.LatLngBounds();
+      // STEP16.21: "선이 잘 안 보인다"는 피드백으로 법정동 경계선 가시성을 높였다 — 굵기
+      // 1→2, 불투명도 0.6→0.9, 구(강남구) 경계와 겹쳐도 구분되도록 더 선명한 파랑으로 변경.
       geometryToPaths(f.geometry).forEach(path => {
         const polygon = new kakao.maps.Polygon({
           path,
-          strokeWeight: 1,
-          strokeColor: '#5b8def',
-          strokeOpacity: 0.6,
+          strokeWeight: 2,
+          strokeColor: '#2f6fed',
+          strokeOpacity: 0.9,
           fillColor: '#5b8def',
-          fillOpacity: 0.03
+          fillOpacity: 0.04
         });
         polygon.setMap(state.map);
         dongPolygonsData.push({ name, polygon });
+        path.forEach(latlng => bounds.extend(latlng));
       });
+      dongBoundsByName.set(name, bounds);
 
       const centroid = geometryCentroid(f.geometry);
       if (centroid && !dongLabelOverlays.has(name)) {
+        // STEP16.21: 라벨("OO동 N")을 누르면 그 동으로 확대해서 관할을 바로 확인할 수 있게 한다.
+        const content = buildDongLabelContent(name, 0);
+        content.addEventListener('click', () => focusOnDong(name));
+        dongLabelContentByName.set(name, content);
+
         const overlay = new kakao.maps.CustomOverlay({
           position: new kakao.maps.LatLng(centroid.lat, centroid.lng),
-          content: buildDongLabelContent(name, 0),
+          content,
           xAnchor: 0.5,
           yAnchor: 0.5,
           zIndex: 5
@@ -449,9 +506,12 @@ export function renderMarkers(sites, onMarkerClick) {
     validMarkers.push(marker);
   });
 
-  if (clusterer) {
-    clusterer.addMarkers(validMarkers);
-  } else {
+  // STEP16.21: clearMarkers()가 이미 clusterer.clear()를 호출했으므로(아래 clearMarkers 참고)
+  // clustererShown을 일단 false로 맞춰두고, lastValidMarkers를 최신 목록으로 갱신한 뒤
+  // updateBoundaryDisplayForZoom()이 현재 줌/필터 상태에 맞게 다시 채울지 말지 결정하게 한다.
+  lastValidMarkers = validMarkers;
+  clustererShown = false;
+  if (!clusterer) {
     // clusterer가 아직 없는 예외 상황(이론상 initMap 이후에는 항상 존재) 대비 폴백.
     validMarkers.forEach(marker => marker.setMap(state.map));
   }
@@ -464,6 +524,10 @@ export function renderMarkers(sites, onMarkerClick) {
   // 라벨을 지도에 보이거나 숨기는 결정은 줌 레벨(updateBoundaryDisplayForZoom)의 몫이라 여기선
   // sites가 비어도(마커가 0개여도) 항상 호출해 카운트를 0으로 정확히 반영한다.
   updateDongCounts(sites || []);
+
+  // STEP16.21: 마커를 다시 그릴 때마다(검색/필터 변경 포함) 현재 줌 레벨 + 관할 필터 활성 여부
+  // 기준으로 클러스터러/동 라벨 표시 상태를 다시 맞춘다(clear() 직후이므로 항상 필요).
+  updateBoundaryDisplayForZoom();
 }
 
 export function clearMarkers() {
