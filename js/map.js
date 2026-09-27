@@ -141,7 +141,10 @@ export async function assignDongToSites(sites) {
 function buildDongLabelContent(name, count) {
   const div = document.createElement('div');
   div.className = 'gnmap-dong-label';
-  div.textContent = count > 0 ? `${name} ${count}` : name;
+  // 사용자 요청: 지도 탭 동 라벨에 "동이름 + 개소수"가 같이 보이던 걸 동이름만 보이게 한다.
+  // count 인자/updateDongCounts()의 개소수 집계 로직 자체는 그대로 두고(다른 곳에서 다시
+  // 쓸 수도 있어 계산은 유지), 화면에 표시만 안 하도록 한다.
+  div.textContent = name;
   return div;
 }
 
@@ -159,8 +162,8 @@ function updateDongCounts(sites) {
     counts.set(site.dong, (counts.get(site.dong) || 0) + 1);
   });
   dongLabelContentByName.forEach((div, name) => {
-    const count = counts.get(name) || 0;
-    div.textContent = count > 0 ? `${name} ${count}` : name;
+    // 사용자 요청: 동이름만 표시(개소수 숨김). counts 집계 자체는 향후 재사용을 위해 그대로 둔다.
+    div.textContent = name;
   });
 }
 
