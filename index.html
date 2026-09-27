@@ -635,16 +635,24 @@
             </div>
           </details>
           <!-- 사용자 요청: "기본순서"는 메인 지도 탭에서는 숨기고(css/mobile.css) 현장 탭에서만
-               보이게 한다. select 자체와 옵션 목록은 그대로 유지한다. -->
-          <select id="site-sort-select">
-            <option value="default">기본순서</option>
-            <option value="name-asc">사업장명 가나다순</option>
-            <option value="company-asc">업체명 가나다순</option>
-            <option value="amount-desc">공사금액 높은순</option>
-            <option value="amount-asc">공사금액 낮은순</option>
-            <option value="deadline">공사기간 임박순</option>
-            <option value="favorite">즐겨찾기 우선</option>
-          </select>
+               보이게 한다. 사용자 요청(재정리): <select>는 선택된 값이 아니라 가장 긴 옵션
+               문자열 기준으로 폭을 잡아 "기본순서"처럼 짧은 라벨일 때 불필요한 여백이 생기던
+               문제가 있어, 관할/공사금액/점검/산재표와 동일한 details+radio 팝오버로 바꾼다.
+               value 목록/의미는 기존 <select>의 option과 완전히 동일하다(js/sites.js 정렬 로직 불변). -->
+          <details id="site-sort-filter" class="site-select-filter">
+            <summary id="site-sort-filter-label" class="site-select-filter-label">기본순서</summary>
+            <div id="site-sort-filter-panel" class="site-select-filter-panel">
+              <div class="site-select-filter-options">
+                <label class="site-select-filter-option"><input type="radio" name="site-sort-filter-radio" value="default" checked><span>기본순서</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+                <label class="site-select-filter-option"><input type="radio" name="site-sort-filter-radio" value="name-asc"><span>사업장명 가나다순</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+                <label class="site-select-filter-option"><input type="radio" name="site-sort-filter-radio" value="company-asc"><span>업체명 가나다순</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+                <label class="site-select-filter-option"><input type="radio" name="site-sort-filter-radio" value="amount-desc"><span>공사금액 높은순</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+                <label class="site-select-filter-option"><input type="radio" name="site-sort-filter-radio" value="amount-asc"><span>공사금액 낮은순</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+                <label class="site-select-filter-option"><input type="radio" name="site-sort-filter-radio" value="deadline"><span>공사기간 임박순</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+                <label class="site-select-filter-option"><input type="radio" name="site-sort-filter-radio" value="favorite"><span>즐겨찾기 우선</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+              </div>
+            </div>
+          </details>
           <div id="site-toggle-filter-row">
             <button type="button" id="site-favorite-filter-btn">★ 즐겨찾기</button>
           </div>
