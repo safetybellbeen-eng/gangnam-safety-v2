@@ -227,6 +227,162 @@ export function panToSite(site) {
   state.map.panTo(new kakao.maps.LatLng(lat, lng));
 }
 
+// ------------------------------------------------------------
+// STEP16.13(모바일 "경로" 탭 — 방문 순서/경로 상세 전용 미니맵).
+//
+// state.map(메인 지도 탭 전용, 컨테이너에 고정)과는 완전히 분리된 별도 kakao.maps.Map
+// 인스턴스를 쓴다 — Kakao SDK는 여러 Map 인스턴스를 동시에 지원하므로 안전하다.
+// 컨테이너 id별로 인스턴스를 1개만 만들어 재사용한다(§37: 중복 초기화/리스너 누적 방지).
+// 실제 경로선(polyline)이나 거리/시간 계산은 절대 하지 않는다 — 승인된 축소 범위는
+// "현재 위치 + 사용자가 정한 순서의 번호 마커"만 지도에 표시하는 것까지다(가짜 경로 금지).
+const routeMaps = new Map(); // containerId -> { map, markers: kakao.maps.Marker[] }
+
+// 색상별이 아니라 "번호"별로 캐시한다(방문 순서가 바뀌면 같은 site라도 번호가 바뀔 수 있음).
+const routeNumberMarkerImageCache = new Map();
+
+function getRouteNumberMarkerImage(number) {
+  if (routeNumberMarkerImageCache.has(number)) return routeNumberMarkerImageCache.get(number);
+
+  const label = String(number);
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="30" height="38" viewBox="0 0 30 38">' +
+    '<path d="M15 1C7.8 1 2 6.6 2 13.4c0 9 13 23.6 13 23.6s13-14.6 13-23.6C28 6.6 22.2 1 15 1z" fill="#16326b"/>' +
+    '<circle cx="15" cy="13.4" r="10.5" fill="#fff"/>' +
+    '<text x="15" y="18" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="bold" fill="#16326b">' + label + '</text>' +
+    '</svg>';
+  const src = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+  const image = new kakao.maps.MarkerImage(
+    src,
+    new kakao.maps.Size(30, 38),
+    { offset: new kakao.maps.Point(15, 38) }
+  );
+  routeNumberMarkerImageCache.set(number, image);
+  return image;
+}
+
+// 현재 위치 표시용(사업장 번호 마커와 구분되는 파란 점). location.js의 state.currentLocationMarker
+// (메인 지도 전용 kakao.maps.Circle)와는 별개로, 경로 미니맵에서만 쓰는 가벼운 MarkerImage다.
+let currentLocationMarkerImage = null;
+function getCurrentLocationMarkerImage() {
+  if (currentLocationMarkerImage) return currentLocationMarkerImage;
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">' +
+    '<circle cx="11" cy="11" r="8" fill="#1a73e8" stroke="#fff" stroke-width="3"/>' +
+    '</svg>';
+  const src = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+  currentLocationMarkerImage = new kakao.maps.MarkerImage(
+    src,
+    new kakao.maps.Size(22, 22),
+    { offset: new kakao.maps.Point(11, 11) }
+  );
+  return currentLocationMarkerImage;
+}
+
+// containerId에 해당하는 경로 미니맵을 생성하거나(이미 있으면) 재사용해 반환한다.
+// center가 유효하면 그 위치를, 아니면 강남구 기본 중심을 초기 중심으로 쓴다.
+export async function initRouteMap(containerId, center) {
+  await loadKakaoSdk();
+
+  let entry = routeMaps.get(containerId);
+  if (entry) return entry.map;
+
+  const container = document.getElementById(containerId);
+  if (!container) throw new Error(`경로 지도 컨테이너를 찾을 수 없습니다: ${containerId}`);
+
+  const validCenter =
+    center && Number.isFinite(center.lat) && Number.isFinite(center.lng) &&
+    center.lat >= -90 && center.lat <= 90 && center.lng >= -180 && center.lng <= 180;
+  const c = validCenter ? center : GANGNAM_CENTER;
+
+  const map = new kakao.maps.Map(container, {
+    center: new kakao.maps.LatLng(c.lat, c.lng),
+    level: DEFAULT_LEVEL
+  });
+
+  routeMaps.set(containerId, { map, markers: [] });
+  return map;
+}
+
+// 지도 컨테이너 크기가 나중에(패널이 display:none→block으로 바뀐 뒤) 확정되는 경우
+// Kakao 지도가 이전 크기 기준으로 렌더링된 상태로 남을 수 있어, 패널을 열 때 relayout이 필요하다.
+export function relayoutRouteMap(containerId) {
+  const entry = routeMaps.get(containerId);
+  if (!entry) return;
+  entry.map.relayout();
+}
+
+export function clearRouteMarkers(containerId) {
+  const entry = routeMaps.get(containerId);
+  if (!entry) return;
+  entry.markers.forEach(marker => marker.setMap(null));
+  entry.markers = [];
+}
+
+// currentLocation({lat,lng}|null)과 orderedSites(방문 순서대로 정렬된, 좌표가 유효한 사업장 배열)로
+// 번호 마커를 그린다. 기존 마커는 모두 지운 뒤 새로 그린다. 경로선(polyline)은 그리지 않는다
+// (승인된 축소 범위 — 실제 도로 경로 geometry가 없으므로 가짜 직선/곡선을 긋지 않는다).
+// onMarkerClick(site.id)를 주입받으면 사업장 마커 클릭 시 호출한다.
+export function renderRouteMarkers(containerId, currentLocation, orderedSites, onMarkerClick) {
+  const entry = routeMaps.get(containerId);
+  if (!entry) return;
+
+  clearRouteMarkers(containerId);
+
+  const bounds = new kakao.maps.LatLngBounds();
+  let hasPoint = false;
+
+  const validLocation =
+    currentLocation && Number.isFinite(currentLocation.lat) && Number.isFinite(currentLocation.lng) &&
+    currentLocation.lat >= -90 && currentLocation.lat <= 90 &&
+    currentLocation.lng >= -180 && currentLocation.lng <= 180;
+
+  if (validLocation) {
+    const position = new kakao.maps.LatLng(currentLocation.lat, currentLocation.lng);
+    const marker = new kakao.maps.Marker({ position, image: getCurrentLocationMarkerImage() });
+    marker.setMap(entry.map);
+    entry.markers.push(marker);
+    bounds.extend(position);
+    hasPoint = true;
+  }
+
+  (orderedSites || []).forEach((site, index) => {
+    const lat = Number(site.lat);
+    const lng = Number(site.lng);
+    const isValid =
+      Number.isFinite(lat) && Number.isFinite(lng) &&
+      lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+    if (!isValid) return; // 좌표 없는 사업장은 지도에 표시하지 않는다(§31 예외처리 — 목록/안내문에서 별도 처리)
+
+    const position = new kakao.maps.LatLng(lat, lng);
+    const marker = new kakao.maps.Marker({ position, image: getRouteNumberMarkerImage(index + 1) });
+    if (typeof onMarkerClick === 'function') {
+      kakao.maps.event.addListener(marker, 'click', () => onMarkerClick(site.id));
+    }
+    marker.setMap(entry.map);
+    entry.markers.push(marker);
+    bounds.extend(position);
+    hasPoint = true;
+  });
+
+  if (hasPoint) {
+    entry.map.setBounds(bounds, 40, 40, 40, 40);
+  }
+}
+
+// 마커를 다시 그리지 않고, containerId의 경로 미니맵을 특정 사업장 좌표로만 이동시킨다.
+// "경로 상세" 화면의 "지도에서 보기" 버튼처럼 목록에서 지도로 시선을 유도할 때 쓴다.
+export function panToRouteSite(containerId, site) {
+  const entry = routeMaps.get(containerId);
+  if (!entry || !site) return;
+  const lat = Number(site.lat);
+  const lng = Number(site.lng);
+  const isValid =
+    Number.isFinite(lat) && Number.isFinite(lng) &&
+    lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+  if (!isValid) return;
+  entry.map.panTo(new kakao.maps.LatLng(lat, lng));
+}
+
 // 사용자 피드백: 지도 탭에서 상세 시트가 하단 일부를 가릴 때, 핀이 "실제로 보이는" 지도
 // 영역(하단 hiddenBottomPx만큼 가려진 나머지 부분) 한가운데에 오도록 지도 중심을 맞춘다.
 // panBy()의 좌/우 부호 규약에 기대지 않기 위해, 지도의 투영좌표(카카오맵 MapProjection —

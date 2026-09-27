@@ -37,6 +37,33 @@ async function geocodeAddress(address) {
   }
 }
 
+// STEP16.13. 좌표 → 주소 역지오코딩. Edge Function의 mode:'reverse' 경로를 사용한다.
+// 반환값: { success:true, address } | { success:false, reason }
+// 실패 시에도 가짜 주소를 만들지 않는다 — 호출부(ui.js)는 success:false면 주소 표시를 생략한다.
+export async function reverseGeocode(lat, lng) {
+  try {
+    const { data, error } = await sb.functions.invoke('gnmap-v2-geocode', {
+      body: { mode: 'reverse', lat, lng },
+    });
+    if (error) {
+      if (error.context && typeof error.context.json === 'function') {
+        try {
+          const body = await error.context.json();
+          if (body && typeof body.reason === 'string') {
+            return { success: false, reason: body.reason };
+          }
+        } catch (_parseErr) {
+          // 본문을 JSON으로 못 읽으면 아래 기본값(INTERNAL_ERROR)으로 폴백.
+        }
+      }
+      return { success: false, reason: 'INTERNAL_ERROR' };
+    }
+    return data;
+  } catch (_e) {
+    return { success: false, reason: 'INTERNAL_ERROR' };
+  }
+}
+
 // STEP 11G. Kakao keyword search 호출. Edge Function의 mode:'keyword' 경로를 사용한다.
 // 반환값: { success:true, candidates:[{placeName, addressName, roadAddressName, lat, lng}, ...] } | { success:false, reason }
 // 이 함수는 후보 목록만 가져온다 — 어떤 좌표도 여기서 확정/적용하지 않는다.

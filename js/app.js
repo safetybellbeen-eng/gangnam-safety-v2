@@ -102,8 +102,9 @@ function activateMobileTab(tab) {
     state.map.setCenter(state.map.getCenter()); // relayout 직후 타일이 흰 화면으로 남는 것을 방지(중심 재설정으로 강제 리드로우)
   }
 
-  // STEP15-D. 경로 탭: 새 로직 없이 기존 선택 상태(state.selectedSiteId/state.sites)와
-  // 기존 길찾기(buildKakaoDirectionsUrl)만 재사용해 다시 그린다.
+  // STEP16.13. 경로 탭: "경로 만들기" 화면(state.routePlanSiteIds 기준)을 다시 그린다.
+  // 탭을 벗어났다 돌아와도 선택 현장은 유지되고, 항상 이 화면(plan)부터 시작한다
+  // (activateMobileTab의 route-order-panel/route-detail-panel 닫기 로직과 세트).
   if (tab === 'route') {
     renderMobileRouteView('mobile-route-content');
   }
@@ -136,6 +137,19 @@ function activateMobileTab(tab) {
     // supervisionMobileSelectedDate/supervisionMobileStatusFilter/supervisionMobileTypeFilter)는 그대로 유지한다.
     state.supervisionMobileView = 'list';
     state.supervisionMobileSelectedId = null;
+  }
+
+  // STEP16.13(모바일 "경로" 탭). "방문 순서"/"경로 상세" 패널은 "경로" 탭 안에서만 열리므로,
+  // 다른 탭으로 이동할 때 열려 있으면 닫는다. routePlanSiteIds(선택한 현장 목록)는 여기서
+  // 지우지 않는다 — "탭을 이동해도 선택 현장이 사라지면 안 된다"는 요구사항 때문에 경로
+  // 탭으로 돌아오면 그대로 이어서 보여야 한다. routeMobileView만 'plan'(첫 화면)으로 되돌려
+  // 다음에 경로 탭에 들어오면 항상 "경로 만들기" 화면부터 시작하게 한다.
+  if (previousTab === 'route' && tab !== previousTab) {
+    ['route-order-panel', 'route-detail-panel'].forEach(id => {
+      const panelEl = document.getElementById(id);
+      if (panelEl) panelEl.style.display = 'none';
+    });
+    state.routeMobileView = 'plan';
   }
 }
 

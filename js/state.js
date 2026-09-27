@@ -63,6 +63,19 @@ export const state = {
   supervisionMobileFormOrigin: 'list', // form 화면의 '뒤로가기' 대상: 'list'(신규 등록) | 'detail'(상세에서 수정 진입)
   supervisionMobileMonthCursor: null,  // { year, month(0-11) } 표시 중인 달. null이면 렌더 시 오늘 기준으로 초기화.
   supervisionMobileSelectedDate: null, // 'YYYY-MM-DD'. null이면 렌더 시 오늘 날짜로 초기화.
-  supervisionMobileQuickFilter: 'all', // 'all' | 'inspection' | 'supervision' | 'done' (목록 상단 필터 chip, 프론트 표시만)
-  supervisionMobileSelectedId: null     // 상세/수정 화면 대상 gnmap_v2_supervisions.id
+  // 사용자 요청(추가 반영): 상단 quick filter는 "진행/예정/완료/전체"(status)로, 감독유형(점검/감독)은
+  // 별도의 "필터(감독유형)"로 분리했다 — 두 축은 서로 독립적으로 AND 결합되어 목록/캘린더에 적용된다.
+  supervisionMobileStatusFilter: 'all', // 'all' | 'scheduled' | 'ongoing' | 'done' (목록 상단 quick filter, 프론트 표시만)
+  supervisionMobileTypeFilter: 'all',   // 'all' | 'inspection' | 'supervision' (감독유형 필터, 프론트 표시만)
+  supervisionMobileSelectedId: null,    // 상세/수정 화면 대상 gnmap_v2_supervisions.id
+
+  // STEP16.13(모바일 "경로" 탭 — 경로 만들기/방문 순서/경로 상세). 새 DB 테이블 없이 이 세션/
+  // 클라이언트 state만으로 유지한다(§29). site id 배열이라 gnmap_v2_sites 삭제(is_active=false
+  // 전환 등)로 목록에서 사라져도 렌더 시점에 state.sites와 대조해 걸러내면 되므로 별도 정리 로직이
+  // 필요 없다. 탭을 벗어나도(더보기 등 다른 탭 이동) 값을 지우지 않아 "페이지 이동 때마다 선택
+  // 현장이 사라지면 안 된다"는 요구를 만족한다.
+  routePlanSiteIds: [],        // 방문할 현장으로 선택한 gnmap_v2_sites.id 배열. 순서 = 선택/드래그 순서.
+  routeMobileView: 'plan',     // '경로' 탭 내부 화면: 'plan'(경로 만들기, #mobile-route-content) |
+                                // 'order'(방문 순서, #route-order-panel) | 'detail'(경로 상세, #route-detail-panel)
+  currentLocationAddress: null // 역지오코딩으로 얻은 현재 위치 주소 문자열. 아직 조회 안 했거나 실패하면 null(가짜 주소 금지).
 };

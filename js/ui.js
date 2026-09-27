@@ -2,13 +2,13 @@
 // XSS 방지: DB 값(site_name/company_name/address 등)은 innerHTML 문자열 조립에 쓰지 않고
 // 전부 textContent 또는 createElement 기반 DOM 생성으로만 넣는다.
 import { state } from './state.js';
-import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight } from './map.js';
+import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight, initRouteMap, relayoutRouteMap, renderRouteMarkers, panToRouteSite } from './map.js';
 import { getFilteredSortedSites, getDongOptions, loadActiveSites } from './sites.js';
 import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
 import { loadUsers, setUserStatus, setUserRole, resetUserPassword, deleteRejectedProfile } from './admin.js';
 import { parseExcelFile } from './excel.js';
-import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, buildLotQueries, runJusoNormalize, buildJusoQuery, runKakaoJusoRecovery, runRoadApproximateRecovery, extractApproximateStructure } from './geocoding.js';
+import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, buildLotQueries, runJusoNormalize, buildJusoQuery, runKakaoJusoRecovery, runRoadApproximateRecovery, extractApproximateStructure, reverseGeocode } from './geocoding.js';
 import { importSitesToDatabase, previewImportImpact, loadUploadHistory } from './import.js';
 import { loadSupervisions, createSupervision, updateSupervision, deleteSupervision } from './supervision.js';
 import { isAdmin, changePassword } from './auth.js';
@@ -615,23 +615,29 @@ export function renderDetail(site) {
   actions.appendChild(directionsBtn);
 
   // 사용자 요청: 액션 버튼을 "길찾기ㅣ경로추가ㅣ메모" 3개로 재구성한다("지도보기"는 대체되어
-  // 제거). 새 지도/경로 로직은 만들지 않고 기존 하단 "경로" 탭(renderMobileRouteView,
-  // state.selectedSiteId 기준)과 기존 buildKakaoDirectionsUrl만 재사용한다. 모바일에서만
-  // 노출한다(PC는 이 media query 밖이라 기존 즐겨찾기+길찾기 2버튼 그대로 — PC 화면 미변경).
+  // 제거). 모바일에서만 노출한다(PC는 이 media query 밖이라 기존 즐겨찾기+길찾기 2버튼 그대로
+  // — PC 화면 미변경).
+  // STEP16.13: "경로추가"는 이제 하단 "경로" 탭으로 이동시키는 대신(기존 동작), 승인된
+  // "+ 경로에 추가" 카트 기능(§30)의 실제 트리거다 — state.routePlanSiteIds에 이 사업장을
+  // 추가/이미 있으면 해제(dedupe)하고, 버튼 라벨/상태만 즉시 바꾼다(탭 이동 없음, 상세 패널은
+  // 계속 열려 있는 채로 여러 현장을 연속으로 추가할 수 있어야 하므로).
   if (isMobileViewport()) {
-    // 경로추가: 하단 "경로" 탭 버튼을 클릭 위임한다. activateMobileTab()이 탭 전환 시 열려있던
-    // 상세를 closeDetail()로 자동으로 닫으며 state.selectedSiteId도 함께 비우므로(§ app.js),
-    // 그 직후 selectedSiteId를 다시 채우고 경로 탭 내용을 다시 그려 이 사업장이 그대로 보이게 한다.
     const routeAddBtn = document.createElement('button');
     routeAddBtn.type = 'button';
     routeAddBtn.className = 'site-detail-action-btn site-detail-btn-secondary';
-    routeAddBtn.textContent = '경로추가';
+    function refreshRouteAddBtn() {
+      const added = state.routePlanSiteIds.includes(site.id);
+      routeAddBtn.textContent = added ? '✓ 경로에 추가됨' : '경로추가';
+      routeAddBtn.classList.toggle('is-added', added);
+    }
+    refreshRouteAddBtn();
     routeAddBtn.addEventListener('click', () => {
-      const siteId = site.id;
-      const routeTabBtn = document.querySelector('.mobile-tab-btn[data-tab="route"]');
-      if (routeTabBtn) routeTabBtn.click();
-      state.selectedSiteId = siteId;
-      renderMobileRouteView('mobile-route-content');
+      if (state.routePlanSiteIds.includes(site.id)) {
+        state.routePlanSiteIds = state.routePlanSiteIds.filter(id => id !== site.id);
+      } else {
+        state.routePlanSiteIds = [...state.routePlanSiteIds, site.id];
+      }
+      refreshRouteAddBtn();
     });
     actions.appendChild(routeAddBtn);
 
@@ -699,55 +705,630 @@ export function closeDetail() {
   }
 }
 
-// STEP15-D. 모바일 "경로" 탭. 새 경로/경유지 기능을 만들지 않고, renderDetail()이 쓰는 것과
-// 동일한 buildKakaoDirectionsUrl/isValidSiteCoord만 재사용해 현재(마지막) 선택된 사업장
-// 하나에 대한 길찾기만 보여준다. 안내 문구는 index.html에 정적으로 있고, 여기서는 선택 유무에
-// 따른 카드/안내 메시지만 채운다.
+// ============================================================
+// STEP16.13(모바일 "경로" 탭 전면 개편 — 경로 만들기/방문 순서/경로 상세).
+//
+// TARGET 시안은 다중 경유지 자동 최적화 + 실제 도로 경로(거리/시간/geometry)를 요구했지만,
+// AUDIT 결과 그 기능은 Kakao Mobility의 유료·승인제 "다중 경유지 길찾기" API가 있어야만
+// 가능하고, 그 API조차 방문 "순서 최적화"는 제공하지 않는다(경유지를 준 순서대로만 길을
+// 찾아줌). 사용자 승인("1,2,3하고 역지오코딩도 포함시켜서 구현하자")에 따라 축소된 범위로
+// 구현한다:
+//   - 경로 만들기(#mobile-route-content): TARGET 그대로 — 현재 위치(+역지오코딩 주소),
+//     여러 현장 다중 선택/삭제/전체삭제, 선택 현장 드래그 재정렬.
+//   - 방문 순서(#route-order-panel): "최적 경로"가 아니라 사용자가 정한 순서를 지도 위
+//     번호 마커로만 보여준다. 자동 최적화/거리/시간/경로선(polyline)은 없다.
+//   - 경로 상세(#route-detail-panel): 지도 + 세로 타임라인 + 현장별 "지도에서 보기"/
+//     "길찾기"(기존 buildKakaoDirectionsUrl, 단일 목적지). 거리/시간/"경로 다시 계산"은
+//     없다(다시 계산할 것 자체가 없음 — 이미 사용자가 정한 순서일 뿐).
+// 새 DB 테이블은 쓰지 않고 state.routePlanSiteIds(정렬된 id 배열)만으로 유지한다.
+// ============================================================
+
+// 카드/타임라인 항목을 pointer 이벤트로 드래그 재정렬한다(HTML5 draggable은 모바일 터치에서
+// 신뢰할 수 없어 쓰지 않는다). listEl의 직계 자식마다 data-drag-id(=String(site.id))가 있어야
+// 하며, handleSelector(예: '.route-drag-handle')를 누른 채 위아래로 끌면 지나간 카드와
+// 자리를 맞바꾼다(SortableJS 등 새 라이브러리 없이 순수 DOM으로 구현). 손을 떼면 그 시점의
+// 최종 DOM 순서를 문자열 배열로 onReorder에 전달한다 — 실제 state 반영은 호출부 책임이다.
+function attachDragReorder(listEl, handleSelector, onReorder) {
+  let dragEl = null;
+  let startY = 0;
+
+  function onPointerMove(e) {
+    if (!dragEl) return;
+    const deltaY = e.clientY - startY;
+    dragEl.style.transform = `translateY(${deltaY}px)`;
+
+    const cards = Array.from(listEl.children);
+    const dragIndex = cards.indexOf(dragEl);
+    const dragRect = dragEl.getBoundingClientRect();
+    const dragCenter = dragRect.top + dragRect.height / 2;
+
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i];
+      if (card === dragEl) continue;
+      const rect = card.getBoundingClientRect();
+      const cardCenter = rect.top + rect.height / 2;
+      if (i < dragIndex && dragCenter < cardCenter) {
+        listEl.insertBefore(dragEl, card);
+        dragEl.style.transform = 'none';
+        startY = e.clientY;
+        break;
+      } else if (i > dragIndex && dragCenter > cardCenter) {
+        listEl.insertBefore(dragEl, card.nextSibling);
+        dragEl.style.transform = 'none';
+        startY = e.clientY;
+        break;
+      }
+    }
+  }
+
+  function onPointerUp() {
+    if (!dragEl) return;
+    dragEl.style.transform = '';
+    dragEl.style.position = '';
+    dragEl.style.zIndex = '';
+    dragEl.classList.remove('route-card-dragging');
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    const newOrder = Array.from(listEl.children).map(c => c.dataset.dragId);
+    dragEl = null;
+    onReorder(newOrder);
+  }
+
+  listEl.addEventListener('pointerdown', (e) => {
+    const handle = e.target.closest(handleSelector);
+    if (!handle) return;
+    const card = handle.closest('[data-drag-id]');
+    if (!card || !listEl.contains(card)) return;
+    e.preventDefault();
+    dragEl = card;
+    startY = e.clientY;
+    dragEl.style.position = 'relative';
+    dragEl.style.zIndex = '10';
+    dragEl.classList.add('route-card-dragging');
+    try { handle.setPointerCapture(e.pointerId); } catch (_err) { /* 캡처 미지원 환경도 동작은 계속되게 무시 */ }
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  });
+}
+
+// attachDragReorder가 돌려주는 것은 DOM data-drag-id(=String(site.id)) 순서일 뿐이므로,
+// 실제 state.routePlanSiteIds에 넣을 원래 id 값(타입 보존 — bigint든 uuid든 Number()로
+// 임의 변환하지 않는다)으로 되돌린다. sites는 이 드래그가 일어난 시점의 정렬된 사업장 배열.
+function mapDragOrderToIds(dragKeys, sites) {
+  const byKey = new Map(sites.map(s => [String(s.id), s.id]));
+  return dragKeys.map(k => byKey.get(k)).filter(id => id !== undefined);
+}
+
+// state.routePlanSiteIds -> 실제 사업장 객체 배열(순서 유지). 이미 삭제된(is_active=false 등)
+// 사업장은 state.sites에 없으므로 자연히 걸러진다 — routePlanSiteIds 자체는 건드리지 않는다
+// (나중에 다시 활성화되면 자동으로 목록에 복귀).
+function getRoutePlanSites() {
+  return state.routePlanSiteIds.map(id => state.sites.find(s => s.id === id)).filter(Boolean);
+}
+
+// "경로 만들기"/"방문 순서" 화면에서 공용으로 쓰는 선택 현장 카드(번호+이름/주소+드래그
+// 손잡이+삭제). showWarnOnly가 아니라 항상 좌표 없는 현장에는 안내문을 보여준다(§31 —
+// 좌표 없는 현장은 지도에는 못 그리지만 목록/순서에서는 빠지지 않는다).
+function buildRouteSiteCard(site, index, onDelete) {
+  const card = document.createElement('div');
+  card.className = 'route-site-card';
+  card.dataset.dragId = String(site.id);
+
+  const handle = document.createElement('span');
+  handle.className = 'route-drag-handle';
+  handle.setAttribute('aria-label', '순서 변경');
+  handle.textContent = '☰';
+  card.appendChild(handle);
+
+  const numberBadge = document.createElement('span');
+  numberBadge.className = 'route-site-number';
+  numberBadge.textContent = String(index + 1);
+  card.appendChild(numberBadge);
+
+  const textWrap = document.createElement('div');
+  textWrap.className = 'route-site-text';
+  const nameEl = document.createElement('div');
+  nameEl.className = 'route-site-name';
+  nameEl.textContent = site.site_name || site.company_name || '-';
+  textWrap.appendChild(nameEl);
+  const addrEl = document.createElement('div');
+  addrEl.className = 'route-site-addr';
+  addrEl.textContent = displayValue(site.address);
+  textWrap.appendChild(addrEl);
+  if (!isValidSiteCoord(site)) {
+    const warn = document.createElement('div');
+    warn.className = 'route-site-warn';
+    warn.textContent = '좌표 정보가 없어 지도에는 표시되지 않습니다.';
+    textWrap.appendChild(warn);
+  }
+  card.appendChild(textWrap);
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.type = 'button';
+  deleteBtn.className = 'route-site-delete-btn';
+  deleteBtn.setAttribute('aria-label', '목록에서 삭제');
+  deleteBtn.textContent = '×';
+  deleteBtn.addEventListener('click', onDelete);
+  card.appendChild(deleteBtn);
+
+  return card;
+}
+
+// 방문 현장 다중 선택 sheet(기존 admin-sheet-overlay/admin-sheet 재사용 — openSupervisionManagerSheet와
+// 동일한 검색+목록 뼈대에 체크박스만 추가). 이미 클라이언트에 로드돼 있는 state.sites를 그대로
+// 검색 대상으로 쓰므로 새 조회는 하지 않는다. "완료"를 눌러야만 onConfirm이 호출되고, 바깥을
+// 클릭하거나 그냥 닫으면 아무 것도 바뀌지 않는다(임시 선택은 이 함수 안의 draftSelected에만 있음).
+function openSitePickerSheet(onConfirm) {
+  const overlay = document.createElement('div');
+  overlay.className = 'admin-sheet-overlay';
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+  const sheet = document.createElement('div');
+  sheet.className = 'admin-sheet route-site-picker-sheet';
+  const titleEl = document.createElement('div');
+  titleEl.className = 'admin-sheet-name';
+  titleEl.textContent = '방문 현장 선택';
+  sheet.appendChild(titleEl);
+
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.className = 'sv-manager-sheet-search';
+  searchInput.placeholder = '현장명/주소/관할 검색';
+  sheet.appendChild(searchInput);
+
+  const listWrap = document.createElement('div');
+  listWrap.className = 'route-picker-list';
+  sheet.appendChild(listWrap);
+
+  const draftSelected = new Set(state.routePlanSiteIds);
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.type = 'button';
+  confirmBtn.className = 'route-picker-confirm-btn';
+
+  function updateConfirmLabel() {
+    confirmBtn.textContent = `완료(${draftSelected.size})`;
+  }
+
+  function renderOptions(query) {
+    listWrap.innerHTML = '';
+    const q = (query || '').trim();
+    const candidates = state.sites.filter(s => {
+      if (!q) return true;
+      return (s.site_name || '').includes(q) || (s.company_name || '').includes(q) ||
+        (s.address || '').includes(q) || (s.dong || '').includes(q);
+    });
+    if (candidates.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'sv-manager-empty';
+      empty.textContent = '검색 결과가 없습니다.';
+      listWrap.appendChild(empty);
+      return;
+    }
+    candidates.forEach(site => {
+      const row = document.createElement('label');
+      row.className = 'route-picker-row';
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = draftSelected.has(site.id);
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) draftSelected.add(site.id);
+        else draftSelected.delete(site.id);
+        updateConfirmLabel();
+      });
+      row.appendChild(checkbox);
+
+      const textWrap = document.createElement('div');
+      textWrap.className = 'route-picker-row-text';
+      const nameEl = document.createElement('div');
+      nameEl.className = 'route-picker-row-name';
+      nameEl.textContent = site.site_name || site.company_name || '-';
+      textWrap.appendChild(nameEl);
+      const addrEl = document.createElement('div');
+      addrEl.className = 'route-picker-row-addr';
+      addrEl.textContent = displayValue(site.address);
+      textWrap.appendChild(addrEl);
+      row.appendChild(textWrap);
+
+      if (!isValidSiteCoord(site)) {
+        const warn = document.createElement('span');
+        warn.className = 'route-picker-row-warn';
+        warn.textContent = '좌표없음';
+        row.appendChild(warn);
+      }
+
+      listWrap.appendChild(row);
+    });
+  }
+
+  renderOptions('');
+  updateConfirmLabel();
+  searchInput.addEventListener('input', () => renderOptions(searchInput.value));
+
+  confirmBtn.addEventListener('click', () => {
+    onConfirm(Array.from(draftSelected));
+    overlay.remove();
+  });
+  sheet.appendChild(confirmBtn);
+
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+}
+
+// 사이트 피커에서 "완료"로 확정된 선택 집합을 state.routePlanSiteIds에 반영한다. 기존 순서는
+// 유지하고(드래그로 이미 정해둔 순서를 무너뜨리지 않음), 새로 체크된 항목만 뒤에 추가한다 —
+// 정확한 "체크한 순간의 순서"까지는 추적하지 않으므로 "새로 추가된 건 맨 뒤"로 충분하다고 판단.
+function applyRoutePlanSelection(newIdList) {
+  const newIds = new Set(newIdList);
+  const kept = state.routePlanSiteIds.filter(id => newIds.has(id));
+  const keptSet = new Set(kept);
+  const added = newIdList.filter(id => !keptSet.has(id));
+  state.routePlanSiteIds = [...kept, ...added];
+}
+
+// 경로 미니맵(방문 순서/경로 상세 화면)을 초기화하고 현재 순서대로 번호 마커를 그린다.
+// 지도 컨테이너 DOM이 이미 화면에 붙어 있어야 호출할 수 있다(크기를 읽어야 하므로).
+async function setupRouteMiniMap(mapContainerId, orderedSites) {
+  const firstValid = orderedSites.find(isValidSiteCoord);
+  const center = state.currentLocation
+    || (firstValid ? { lat: Number(firstValid.lat), lng: Number(firstValid.lng) } : undefined);
+  try {
+    await initRouteMap(mapContainerId, center);
+    relayoutRouteMap(mapContainerId);
+    renderRouteMarkers(mapContainerId, state.currentLocation, orderedSites);
+  } catch (e) {
+    console.error('경로 지도 초기화 실패:', e);
+  }
+}
+
+// "출발지" 카드의 현재 위치 버튼. 기존 requestCurrentLocation()(§8, 1회성, watchPosition
+// 없음)만 재사용하고, 성공하면 이번 STEP에서 새로 추가한 reverseGeocode()로 주소 표시를
+// 시도한다. 실패해도 좌표 자체는 이미 state.currentLocation에 반영돼 있으므로 지도/마커는
+// 정상 동작하고, 주소 줄만 생략한다(가짜 주소 금지, §31).
+async function handleRouteLocationRequest(containerId) {
+  if (state.locationRequestInFlight) return;
+  state.locationRequestInFlight = true;
+  renderMobileRouteView(containerId);
+
+  const result = await requestCurrentLocation();
+  state.locationRequestInFlight = false;
+
+  if (!result.ok) {
+    renderMobileRouteView(containerId);
+    const container = document.getElementById(containerId);
+    if (container) {
+      const err = document.createElement('p');
+      err.className = 'route-start-error';
+      err.textContent = result.message;
+      container.prepend(err);
+    }
+    return;
+  }
+
+  state.currentLocationAddress = null; // 역지오코딩 완료 전까지 "주소 확인 중" 표시
+  renderMobileRouteView(containerId);
+
+  const geoResult = await reverseGeocode(state.currentLocation.lat, state.currentLocation.lng);
+  state.currentLocationAddress = geoResult.success ? geoResult.address : null;
+  renderMobileRouteView(containerId);
+}
+
+// ① 경로 만들기 — 하단 탭 "경로"의 첫 화면(#mobile-route-content).
 export function renderMobileRouteView(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
   container.innerHTML = '';
 
-  const site = state.selectedSiteId !== null
-    ? state.sites.find(s => s.id === state.selectedSiteId)
-    : null;
+  const selectedSites = getRoutePlanSites();
 
-  if (!site) {
+  // 오늘의 경로
+  const summaryCard = document.createElement('div');
+  summaryCard.className = 'route-summary-card';
+  const summaryTitle = document.createElement('div');
+  summaryTitle.className = 'route-card-title';
+  summaryTitle.textContent = '오늘의 경로';
+  summaryCard.appendChild(summaryTitle);
+  const summaryCount = document.createElement('div');
+  summaryCount.className = 'route-summary-count';
+  summaryCount.textContent = selectedSites.length > 0
+    ? `방문 현장 ${selectedSites.length}곳 선택됨`
+    : '아직 선택한 현장이 없습니다.';
+  summaryCard.appendChild(summaryCount);
+  container.appendChild(summaryCard);
+
+  // 출발지
+  const startCard = document.createElement('div');
+  startCard.className = 'route-start-card';
+  const startTitle = document.createElement('div');
+  startTitle.className = 'route-card-title';
+  startTitle.textContent = '출발지';
+  startCard.appendChild(startTitle);
+
+  const startRow = document.createElement('div');
+  startRow.className = 'route-start-row';
+  const startText = document.createElement('div');
+  startText.className = 'route-start-text';
+  if (state.currentLocation) {
+    const label = document.createElement('div');
+    label.className = 'route-start-label';
+    label.textContent = '현재 위치';
+    startText.appendChild(label);
+    const addr = document.createElement('div');
+    addr.className = 'route-start-address';
+    addr.textContent = state.currentLocationAddress || '주소 확인 중...';
+    startText.appendChild(addr);
+  } else {
+    const label = document.createElement('div');
+    label.className = 'route-start-label';
+    label.textContent = '현재 위치를 아직 가져오지 않았습니다.';
+    startText.appendChild(label);
+  }
+  startRow.appendChild(startText);
+
+  const startBtn = document.createElement('button');
+  startBtn.type = 'button';
+  startBtn.className = 'route-start-btn';
+  startBtn.textContent = state.currentLocation ? '위치 변경' : '현재 위치 가져오기';
+  startBtn.disabled = state.locationRequestInFlight;
+  startBtn.addEventListener('click', () => handleRouteLocationRequest(containerId));
+  startRow.appendChild(startBtn);
+  startCard.appendChild(startRow);
+  container.appendChild(startCard);
+
+  // + 방문 현장 추가
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'route-add-site-btn';
+  addBtn.textContent = '+ 방문 현장 추가';
+  addBtn.addEventListener('click', () => {
+    openSitePickerSheet((newIds) => {
+      applyRoutePlanSelection(newIds);
+      renderMobileRouteView(containerId);
+    });
+  });
+  container.appendChild(addBtn);
+
+  // 선택 현장 목록(드래그로 순서 변경, 개별 삭제)
+  if (selectedSites.length > 0) {
+    const listEl = document.createElement('div');
+    listEl.className = 'route-site-list';
+    selectedSites.forEach((site, index) => {
+      listEl.appendChild(buildRouteSiteCard(site, index, () => {
+        state.routePlanSiteIds = state.routePlanSiteIds.filter(id => id !== site.id);
+        renderMobileRouteView(containerId);
+      }));
+    });
+    container.appendChild(listEl);
+
+    attachDragReorder(listEl, '.route-drag-handle', (newOrderIds) => {
+      state.routePlanSiteIds = mapDragOrderToIds(newOrderIds, selectedSites);
+      renderMobileRouteView(containerId);
+    });
+
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'route-clear-all-btn';
+    clearBtn.textContent = '전체 삭제';
+    clearBtn.addEventListener('click', () => {
+      state.routePlanSiteIds = [];
+      renderMobileRouteView(containerId);
+    });
+    container.appendChild(clearBtn);
+  }
+
+  // 방문 순서 만들기(선택 현장이 있어야 활성화)
+  const ctaBtn = document.createElement('button');
+  ctaBtn.type = 'button';
+  ctaBtn.className = 'route-cta-btn';
+  ctaBtn.textContent = '방문 순서 만들기';
+  ctaBtn.disabled = selectedSites.length === 0;
+  ctaBtn.addEventListener('click', () => openRouteOrderPanel());
+  container.appendChild(ctaBtn);
+}
+
+// ② 방문 순서 — #route-order-panel(전체화면 패널, "경로" 탭에 머무른 채 연다).
+export function openRouteOrderPanel() {
+  const panel = document.getElementById('route-order-panel');
+  if (!panel) return;
+  panel.style.display = 'block';
+  renderRouteOrderPanel('route-order-panel');
+}
+
+export async function renderRouteOrderPanel(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+
+  const { header, backBtn } = buildSettingsSubHeader('방문 순서');
+  backBtn.addEventListener('click', () => { container.style.display = 'none'; });
+  container.appendChild(header);
+
+  const selectedSites = getRoutePlanSites();
+
+  if (selectedSites.length === 0) {
     const msg = document.createElement('p');
     msg.className = 'mobile-placeholder';
-    msg.textContent = '현장 탭에서 목적지를 선택해주세요.';
+    msg.textContent = '선택한 방문 현장이 없습니다. 경로 만들기에서 현장을 먼저 선택해주세요.';
     container.appendChild(msg);
     return;
   }
 
-  const card = document.createElement('div');
-  card.className = 'mobile-route-card';
+  const noteEl = document.createElement('p');
+  noteEl.className = 'route-order-note';
+  noteEl.textContent = '아래 번호는 자동으로 계산된 최적 경로가 아니라, 선택하거나 드래그로 정한 방문 순서입니다.';
+  container.appendChild(noteEl);
 
-  const nameEl = document.createElement('div');
-  nameEl.className = 'mobile-route-name';
+  const mapWrap = document.createElement('div');
+  mapWrap.id = 'route-order-map';
+  mapWrap.className = 'route-mini-map';
+  container.appendChild(mapWrap);
+
+  const listEl = document.createElement('div');
+  listEl.className = 'route-site-list';
+  selectedSites.forEach((site, index) => {
+    listEl.appendChild(buildRouteSiteCard(site, index, () => {
+      state.routePlanSiteIds = state.routePlanSiteIds.filter(id => id !== site.id);
+      renderRouteOrderPanel(containerId);
+    }));
+  });
+  container.appendChild(listEl);
+
+  attachDragReorder(listEl, '.route-drag-handle', (newOrderIds) => {
+    state.routePlanSiteIds = mapDragOrderToIds(newOrderIds, selectedSites);
+    renderRouteOrderPanel(containerId);
+  });
+
+  const detailBtn = document.createElement('button');
+  detailBtn.type = 'button';
+  detailBtn.className = 'route-cta-btn';
+  detailBtn.textContent = '경로 상세 보기';
+  detailBtn.addEventListener('click', () => openRouteDetailPanel());
+  container.appendChild(detailBtn);
+
+  await setupRouteMiniMap('route-order-map', selectedSites);
+}
+
+// ③ 경로 상세 — #route-detail-panel(전체화면 패널). 지도 + 세로 타임라인 + 현장별
+// "지도에서 보기"/"길찾기". 거리/시간/"경로 다시 계산"은 없다(승인된 축소 범위 — 실제 도로
+// 경로 데이터가 없어 다시 계산할 대상 자체가 없음).
+export function openRouteDetailPanel() {
+  const panel = document.getElementById('route-detail-panel');
+  if (!panel) return;
+  panel.style.display = 'block';
+  renderRouteDetailPanel('route-detail-panel');
+}
+
+function buildRouteTimelineStop(site, index, total, onDelete) {
+  const row = document.createElement('div');
+  row.className = 'route-timeline-row';
+  row.dataset.dragId = String(site.id);
+
+  const rail = document.createElement('div');
+  rail.className = 'route-timeline-rail';
+  const dot = document.createElement('span');
+  dot.className = 'route-timeline-dot';
+  dot.textContent = String(index + 1);
+  rail.appendChild(dot);
+  if (index < total - 1) {
+    const line = document.createElement('span');
+    line.className = 'route-timeline-line';
+    rail.appendChild(line);
+  }
+  row.appendChild(rail);
+
+  const body = document.createElement('div');
+  body.className = 'route-timeline-body';
+
+  const topRow = document.createElement('div');
+  topRow.className = 'route-timeline-top';
+  const handle = document.createElement('span');
+  handle.className = 'route-drag-handle';
+  handle.setAttribute('aria-label', '순서 변경');
+  handle.textContent = '☰';
+  topRow.appendChild(handle);
+  const nameEl = document.createElement('span');
+  nameEl.className = 'route-timeline-name';
   nameEl.textContent = site.site_name || site.company_name || '-';
-  card.appendChild(nameEl);
+  topRow.appendChild(nameEl);
+  const deleteBtn = document.createElement('button');
+  deleteBtn.type = 'button';
+  deleteBtn.className = 'route-site-delete-btn';
+  deleteBtn.setAttribute('aria-label', '목록에서 삭제');
+  deleteBtn.textContent = '×';
+  deleteBtn.addEventListener('click', onDelete);
+  topRow.appendChild(deleteBtn);
+  body.appendChild(topRow);
 
   const addrEl = document.createElement('div');
-  addrEl.className = 'mobile-route-address';
+  addrEl.className = 'route-site-addr';
   addrEl.textContent = displayValue(site.address);
-  card.appendChild(addrEl);
+  body.appendChild(addrEl);
+
+  const hasCoord = isValidSiteCoord(site);
+  if (!hasCoord) {
+    const warn = document.createElement('div');
+    warn.className = 'route-site-warn';
+    warn.textContent = '좌표 정보가 없어 지도 표시·길찾기를 이용할 수 없습니다.';
+    body.appendChild(warn);
+  }
+
+  const actions = document.createElement('div');
+  actions.className = 'route-timeline-actions';
+
+  const viewBtn = document.createElement('button');
+  viewBtn.type = 'button';
+  viewBtn.className = 'route-timeline-action-btn';
+  viewBtn.textContent = '지도에서 보기';
+  viewBtn.disabled = !hasCoord;
+  if (hasCoord) {
+    viewBtn.addEventListener('click', () => panToRouteSite('route-detail-map', site));
+  }
+  actions.appendChild(viewBtn);
 
   const directionsBtn = document.createElement('button');
   directionsBtn.type = 'button';
-  directionsBtn.className = 'mobile-route-directions-btn';
-  directionsBtn.textContent = '카카오맵 길찾기';
-  const hasValidCoord = isValidSiteCoord(site);
-  directionsBtn.disabled = !hasValidCoord;
-  if (hasValidCoord) {
+  directionsBtn.className = 'route-timeline-action-btn route-timeline-action-primary';
+  directionsBtn.textContent = '길찾기';
+  directionsBtn.disabled = !hasCoord;
+  if (hasCoord) {
     directionsBtn.addEventListener('click', () => {
       const url = buildKakaoDirectionsUrl(site.site_name || site.company_name, site.lat, site.lng);
       window.open(url, '_blank', 'noopener,noreferrer');
     });
   }
-  card.appendChild(directionsBtn);
+  actions.appendChild(directionsBtn);
 
-  container.appendChild(card);
+  body.appendChild(actions);
+  row.appendChild(body);
+  return row;
+}
+
+export async function renderRouteDetailPanel(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+
+  const { header, backBtn } = buildSettingsSubHeader('경로 상세');
+  backBtn.addEventListener('click', () => { container.style.display = 'none'; });
+  container.appendChild(header);
+
+  const selectedSites = getRoutePlanSites();
+
+  if (selectedSites.length === 0) {
+    const msg = document.createElement('p');
+    msg.className = 'mobile-placeholder';
+    msg.textContent = '선택한 방문 현장이 없습니다. 경로 만들기에서 현장을 먼저 선택해주세요.';
+    container.appendChild(msg);
+    return;
+  }
+
+  const noteEl = document.createElement('p');
+  noteEl.className = 'route-order-note';
+  noteEl.textContent = '실제 도로 경로와 이동 거리·소요 시간은 제공되지 않습니다. 현장별로 카카오맵 길찾기를 이용해주세요.';
+  container.appendChild(noteEl);
+
+  const mapWrap = document.createElement('div');
+  mapWrap.id = 'route-detail-map';
+  mapWrap.className = 'route-mini-map';
+  container.appendChild(mapWrap);
+
+  const timeline = document.createElement('div');
+  timeline.className = 'route-timeline';
+  selectedSites.forEach((site, index) => {
+    timeline.appendChild(buildRouteTimelineStop(site, index, selectedSites.length, () => {
+      state.routePlanSiteIds = state.routePlanSiteIds.filter(id => id !== site.id);
+      renderRouteDetailPanel(containerId);
+    }));
+  });
+  container.appendChild(timeline);
+
+  attachDragReorder(timeline, '.route-drag-handle', (newOrderIds) => {
+    state.routePlanSiteIds = mapDragOrderToIds(newOrderIds, selectedSites);
+    renderRouteDetailPanel(containerId);
+  });
+
+  await setupRouteMiniMap('route-detail-map', selectedSites);
 }
 
 // STEP15-E.6: 더보기 메뉴 행 왼쪽에 붙는 장식용 line SVG 아이콘. 외부 아이콘 라이브러리를
