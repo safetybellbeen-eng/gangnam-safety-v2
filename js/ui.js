@@ -812,9 +812,9 @@ function buildMobilePanelCloseBtn(panelId) {
 //   기능(admin only) → 앱 정보/로그아웃 순으로 재구성했다.
 // - 관리자 메뉴 카드(회원관리/사업장 데이터 관리)는 기존 그대로 유지한다(admin만 노출, 기존
 //   #btn-admin-panel/#btn-upload-panel 클릭 위임 그대로).
-// - 이전에 있던 "업무 > 감독일정" 행은 제거한다 — 하단 "알림" 탭 제거와 함께 그 기능의 유일한
-//   진입점을 상단 헤더 벨(#mobile-header-alert-btn, 기존 그대로 activateMobileTab('alert') 호출)
-//   하나로 통일한다. supervision-panel/데이터/RPC는 전혀 건드리지 않는다.
+// - "감독일정관리" 항목은 프로필 카드 바로 아래 단독 그룹으로 표시하며, 기존 헤더 벨
+//   (#mobile-header-alert-btn, activateMobileTab('alert') 호출)과 완전히 동일한 진입점을
+//   재사용한다(새 로직 없음). supervision-panel/데이터/RPC는 전혀 건드리지 않는다.
 // - 버전 정보는 TARGET의 "v1.0.0"을 하드코딩하지 않고 CONFIG.APP_VERSION(config.js, sw.js의
 //   CACHE_VERSION과 동일한 값)을 그대로 표시한다.
 // - 로그아웃은 기존 #logout-approved 클릭 위임 그대로 재사용한다(새 handler 없음).
@@ -921,6 +921,12 @@ export function renderMobileMoreMenu(containerId) {
 
     container.appendChild(group);
   }
+
+  // 감독일정관리 — 기존 헤더 벨(#mobile-header-alert-btn, activateMobileTab('alert'))과 동일한
+  // 진입점을 더보기 화면에도 추가한 것으로, 새 로직 없이 기존 클릭을 위임한다.
+  addMenuCard(null, [
+    { label: '감독일정관리', icon: 'calendar', onClick: () => document.getElementById('mobile-header-alert-btn').click() },
+  ]);
 
   // 계정/설정 — 4개 항목 모두 아직 실제 기능이 없어 정적 행으로만 표시한다(미구현).
   addMenuCard(null, [
