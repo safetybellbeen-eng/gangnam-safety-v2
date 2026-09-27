@@ -2007,7 +2007,10 @@
      여기서는 위치만 override하고 열기/닫기 로직은 건드리지 않는다. */
   #app[data-mobile-tab="more"] #admin-panel,
   #app[data-mobile-tab="more"] #upload-panel,
-  #app[data-mobile-tab="more"] #supervision-panel {
+  #app[data-mobile-tab="more"] #supervision-panel,
+  #app[data-mobile-tab="more"] #app-settings-panel,
+  #app[data-mobile-tab="more"] #password-change-panel,
+  #app[data-mobile-tab="more"] #notification-settings-panel {
     position: fixed;
     top: 0;
     left: 0;
@@ -4243,6 +4246,249 @@
   .mobile-statusview-btn:active {
     background: #0f2247;
   }
+
+  /* ============================================================
+     STEP16.6: 모바일 앱 설정/비밀번호 변경/알림 설정. 새 화면 3개가 공유하는 카드/row/토글
+     컴포넌트를 여기 한 번만 정의한다(재사용, 화면별 중복 CSS 없음). #app-settings-panel /
+     #password-change-panel / #notification-settings-panel의 전체화면 위치 자체는 위
+     admin-panel/upload-panel과 같은 규칙(#app[data-mobile-tab="more"] ...)을 그대로 쓴다.
+     ============================================================ */
+  .settings-card {
+    background: #fff;
+    border: 1px solid var(--gnmap-border);
+    border-radius: 14px;
+    margin: 0 16px 16px;
+    overflow: hidden;
+  }
+  .settings-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 16px 6px;
+    font-size: 14px;
+    font-weight: var(--gnmap-fw-bold);
+    color: var(--gnmap-navy);
+  }
+  .settings-card-title svg { width: 18px; height: 18px; }
+  .settings-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    border-top: 1px solid var(--gnmap-border);
+  }
+  .settings-card-title + .settings-row { border-top: none; }
+  .settings-row.is-disabled { opacity: 0.45; }
+  .settings-row-icon {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    color: var(--gnmap-text-sub);
+    margin-top: 1px;
+  }
+  .settings-row-icon svg { width: 20px; height: 20px; }
+  .settings-row-text { flex: 1; min-width: 0; }
+  .settings-row-title {
+    font-size: 14px;
+    font-weight: var(--gnmap-fw-bold);
+    color: #1a2233;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .settings-row-badge {
+    font-size: 11px;
+    font-weight: bold;
+    color: var(--gnmap-blue);
+    background: var(--gnmap-blue-light);
+    border-radius: 6px;
+    padding: 1px 6px;
+  }
+  .settings-row-desc {
+    font-size: 12px;
+    color: var(--gnmap-text-sub);
+    margin-top: 2px;
+    line-height: 1.4;
+  }
+  .settings-row-control {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    padding-top: 1px;
+  }
+
+  /* iOS 스타일 pill 토글 스위치 — 프로젝트 최초 도입 컴포넌트(재사용할 기존 토글 UI 없음). */
+  .settings-toggle {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 26px;
+  }
+  .settings-toggle input {
+    position: absolute;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    cursor: pointer;
+  }
+  .settings-toggle-track {
+    position: absolute;
+    inset: 0;
+    background: #d5d9e0;
+    border-radius: 999px;
+    transition: background 0.15s ease;
+  }
+  .settings-toggle-track::before {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    transition: transform 0.15s ease;
+  }
+  .settings-toggle input:checked + .settings-toggle-track {
+    background: var(--gnmap-blue);
+  }
+  .settings-toggle input:checked + .settings-toggle-track::before {
+    transform: translateX(18px);
+  }
+  .settings-toggle.is-disabled { opacity: 0.6; }
+  .settings-toggle input:disabled { cursor: not-allowed; }
+
+  /* "현재 위치 >" / "1일 전 >" 형태의 값+chevron 버튼. */
+  .settings-value-btn {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    border: none;
+    background: none;
+    color: var(--gnmap-blue);
+    font-size: 13px;
+    font-weight: bold;
+    padding: 4px 0;
+    white-space: nowrap;
+  }
+  .settings-value-btn svg { width: 16px; height: 16px; }
+  .settings-value-btn:disabled { color: var(--gnmap-text-meta); }
+
+  /* 지도 시작 위치/사전 알림 선택 시트 — admin-sheet-overlay/admin-sheet(기존)를 그대로 쓰고
+     옵션 행 스타일만 추가한다. */
+  .settings-sheet-option {
+    width: 100%;
+    text-align: left;
+    padding: 12px 4px;
+    border: none;
+    background: none;
+    border-top: 1px solid var(--gnmap-border);
+    font-size: 14px;
+    color: #333;
+  }
+  .settings-sheet-option:first-of-type { border-top: none; }
+  .settings-sheet-option.active {
+    color: var(--gnmap-blue);
+    font-weight: bold;
+  }
+
+  /* 안내 카드(비밀번호 변경 상단 lock 안내 / 알림 설정 하단 "알림 안내") */
+  .settings-notice-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--gnmap-blue-light);
+    border-radius: 12px;
+    margin: 0 16px 16px;
+    padding: 14px;
+    font-size: 13px;
+    color: #1a2233;
+    line-height: 1.4;
+  }
+  .settings-notice-card svg { width: 20px; height: 20px; flex-shrink: 0; color: var(--gnmap-blue); }
+  .settings-notice-card-column {
+    flex-direction: column;
+    align-items: stretch;
+    background: var(--gnmap-bg-soft);
+  }
+  .settings-notice-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: bold;
+    margin-bottom: 6px;
+  }
+  .settings-permission-btn {
+    align-self: flex-start;
+    margin-top: 4px;
+  }
+
+  /* 비밀번호 변경 폼 */
+  .settings-form { padding: 0 16px 24px; }
+  .settings-field { margin-bottom: 16px; }
+  .settings-password-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .settings-password-wrap input {
+    width: 100%;
+    height: 44px;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 12px;
+    border: 1px solid var(--gnmap-border);
+    background: var(--gnmap-bg-soft);
+    padding: 0 46px 0 14px;
+    font-size: 14px;
+    color: #1a2233;
+  }
+  .settings-password-wrap input:focus {
+    outline: none;
+    border-color: var(--gnmap-blue);
+    background: #fff;
+  }
+  .settings-password-eye-btn {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    padding: 8px;
+    color: #a3abb8;
+    cursor: pointer;
+  }
+  .settings-password-eye-btn svg { width: 18px; height: 18px; }
+  .settings-password-eye-btn.active { color: var(--gnmap-blue); }
+  .settings-guide-card {
+    background: var(--gnmap-bg-soft);
+    border-radius: 12px;
+    padding: 14px;
+    margin: 4px 0 20px;
+  }
+  .settings-guide-title {
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--gnmap-navy);
+    margin-bottom: 6px;
+  }
+  .settings-guide-card ul {
+    margin: 0;
+    padding-left: 18px;
+  }
+  .settings-guide-card li {
+    font-size: 12px;
+    color: var(--gnmap-text-sub);
+    line-height: 1.6;
+  }
+  .settings-success-text { color: var(--gnmap-green) !important; }
 }
 
 /* [STEP16.5 FINAL-3] 짧은 실효 viewport 전용 압축. HERO는 aspect-ratio(67/100)로 폭에
