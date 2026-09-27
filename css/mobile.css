@@ -1152,33 +1152,36 @@
     min-height: 36px;
   }
 
-  /* 사용자 요청(STEP16.22): 메모를 상세 패널에 바로 두지 않고 "메모" 버튼을 누르면 뜨는
-     팝업으로 뺀다(js/ui.js openNoteModal). 내용(제목/textarea/저장/삭제)은 기존
-     .site-detail-section-title/.site-detail-note-textarea/.site-detail-note-actions를 그대로
-     재사용하므로 여기서는 오버레이/카드/닫기 버튼만 새로 정의한다. */
+  /* 사용자 요청: 메모를 상세 패널에 바로 두지 않고 "메모" 버튼을 누르면 뜨는 팝업으로
+     보여준다(js/ui.js openNoteModal) — 화면 정중앙에 크게 표시하고 X로 닫으며, 작은
+     "메모 작성/수정" 버튼으로 실제 편집(더보기 > 현장 메모 관리)로 넘어간다. */
   .site-note-modal-overlay {
     position: fixed;
     inset: 0;
     z-index: 300;
     background: rgba(15, 23, 42, 0.45);
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
   }
   .site-note-modal-content {
     width: 100%;
-    max-width: 480px;
-    max-height: 80vh;
+    max-width: 380px;
+    max-height: 70vh;
     overflow-y: auto;
     box-sizing: border-box;
     background: #fff;
-    border-radius: 16px 16px 0 0;
-    padding: var(--gnmap-space-4) var(--gnmap-space-4) calc(var(--gnmap-space-4) + env(safe-area-inset-bottom, 0px));
-    box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.2);
+    border-radius: 16px;
+    padding: var(--gnmap-space-4) var(--gnmap-space-5) var(--gnmap-space-5);
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.28);
+    text-align: center;
   }
   .site-note-modal-header {
     display: flex;
     justify-content: flex-end;
+    margin: 0 calc(-1 * var(--gnmap-space-2)) -4px 0;
   }
   .site-note-modal-close {
     width: 32px;
@@ -1191,6 +1194,38 @@
     color: var(--gnmap-text-sub);
     background: none;
     border: none;
+    cursor: pointer;
+  }
+  .site-note-modal-title {
+    margin: 0 0 12px;
+    text-align: center;
+  }
+  .site-note-modal-body {
+    font-size: 16px;
+    line-height: 1.7;
+    color: var(--gnmap-text-primary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    text-align: left;
+    margin: 0 0 20px;
+    min-height: 48px;
+  }
+  .site-note-modal-body.is-empty {
+    color: var(--gnmap-text-sub);
+    text-align: center;
+  }
+  .site-note-modal-write-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 0 20px;
+    border-radius: var(--gnmap-radius-pill);
+    border: none;
+    background: var(--gnmap-blue);
+    color: #fff;
+    font-size: 13px;
+    font-weight: var(--gnmap-fw-semibold);
     cursor: pointer;
   }
 
@@ -2099,6 +2134,16 @@
     border: none;
     background: var(--gnmap-red);
     color: #fff;
+  }
+  .sv-mobile-save-btn {
+    border: none;
+    background: var(--gnmap-blue);
+    color: #fff;
+  }
+  .sv-mobile-save-btn:disabled {
+    background: var(--gnmap-gray-bg);
+    color: var(--gnmap-gray);
+    cursor: not-allowed;
   }
 
   /* STEP15-D: 더보기 탭에서 여는 회원관리/엑셀업로드/감독일정 패널 — 세 패널 모두 PC에서는
@@ -5029,7 +5074,7 @@
     width: 100%;
     height: 42px;
     box-sizing: border-box;
-    padding: 0 12px 0 38px;
+    padding: 0 34px 0 38px;
     border: 1px solid var(--gnmap-border);
     border-radius: var(--gnmap-radius-md);
     background: var(--gnmap-bg-soft);
@@ -5069,6 +5114,29 @@
   }
   .site-notes-card-icon { color: var(--gnmap-blue); }
   .site-notes-card-icon svg { width: 18px; height: 18px; }
+  .site-notes-card-favorite-badge {
+    color: var(--gnmap-amber, #f59e0b);
+    font-size: 14px;
+    line-height: 1;
+  }
+  .site-notes-search-clear {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: none;
+    background: var(--gnmap-border);
+    color: var(--gnmap-text-sub);
+    font-size: 14px;
+    line-height: 1;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
   .site-notes-card-preview {
     font-size: 13px;
     color: var(--gnmap-text-sub);
