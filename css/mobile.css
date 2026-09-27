@@ -5107,7 +5107,13 @@
   .site-notes-select-field-text.is-placeholder { color: var(--gnmap-text-sub); }
   .site-notes-select-field-chevron { flex-shrink: 0; color: var(--gnmap-text-sub); display: flex; }
   .site-notes-select-field-chevron svg { width: 16px; height: 16px; }
+  .site-notes-select-field.is-locked {
+    background: var(--gnmap-bg-soft);
+    color: var(--gnmap-text-sub);
+  }
+  .site-notes-select-field.is-locked .site-notes-select-field-text { color: var(--gnmap-text-sub); }
   .site-notes-existing-hint { font-size: 12px; color: var(--gnmap-blue); margin: 6px 2px 0; }
+  .site-notes-delete-actions { padding: 4px 16px 0; }
   .site-notes-textarea {
     min-height: 200px;
     padding: 12px;
