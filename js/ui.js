@@ -196,6 +196,9 @@ function renderNoteSection(panel, siteId) {
   });
 
   deleteBtn.addEventListener('click', async () => {
+    // 사용자 요청: 삭제는 복구할 수 없으므로 확인 절차를 거친다(confirmNoteDelete는 방금
+    // 작성/수정한 메모면 문구를 한 번 더 강하게 바꾼다 — 아래 정의, 새 삭제 로직 없음).
+    if (!confirmNoteDelete(existing)) return;
     if (state.noteInFlight.has(siteId)) return;
     state.noteInFlight.add(siteId);
     saveBtn.disabled = true;
@@ -218,11 +221,11 @@ function renderNoteSection(panel, siteId) {
   panel.appendChild(noteActions);
 }
 
-// 사용자 요청(STEP16.22): 모바일에서는 상세 패널에 메모를 바로 보여주지 않고, "메모" 버튼을
-// 눌렀을 때만 팝업(모달)으로 작성/열람/수정/삭제한다. 저장/삭제 로직(saveNote/deleteNote)은
-// renderNoteSection을 그대로 재사용해 새로 만들지 않는다 — 모달 본문 컨테이너를 그 함수에
-// panel 대신 넘길 뿐이다. 배경 클릭/×/Escape로 닫히며, 매번 새로 만들고 닫을 때 제거한다
-// (지도 위 CustomOverlay처럼 상태를 남겨둘 필요가 없는 일회성 UI).
+// 사용자 요청: 지도/현장/경로 탭의 현장상세정보에서 "메모" 버튼을 누르면, 더 이상 이 팝업
+// 안에서 바로 수정/삭제하지 않는다 — 메모 내용을 화면 정중앙에 크게 "보여주기만" 하고
+// X로 닫으며, 작은 "메모 작성/수정" 버튼을 누르면 더보기 > 현장 메모 관리(전체화면, 해당
+// 현장 자동 선택+잠금)로 넘어가 실제 작성/수정/삭제를 하도록 한다(openSiteNotesWritePanel
+// 재사용 — 새 작성/수정 로직 없음). 데이터 조회는 기존 getNote()만 그대로 쓴다.
 function openNoteModal(siteId) {
   closeNoteModal(); // 혹시 이미 열려있던 모달이 있으면 먼저 정리(중복 방지)
 
@@ -248,7 +251,35 @@ function openNoteModal(siteId) {
   header.appendChild(closeBtn);
   content.appendChild(header);
 
-  renderNoteSection(content, siteId); // 제목/textarea/저장/삭제를 그대로 채워 넣는다.
+  const title = document.createElement('h3');
+  title.className = 'site-detail-section-title site-note-modal-title';
+  title.textContent = '개인 메모';
+  content.appendChild(title);
+
+  const existing = getNote(siteId);
+  const body = document.createElement('div');
+  body.className = 'site-note-modal-body';
+  if (existing && existing.content) {
+    body.textContent = existing.content;
+  } else {
+    body.classList.add('is-empty');
+    body.textContent = '작성된 메모가 없습니다.';
+  }
+  content.appendChild(body);
+
+  const writeBtn = document.createElement('button');
+  writeBtn.type = 'button';
+  writeBtn.className = 'site-note-modal-write-btn';
+  writeBtn.textContent = existing ? '메모 수정' : '메모 작성';
+  writeBtn.addEventListener('click', () => {
+    closeNoteModal();
+    // "더보기"로 넘어가서 현장 메모 작성/수정 화면을 연다 — 해당 현장은 siteId로 자동 적용,
+    // locked:true로 현장 선택은 잠근다(카드 클릭 진입과 동일한 화면/로직 재사용).
+    const moreTabBtn = document.querySelector('.mobile-tab-btn[data-tab="more"]');
+    if (moreTabBtn) moreTabBtn.click();
+    openSiteNotesWritePanel(siteId, { locked: true });
+  });
+  content.appendChild(writeBtn);
 
   overlay.appendChild(content);
   document.body.appendChild(overlay);
@@ -264,9 +295,8 @@ function closeNoteModal() {
   const overlay = document.getElementById('site-note-modal-overlay');
   if (overlay) overlay.remove();
   document.removeEventListener('keydown', handleNoteModalKeydown);
-  // STEP16.23: "더보기 > 현장 메모" 목록에서 카드를 눌러 이 모달로 열람/수정/삭제한 경우,
-  // 모달을 닫을 때 목록(전체 건수/미리보기/날짜/"수정됨" 배지)도 최신 상태로 다시 그린다.
-  // 목록 패널이 열려있지 않으면(예: 현장 상세에서 연 경우) 아무 일도 하지 않는다.
+  // STEP16.23: "더보기 > 현장 메모" 목록이 열려 있는 상태였다면, 모달을 닫을 때 목록(전체
+  // 건수/미리보기/날짜/"수정됨" 배지)도 최신 상태로 다시 그린다.
   const notesPanel = document.getElementById('site-notes-panel');
   if (notesPanel && notesPanel.style.display !== 'none') {
     renderSiteNotesPanel('site-notes-panel');
@@ -360,19 +390,39 @@ function renderSiteNotesPanel(containerId) {
   searchInput.className = 'site-notes-search-input';
   searchInput.placeholder = '현장명 또는 메모 내용을 검색하세요.';
   searchInput.value = state.siteNotesSearchQuery;
+  // 사용자 요청: 검색어 초기화(x) 버튼 — 입력값이 있을 때만 보이고, 누르면 검색어만 지운다
+  // (필터 칩 선택은 그대로 유지).
+  const searchClearBtn = document.createElement('button');
+  searchClearBtn.type = 'button';
+  searchClearBtn.className = 'site-notes-search-clear';
+  searchClearBtn.setAttribute('aria-label', '검색어 지우기');
+  searchClearBtn.textContent = '×';
+  searchClearBtn.style.display = state.siteNotesSearchQuery ? 'flex' : 'none';
   searchInput.addEventListener('input', () => {
     state.siteNotesSearchQuery = searchInput.value;
+    searchClearBtn.style.display = searchInput.value ? 'flex' : 'none';
     renderSiteNotesList();
   });
+  searchClearBtn.addEventListener('click', () => {
+    state.siteNotesSearchQuery = '';
+    searchInput.value = '';
+    searchClearBtn.style.display = 'none';
+    renderSiteNotesList();
+    searchInput.focus();
+  });
   searchWrap.appendChild(searchInput);
+  searchWrap.appendChild(searchClearBtn);
   container.appendChild(searchWrap);
 
   const filterRow = document.createElement('div');
   filterRow.className = 'site-notes-filter-row';
+  // 사용자 요청: 정렬 옵션에 "현장명순"을 추가한다("생성일순"은 기존 "최근 작성"이 이미
+  // created_at 내림차순 정렬을 제공하므로 중복 추가하지 않는다).
   const filters = [
     { value: 'all', label: '전체' },
     { value: 'recent-created', label: '최근 작성' },
     { value: 'recent-updated', label: '최근 수정' },
+    { value: 'name', label: '현장명순' },
   ];
   filters.forEach(f => {
     const chip = document.createElement('button');
@@ -407,6 +457,13 @@ function renderSiteNotesPanel(containerId) {
 
     if (state.siteNotesFilter === 'recent-created') {
       rows = rows.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    } else if (state.siteNotesFilter === 'name') {
+      // 현장명순(가나다순). site_name이 없는 경우 company_name으로 대체(카드 표시 기준과 동일).
+      rows = rows.slice().sort((a, b) => {
+        const nameA = a.site.site_name || a.site.company_name || '';
+        const nameB = b.site.site_name || b.site.company_name || '';
+        return nameA.localeCompare(nameB, 'ko');
+      });
     } else {
       // '전체'/'최근 수정' 모두 최신 수정순 — "전체"의 기본 정렬 기준으로도 자연스럽다.
       rows = rows.slice().sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
@@ -420,6 +477,7 @@ function renderSiteNotesPanel(containerId) {
       emptyIcon.style.height = '32px';
       empty.appendChild(emptyIcon);
       if (allNotes.length === 0) {
+        // 메모 자체가 하나도 없는 경우 — "검색 결과 없음"과 구분되는 안내 + 바로 작성 CTA.
         const line1 = document.createElement('p');
         line1.textContent = '작성된 현장 메모가 없습니다.';
         empty.appendChild(line1);
@@ -436,9 +494,29 @@ function renderSiteNotesPanel(containerId) {
         cta.addEventListener('click', () => openSiteNotesWritePanel(null));
         empty.appendChild(cta);
       } else {
+        // 메모는 있지만 검색어와 일치하는 것이 없는 경우 — 검색어를 원인으로 명확히 안내하고
+        // 바로 지울 수 있게 한다(왜 안 보이는지 헷갈리지 않도록).
         const line1 = document.createElement('p');
         line1.textContent = '검색 결과가 없습니다.';
         empty.appendChild(line1);
+        if (query) {
+          const line2 = document.createElement('p');
+          line2.textContent = `"${query}"와(과) 일치하는 메모를 찾지 못했습니다.`;
+          empty.appendChild(line2);
+          const clearCta = document.createElement('button');
+          clearCta.type = 'button';
+          clearCta.className = 'sv-mobile-empty-cta';
+          const clearCtaText = document.createElement('span');
+          clearCtaText.textContent = '검색어 지우기';
+          clearCta.appendChild(clearCtaText);
+          clearCta.addEventListener('click', () => {
+            state.siteNotesSearchQuery = '';
+            searchInput.value = '';
+            searchClearBtn.style.display = 'none';
+            renderSiteNotesList();
+          });
+          empty.appendChild(clearCta);
+        }
       }
       listEl.appendChild(empty);
       return;
@@ -465,6 +543,15 @@ function buildSiteNoteCard(n) {
   icon.className = 'site-notes-card-icon';
   icon.appendChild(svIcon(SV_ICON_DOC));
   top.appendChild(icon);
+  // 사용자 요청: 즐겨찾기로 표시된 현장이면 별 배지를 함께 보여줘 우선순위 파악을 돕는다
+  // (기존 favorites.js의 isFavorite()만 조회 — 새 상태/새 CRUD 없음).
+  if (isFavorite(n.site.id)) {
+    const favBadge = document.createElement('span');
+    favBadge.className = 'site-notes-card-favorite-badge';
+    favBadge.textContent = '★';
+    favBadge.setAttribute('aria-label', '즐겨찾기 현장');
+    top.appendChild(favBadge);
+  }
   card.appendChild(top);
 
   const title = document.createElement('div');
@@ -636,40 +723,12 @@ function renderSiteNotesWritePanel(containerId) {
   guideCard.appendChild(guideList);
   container.appendChild(guideCard);
 
-  // 삭제 버튼 — 감독일정관리 상세 화면과 동일하게(.sv-mobile-delete-btn), 카드를 눌러 기존
-  // 메모를 수정하러 들어온 경우(locked)에만 노출한다. deleteNote()는 renderNoteSection에서
-  // 쓰는 것과 동일한 기존 로직을 그대로 호출한다(새 삭제 로직 없음).
-  if (locked && existingNote) {
-    const deleteActions = document.createElement('div');
-    deleteActions.className = 'sv-mobile-detail-actions site-notes-delete-actions';
-    const deleteBtn = document.createElement('button');
-    deleteBtn.type = 'button';
-    deleteBtn.className = 'sv-mobile-delete-btn';
-    deleteBtn.textContent = '메모 삭제';
-    deleteBtn.addEventListener('click', async () => {
-      if (!window.confirm('이 메모를 삭제하시겠습니까?')) return;
-      const siteId = state.siteNotesWriteSiteId;
-      if (state.noteInFlight.has(siteId)) return;
-      state.noteInFlight.add(siteId);
-      deleteBtn.disabled = true;
-      try {
-        const success = await deleteNote(siteId);
-        if (success) closeSiteNotesWritePanel();
-        else deleteBtn.disabled = false;
-      } finally {
-        state.noteInFlight.delete(siteId);
-      }
-    });
-    deleteActions.appendChild(deleteBtn);
-    container.appendChild(deleteActions);
-  }
-
-  // 저장 버튼
-  const saveBtnWrap = document.createElement('div');
-  saveBtnWrap.className = 'site-notes-save-btn-wrap';
+  // 저장 버튼 — locked(카드를 눌러 들어온 수정 모드)일 때는 삭제 버튼과 한 행에 나란히
+  // 배치하고(사용자 요청: 감독일정관리와 동일하게), 새 메모 작성일 때는 기존처럼 전체너비
+  // 단독 버튼으로 둔다.
   const saveBtn = document.createElement('button');
   saveBtn.type = 'button';
-  saveBtn.className = 'upload-mobile-primary-btn';
+  saveBtn.className = (locked && existingNote) ? 'sv-mobile-save-btn' : 'upload-mobile-primary-btn';
   saveBtn.textContent = '메모 저장';
   function updateSaveBtnState() {
     const hasSite = !!state.siteNotesWriteSiteId;
@@ -696,8 +755,51 @@ function renderSiteNotesWritePanel(containerId) {
       saveBtn.disabled = false;
     }
   });
-  saveBtnWrap.appendChild(saveBtn);
-  container.appendChild(saveBtnWrap);
+
+  // 삭제 버튼 — 감독일정관리 상세 화면과 동일하게(.sv-mobile-delete-btn), 카드를 눌러 기존
+  // 메모를 수정하러 들어온 경우(locked)에만 노출한다. deleteNote()는 renderNoteSection에서
+  // 쓰는 것과 동일한 기존 로직을 그대로 호출한다(새 삭제 로직 없음).
+  if (locked && existingNote) {
+    const actionsRow = document.createElement('div');
+    actionsRow.className = 'sv-mobile-detail-actions site-notes-delete-actions';
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'sv-mobile-delete-btn';
+    deleteBtn.textContent = '메모 삭제';
+    deleteBtn.addEventListener('click', async () => {
+      if (!confirmNoteDelete(existingNote)) return;
+      const siteId = state.siteNotesWriteSiteId;
+      if (state.noteInFlight.has(siteId)) return;
+      state.noteInFlight.add(siteId);
+      deleteBtn.disabled = true;
+      try {
+        const success = await deleteNote(siteId);
+        if (success) closeSiteNotesWritePanel();
+        else deleteBtn.disabled = false;
+      } finally {
+        state.noteInFlight.delete(siteId);
+      }
+    });
+    actionsRow.appendChild(deleteBtn);
+    actionsRow.appendChild(saveBtn);
+    container.appendChild(actionsRow);
+  } else {
+    const saveBtnWrap = document.createElement('div');
+    saveBtnWrap.className = 'site-notes-save-btn-wrap';
+    saveBtnWrap.appendChild(saveBtn);
+    container.appendChild(saveBtnWrap);
+  }
+}
+
+// 메모 삭제 확인 — 감독일정 삭제 confirm과 동일한 패턴. "복구 불가" 안내를 항상 포함하고,
+// 방금(1분 이내) 수정/작성된 메모라면 실수 클릭 방지를 위해 문구를 한 번 더 강하게 바꾼다.
+function confirmNoteDelete(note) {
+  const ts = note && (note.updated_at || note.created_at);
+  const recentlyModified = ts && (Date.now() - new Date(ts).getTime() < 60000);
+  if (recentlyModified) {
+    return window.confirm('방금 작성/수정한 메모입니다. 삭제하면 복구할 수 없습니다.\n정말 삭제하시겠습니까?');
+  }
+  return window.confirm('이 메모를 삭제하시겠습니까?\n삭제한 메모는 복구할 수 없습니다.');
 }
 
 // "현장 선택" bottom sheet(현장 메모 작성 전용, 단일 선택) — 기존 openSupervisionManagerSheet
@@ -1212,8 +1314,9 @@ export function renderDetail(site) {
     });
     actions.appendChild(routeAddBtn);
 
-    // 사용자 요청(STEP16.22): 메모는 더 이상 탭을 이동시키지 않고, 어느 탭에서 열든 팝업으로
-    // 작성/열람/수정/삭제한다(openNoteModal, 아래 renderNoteSection 재사용).
+    // 사용자 요청: 메모는 어느 탭에서 열든 팝업(openNoteModal)으로 열람만 하고, 팝업 안의
+    // 작은 "메모 작성/수정" 버튼을 눌러야 더보기 > 현장 메모 관리(해당 현장 자동 선택)로
+    // 넘어가 실제 작성/수정/삭제를 한다.
     const noteBtn = document.createElement('button');
     noteBtn.type = 'button';
     noteBtn.className = 'site-detail-action-btn site-detail-btn-secondary';
