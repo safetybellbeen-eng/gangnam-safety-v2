@@ -431,6 +431,9 @@ export function renderSiteList(containerId) {
       summaryRows.forEach(([label, value]) => {
         const cell = document.createElement('div');
         cell.className = 'site-list-summary-item';
+        // 사용자 피드백: 공사기간은 "YYYY.MM.DD ~ YYYY.MM.DD" 길이가 길어 2열 폭에서 종료일이
+        // 잘려 안 보였다. 이 항목만 2열 전체 폭을 쓰도록 별도 클래스를 붙인다(css/mobile.css).
+        if (label === '공사기간') cell.classList.add('site-list-summary-item--wide');
         const labelEl = document.createElement('span');
         labelEl.className = 'site-list-summary-label';
         labelEl.textContent = label;
