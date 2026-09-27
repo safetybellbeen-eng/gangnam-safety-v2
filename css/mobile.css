@@ -1066,6 +1066,13 @@
     background: var(--gnmap-red-bg);
     color: var(--gnmap-red);
   }
+  /* STEP16.13: "경로추가" 버튼이 이미 추가된 상태일 때(체크 표시) — 색만 blue로 강조하고
+     구조/크기는 다른 secondary 버튼과 동일하게 유지한다. */
+  .site-detail-btn-secondary.is-added {
+    border: 1px solid var(--gnmap-blue);
+    background: var(--gnmap-blue-light);
+    color: var(--gnmap-blue);
+  }
 
   /* 개인 메모 section — 제목/textarea/저장·삭제를 업무용 카드 톤으로 정돈한다. 기존
      value/이벤트/저장(saveNote)·삭제(deleteNote) 로직은 전혀 바꾸지 않는다. 컴팩트형에서는
@@ -2022,7 +2029,9 @@
   #app[data-mobile-tab="more"] #account-info-panel,
   #app[data-mobile-tab="more"] #app-settings-panel,
   #app[data-mobile-tab="more"] #password-change-panel,
-  #app[data-mobile-tab="more"] #notification-settings-panel {
+  #app[data-mobile-tab="more"] #notification-settings-panel,
+  #app[data-mobile-tab="route"] #route-order-panel,
+  #app[data-mobile-tab="route"] #route-detail-panel {
     position: fixed;
     top: 0;
     left: 0;
@@ -2055,7 +2064,8 @@
     line-height: 1.5;
   }
 
-  /* STEP15-D: 경로 탭 — 선택된 사업장 카드 + 길찾기 버튼. */
+  /* STEP15-D(레거시, 더 이상 새로 그려지지 않지만 규칙 자체는 남겨둔다 — 호환용): 경로 탭 —
+     선택된 사업장 카드 + 길찾기 버튼. */
   .mobile-route-card {
     background: #fff;
     border: 1px solid #eee;
@@ -2085,6 +2095,325 @@
   }
   .mobile-route-directions-btn:disabled {
     background: #ccc;
+  }
+
+  /* ============================================================
+     STEP16.13: 경로 탭 전면 개편 — 경로 만들기/방문 순서/경로 상세 공통 스타일.
+     기존 --gnmap-* 토큰만 쓰고 새 색상/치수 체계를 만들지 않는다.
+     ============================================================ */
+  .route-card-title {
+    font-size: var(--gnmap-fs-card-title);
+    font-weight: var(--gnmap-fw-bold);
+    color: var(--gnmap-navy);
+    margin-bottom: var(--gnmap-space-2);
+  }
+  .route-summary-card,
+  .route-start-card {
+    background: #fff;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-md);
+    box-shadow: var(--gnmap-shadow-sm);
+    padding: var(--gnmap-space-4);
+    margin-bottom: var(--gnmap-space-3);
+  }
+  .route-summary-count {
+    font-size: var(--gnmap-fs-body);
+    color: var(--gnmap-text-sub);
+  }
+  .route-start-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gnmap-space-3);
+  }
+  .route-start-text { flex: 1; min-width: 0; }
+  .route-start-label {
+    font-size: var(--gnmap-fs-body);
+    font-weight: var(--gnmap-fw-semibold);
+    color: var(--gnmap-text-primary);
+  }
+  .route-start-address {
+    font-size: var(--gnmap-fs-secondary);
+    color: var(--gnmap-text-sub);
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .route-start-btn {
+    flex-shrink: 0;
+    min-height: var(--gnmap-tap-min);
+    padding: 0 var(--gnmap-space-3);
+    border: 1px solid var(--gnmap-blue);
+    background: #fff;
+    color: var(--gnmap-blue);
+    border-radius: var(--gnmap-radius-sm);
+    font-size: var(--gnmap-fs-secondary);
+    font-weight: var(--gnmap-fw-semibold);
+  }
+  .route-start-btn:disabled { opacity: 0.5; }
+  .route-start-error {
+    color: var(--gnmap-red);
+    background: var(--gnmap-red-bg);
+    border-radius: var(--gnmap-radius-sm);
+    padding: var(--gnmap-space-2) var(--gnmap-space-3);
+    font-size: var(--gnmap-fs-secondary);
+    margin-bottom: var(--gnmap-space-3);
+  }
+  .route-add-site-btn {
+    width: 100%;
+    min-height: var(--gnmap-tap-min);
+    border: 1px dashed var(--gnmap-blue);
+    background: var(--gnmap-blue-light);
+    color: var(--gnmap-blue);
+    border-radius: var(--gnmap-radius-md);
+    font-size: var(--gnmap-fs-body);
+    font-weight: var(--gnmap-fw-bold);
+    margin-bottom: var(--gnmap-space-3);
+  }
+  .route-order-note {
+    font-size: var(--gnmap-fs-caption);
+    color: var(--gnmap-text-meta);
+    background: var(--gnmap-bg-soft);
+    border-radius: var(--gnmap-radius-sm);
+    padding: var(--gnmap-space-2) var(--gnmap-space-3);
+    margin-bottom: var(--gnmap-space-3);
+    line-height: 1.5;
+  }
+
+  /* 선택 현장 카드(경로 만들기/방문 순서 공용) */
+  .route-site-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gnmap-space-2);
+    margin-bottom: var(--gnmap-space-3);
+  }
+  .route-site-card {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--gnmap-space-2);
+    background: #fff;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-md);
+    padding: var(--gnmap-space-3);
+    touch-action: none;
+  }
+  .route-site-card.route-card-dragging {
+    box-shadow: var(--gnmap-shadow-md);
+    background: var(--gnmap-blue-light);
+  }
+  .route-drag-handle {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    color: var(--gnmap-text-meta);
+    font-size: 16px;
+    cursor: grab;
+    touch-action: none;
+  }
+  .route-site-number {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--gnmap-navy);
+    color: #fff;
+    font-size: var(--gnmap-fs-caption);
+    font-weight: var(--gnmap-fw-bold);
+    margin-top: 2px;
+  }
+  .route-site-text { flex: 1; min-width: 0; }
+  .route-site-name {
+    font-size: var(--gnmap-fs-body);
+    font-weight: var(--gnmap-fw-semibold);
+    color: var(--gnmap-text-primary);
+  }
+  .route-site-addr {
+    font-size: var(--gnmap-fs-secondary);
+    color: var(--gnmap-text-sub);
+    margin-top: 2px;
+  }
+  .route-site-warn {
+    font-size: var(--gnmap-fs-caption);
+    color: var(--gnmap-amber);
+    margin-top: 2px;
+  }
+  .route-site-delete-btn {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    border: none;
+    background: transparent;
+    color: var(--gnmap-text-meta);
+    font-size: 18px;
+    line-height: 1;
+  }
+  .route-clear-all-btn {
+    width: 100%;
+    min-height: 38px;
+    border: none;
+    background: transparent;
+    color: var(--gnmap-red);
+    font-size: var(--gnmap-fs-secondary);
+    font-weight: var(--gnmap-fw-semibold);
+    margin-bottom: var(--gnmap-space-3);
+  }
+  .route-cta-btn {
+    width: 100%;
+    min-height: 48px;
+    border: none;
+    border-radius: var(--gnmap-radius-md);
+    background: var(--gnmap-blue);
+    color: #fff;
+    font-size: var(--gnmap-fs-body);
+    font-weight: var(--gnmap-fw-bold);
+  }
+  .route-cta-btn:disabled {
+    background: var(--gnmap-gray-bg);
+    color: var(--gnmap-text-meta);
+  }
+
+  /* 방문 순서/경로 상세 — 미니맵 */
+  .route-mini-map {
+    width: 100%;
+    height: 220px;
+    border-radius: var(--gnmap-radius-md);
+    overflow: hidden;
+    margin-bottom: var(--gnmap-space-3);
+    background: var(--gnmap-bg-soft);
+  }
+
+  /* 경로 상세 — 세로 타임라인 */
+  .route-timeline {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: var(--gnmap-space-3);
+  }
+  .route-timeline-row {
+    display: flex;
+    gap: var(--gnmap-space-3);
+    touch-action: none;
+  }
+  .route-timeline-rail {
+    flex-shrink: 0;
+    width: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .route-timeline-dot {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--gnmap-navy);
+    color: #fff;
+    font-size: var(--gnmap-fs-caption);
+    font-weight: var(--gnmap-fw-bold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .route-timeline-line {
+    flex: 1;
+    width: 2px;
+    background: var(--gnmap-border);
+    margin: 2px 0;
+    min-height: 24px;
+  }
+  .route-timeline-body {
+    flex: 1;
+    min-width: 0;
+    padding-bottom: var(--gnmap-space-4);
+  }
+  .route-timeline-top {
+    display: flex;
+    align-items: center;
+    gap: var(--gnmap-space-2);
+  }
+  .route-timeline-name {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--gnmap-fs-body);
+    font-weight: var(--gnmap-fw-semibold);
+    color: var(--gnmap-text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .route-timeline-actions {
+    display: flex;
+    gap: var(--gnmap-space-2);
+    margin-top: var(--gnmap-space-2);
+  }
+  .route-timeline-action-btn {
+    flex: 1;
+    min-height: 38px;
+    border: 1px solid var(--gnmap-border);
+    background: #fff;
+    color: var(--gnmap-navy);
+    border-radius: var(--gnmap-radius-sm);
+    font-size: var(--gnmap-fs-secondary);
+    font-weight: var(--gnmap-fw-semibold);
+  }
+  .route-timeline-action-btn:disabled { opacity: 0.5; }
+  .route-timeline-action-primary {
+    border: 1px solid var(--gnmap-blue);
+    background: var(--gnmap-blue);
+    color: #fff;
+  }
+
+  /* 방문 현장 다중 선택 sheet — admin-sheet-overlay/admin-sheet(기존) 재사용,
+     sv-manager-sheet-search(기존 검색창)까지 그대로 쓰고 목록/완료 버튼만 전용 스타일. */
+  .route-picker-list {
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+  .route-picker-row {
+    display: flex;
+    align-items: center;
+    gap: var(--gnmap-space-2);
+    padding: var(--gnmap-space-2) 0;
+    border-bottom: 1px solid var(--gnmap-border);
+  }
+  .route-picker-row:last-child { border-bottom: none; }
+  .route-picker-row input[type="checkbox"] {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+  }
+  .route-picker-row-text { flex: 1; min-width: 0; }
+  .route-picker-row-name {
+    font-size: var(--gnmap-fs-body);
+    font-weight: var(--gnmap-fw-semibold);
+    color: var(--gnmap-text-primary);
+  }
+  .route-picker-row-addr {
+    font-size: var(--gnmap-fs-caption);
+    color: var(--gnmap-text-sub);
+    margin-top: 2px;
+  }
+  .route-picker-row-warn {
+    flex-shrink: 0;
+    font-size: var(--gnmap-fs-caption);
+    color: var(--gnmap-amber);
+  }
+  .route-picker-confirm-btn {
+    width: 100%;
+    min-height: 46px;
+    border: none;
+    border-radius: var(--gnmap-radius-md);
+    background: var(--gnmap-blue);
+    color: #fff;
+    font-size: var(--gnmap-fs-body);
+    font-weight: var(--gnmap-fw-bold);
+    margin-top: var(--gnmap-space-3);
   }
 
   /* STEP15-D/E.6, STEP16.5 후속: 더보기 탭 — 로그인 사용자 정보 카드 + 메뉴 카드들.
