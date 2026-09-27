@@ -112,7 +112,9 @@
 .mobile-statusview-info,
 .admin-mobile-view,
 .upload-mobile-view,
-.admin-sheet-overlay {
+.supervision-mobile-view,
+.admin-sheet-overlay,
+#supervision-mobile-host {
   display: none;
 }
 
@@ -1411,6 +1413,560 @@
     margin-top: 6px;
   }
 
+  /* ============================================================
+     STEP16.5: 모바일 "감독일정관리" TARGET UI (목록/캘린더/등록/수정/상세).
+     supervision.js의 CRUD/RLS, computeSupervisionStatus() 자동계산 로직은 전혀 건드리지 않는다.
+     위 STEP15-E.5 규칙(#supervision-panel-header/#supervision-filter-bar/#supervision-list-wrap/
+     #supervision-form)은 그대로 두되, 이 TARGET UI가 들어오면 그 자리는 새 .supervision-mobile-view
+     하나로 대체한다 — PC/기존 마크업은 DOM에서 지우지 않고 숨기기만 한다. ============================ */
+  #app[data-mobile-tab="alert"] #supervision-panel-header,
+  #app[data-mobile-tab="alert"] #supervision-filter-bar,
+  #app[data-mobile-tab="alert"] #supervision-list-wrap,
+  #app[data-mobile-tab="alert"] #supervision-form {
+    display: none !important;
+  }
+  #app[data-mobile-tab="alert"] #supervision-panel {
+    padding: 0;
+  }
+  #app[data-mobile-tab="alert"] #supervision-mobile-host {
+    display: block;
+  }
+  .supervision-mobile-view {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
+    padding-bottom: 24px;
+  }
+  .sv-mobile-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 16px 16px 8px;
+    gap: 12px;
+  }
+  .sv-mobile-header-titlewrap {
+    flex: 1;
+    min-width: 0;
+  }
+  .sv-mobile-title {
+    font-size: 22px;
+    font-weight: var(--gnmap-fw-bold);
+    color: var(--gnmap-navy);
+    margin: 0 0 4px;
+  }
+  .sv-mobile-subtitle {
+    font-size: 13px;
+    color: var(--gnmap-text-sub);
+    margin: 0;
+  }
+  .sv-mobile-add-btn {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: var(--gnmap-blue);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--gnmap-shadow-sm);
+  }
+  .sv-mobile-add-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+  /* 뒤로가기 헤더(등록/수정/상세 화면 공통) */
+  .sv-mobile-subheader {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+  }
+  .sv-mobile-back-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: none;
+    color: var(--gnmap-navy);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .sv-mobile-back-btn svg {
+    width: 22px;
+    height: 22px;
+  }
+  .sv-mobile-subheader-title {
+    font-size: 17px;
+    font-weight: var(--gnmap-fw-bold);
+    color: var(--gnmap-navy);
+  }
+
+  /* 월 이동 바 */
+  .sv-mobile-month-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 4px 16px 12px;
+  }
+  .sv-mobile-month-nav-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: none;
+    color: var(--gnmap-text-sub);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sv-mobile-month-nav-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  .sv-mobile-month-label {
+    font-size: 16px;
+    font-weight: var(--gnmap-fw-semibold);
+    color: var(--gnmap-navy);
+    min-width: 96px;
+    text-align: center;
+  }
+  .sv-mobile-today-btn {
+    margin-left: 4px;
+    min-height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-pill);
+    background: var(--gnmap-bg-soft);
+    font-size: 12px;
+    color: #333;
+  }
+
+  /* 캘린더 그리드 */
+  .sv-mobile-calendar {
+    padding: 0 12px;
+  }
+  .sv-mobile-weekday-row,
+  .sv-mobile-week-row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+  }
+  .sv-mobile-weekday-row {
+    margin-bottom: 4px;
+  }
+  .sv-mobile-weekday {
+    text-align: center;
+    font-size: 11px;
+    color: var(--gnmap-text-meta);
+    padding: 4px 0;
+  }
+  .sv-mobile-day-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 1px 6px;
+    border: none;
+    background: none;
+    min-height: 44px;
+  }
+  .sv-mobile-day-num {
+    width: 26px;
+    height: 26px;
+    line-height: 26px;
+    border-radius: 50%;
+    font-size: 13px;
+    color: var(--gnmap-text-primary);
+  }
+  .sv-mobile-day-cell.is-outside .sv-mobile-day-num {
+    color: #c3c8d1;
+  }
+  .sv-mobile-day-cell.is-today .sv-mobile-day-num {
+    box-shadow: inset 0 0 0 1px var(--gnmap-blue);
+  }
+  .sv-mobile-day-cell.is-selected .sv-mobile-day-num {
+    background: var(--gnmap-blue);
+    color: #fff;
+    font-weight: bold;
+  }
+  .sv-mobile-day-bar {
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--gnmap-blue);
+  }
+  .sv-mobile-day-bar.sv-type-supervision { background: var(--gnmap-amber); }
+  .sv-mobile-day-bar.sv-type-inspection { background: var(--gnmap-blue); }
+  .sv-mobile-day-bar.sv-type-none { background: var(--gnmap-gray); }
+  .sv-mobile-day-bar.sv-status-done { background: var(--gnmap-green); }
+  .sv-mobile-day-bar.sv-empty { background: transparent; }
+
+  /* 범례 */
+  .sv-mobile-legend {
+    display: flex;
+    gap: 16px;
+    padding: 10px 16px 4px;
+    font-size: 12px;
+    color: var(--gnmap-text-sub);
+  }
+  .sv-mobile-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .sv-mobile-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+  .sv-mobile-legend-dot.sv-type-inspection { background: var(--gnmap-blue); }
+  .sv-mobile-legend-dot.sv-type-supervision { background: var(--gnmap-amber); }
+  .sv-mobile-legend-dot.sv-status-done { background: var(--gnmap-green); }
+
+  /* 필터 chip (전체/점검/감독/완료) */
+  .sv-mobile-filter-bar {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    flex-wrap: wrap;
+  }
+  .sv-mobile-filter-chip {
+    flex: 1 1 auto;
+    min-height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-pill);
+    background: var(--gnmap-bg-soft);
+    color: #333;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .sv-mobile-filter-chip.active {
+    border-color: var(--gnmap-blue);
+    background: var(--gnmap-blue-light);
+    color: var(--gnmap-blue);
+    font-weight: bold;
+  }
+
+  /* 선택 날짜 헤더 (2026. 09. 26. (토)   총 2건) */
+  .sv-mobile-selected-date-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 4px 16px 8px;
+    border-bottom: 1px solid var(--gnmap-border);
+  }
+  .sv-mobile-selected-date-label {
+    font-size: 14px;
+    font-weight: var(--gnmap-fw-semibold);
+    color: var(--gnmap-navy);
+  }
+  .sv-mobile-selected-date-count {
+    font-size: 13px;
+    color: var(--gnmap-text-sub);
+  }
+
+  /* 일정 카드 목록 */
+  .sv-mobile-card-list {
+    padding: 8px 16px 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .sv-mobile-card {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-md);
+    background: #fff;
+    box-shadow: var(--gnmap-shadow-sm);
+    padding: 14px;
+  }
+  .sv-mobile-card-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .sv-mobile-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 3px 9px;
+    border-radius: var(--gnmap-radius-pill);
+    color: #fff;
+  }
+  .sv-mobile-badge.sv-type-inspection { background: var(--gnmap-blue); }
+  .sv-mobile-badge.sv-type-supervision { background: var(--gnmap-amber); }
+  .sv-mobile-badge.sv-type-none { background: var(--gnmap-gray); }
+  .sv-mobile-badge-status {
+    color: #fff;
+    background: var(--gnmap-gray);
+  }
+  .sv-mobile-badge-status.sv-status-scheduled { background: var(--gnmap-gray); }
+  .sv-mobile-badge-status.sv-status-ongoing { background: var(--gnmap-blue); }
+  .sv-mobile-badge-status.sv-status-done { background: var(--gnmap-green); }
+  .sv-mobile-card-chevron {
+    margin-left: auto;
+    color: var(--gnmap-text-meta);
+    flex-shrink: 0;
+  }
+  .sv-mobile-card-chevron svg { width: 16px; height: 16px; }
+  .sv-mobile-card-title {
+    font-size: 15px;
+    font-weight: var(--gnmap-fw-semibold);
+    color: var(--gnmap-navy);
+    margin: 0 0 6px;
+    word-break: break-word;
+  }
+  .sv-mobile-card-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--gnmap-text-sub);
+    margin-top: 3px;
+  }
+  .sv-mobile-card-meta-row svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+  .sv-mobile-empty {
+    text-align: center;
+    color: var(--gnmap-text-sub);
+    font-size: 13px;
+    padding: 40px 24px 16px;
+  }
+  .sv-mobile-empty-cta {
+    margin-top: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 36px;
+    padding: 0 16px;
+    border: 1px solid var(--gnmap-blue);
+    border-radius: var(--gnmap-radius-pill);
+    background: var(--gnmap-blue-light);
+    color: var(--gnmap-blue);
+    font-size: 13px;
+    font-weight: bold;
+  }
+
+  /* 등록/수정 폼 */
+  .sv-mobile-form {
+    padding: 4px 16px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .sv-mobile-field label,
+  .sv-mobile-field-label {
+    display: block;
+    font-size: 13px;
+    font-weight: var(--gnmap-fw-semibold);
+    color: var(--gnmap-navy);
+    margin-bottom: 6px;
+  }
+  .sv-mobile-required {
+    color: var(--gnmap-red);
+    margin-left: 2px;
+  }
+  .sv-mobile-field input[type="text"],
+  .sv-mobile-field input[type="date"],
+  .sv-mobile-field textarea {
+    width: 100%;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-sm);
+    font-size: 14px;
+    box-sizing: border-box;
+    background: #fff;
+    color: var(--gnmap-text-primary);
+  }
+  .sv-mobile-date-range {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sv-mobile-date-range input { flex: 1; min-width: 0; }
+  .sv-mobile-date-range-sep {
+    color: var(--gnmap-text-sub);
+    flex-shrink: 0;
+  }
+  .sv-mobile-type-toggle {
+    display: flex;
+    gap: 10px;
+  }
+  .sv-mobile-type-btn {
+    flex: 1;
+    min-height: 46px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-sm);
+    background: #fff;
+    color: #333;
+    font-size: 14px;
+    font-weight: var(--gnmap-fw-semibold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .sv-mobile-type-btn.active {
+    border-color: var(--gnmap-blue);
+    background: var(--gnmap-blue);
+    color: #fff;
+  }
+  .sv-mobile-manager-select-btn {
+    width: 100%;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-sm);
+    background: #fff;
+    color: var(--gnmap-text-primary);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-sizing: border-box;
+  }
+  .sv-mobile-manager-select-btn.is-placeholder { color: var(--gnmap-text-meta); }
+  .sv-mobile-manager-select-btn svg:first-child { width: 18px; height: 18px; flex-shrink: 0; color: var(--gnmap-text-sub); }
+  .sv-mobile-manager-select-btn .sv-mobile-card-chevron { margin-left: auto; }
+  .sv-mobile-field-error {
+    color: var(--gnmap-red);
+    font-size: 12px;
+    margin-top: 6px;
+  }
+  .sv-mobile-submit-btn {
+    width: 100%;
+    min-height: 48px;
+    border: none;
+    border-radius: var(--gnmap-radius-sm);
+    background: var(--gnmap-blue);
+    color: #fff;
+    font-size: 15px;
+    font-weight: bold;
+  }
+  .sv-mobile-submit-btn:disabled {
+    opacity: 0.6;
+  }
+  .sv-mobile-cancel-btn {
+    width: 100%;
+    min-height: 44px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-sm);
+    background: #fff;
+    color: #333;
+    font-size: 14px;
+  }
+
+  /* 담당 감독관 선택 bottom sheet: 기존 admin-sheet-overlay/admin-sheet 재사용, 목록만 전용 스타일. */
+  .sv-manager-sheet-search {
+    width: 100%;
+    min-height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-sm);
+    font-size: 14px;
+    box-sizing: border-box;
+    margin-bottom: 10px;
+  }
+  .sv-manager-option {
+    width: 100%;
+    text-align: left;
+    min-height: 44px;
+    padding: 8px 4px;
+    border: none;
+    border-bottom: 1px solid var(--gnmap-border);
+    background: none;
+    font-size: 14px;
+    color: var(--gnmap-text-primary);
+  }
+  .sv-manager-option:last-child { border-bottom: none; }
+  .sv-manager-empty {
+    padding: 20px 4px;
+    text-align: center;
+    color: var(--gnmap-text-sub);
+    font-size: 13px;
+  }
+
+  /* 상세 화면 */
+  .sv-mobile-detail-hero {
+    margin: 4px 16px 16px;
+    padding: 16px;
+    border-radius: var(--gnmap-radius-lg);
+    background: var(--gnmap-blue-light);
+  }
+  .sv-mobile-detail-hero-badges {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .sv-mobile-detail-hero-title {
+    font-size: 19px;
+    font-weight: var(--gnmap-fw-bold);
+    color: var(--gnmap-navy);
+    margin: 0 0 8px;
+    word-break: break-word;
+  }
+  .sv-mobile-detail-hero-date {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--gnmap-text-sub);
+  }
+  .sv-mobile-detail-hero-date svg { width: 14px; height: 14px; }
+  .sv-mobile-info-card {
+    margin: 0 16px 16px;
+    padding: 14px 16px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-md);
+    background: #fff;
+  }
+  .sv-mobile-info-card-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: var(--gnmap-fw-semibold);
+    color: var(--gnmap-navy);
+    margin-bottom: 8px;
+  }
+  .sv-mobile-info-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 0;
+    border-top: 1px solid var(--gnmap-border);
+    font-size: 13px;
+  }
+  .sv-mobile-info-row:first-of-type { border-top: none; }
+  .sv-mobile-info-row-label { color: var(--gnmap-text-sub); flex-shrink: 0; }
+  .sv-mobile-info-row-value { color: var(--gnmap-text-primary); text-align: right; }
+  .sv-mobile-detail-actions {
+    display: flex;
+    gap: 10px;
+    padding: 4px 16px 8px;
+  }
+  .sv-mobile-detail-actions button { flex: 1; min-height: 46px; border-radius: var(--gnmap-radius-sm); font-size: 14px; font-weight: bold; }
+  .sv-mobile-edit-btn {
+    border: 1px solid var(--gnmap-blue);
+    background: #fff;
+    color: var(--gnmap-blue);
+  }
+  .sv-mobile-delete-btn {
+    border: none;
+    background: var(--gnmap-red);
+    color: #fff;
+  }
+
   /* STEP15-D: 더보기 탭에서 여는 회원관리/엑셀업로드/감독일정 패널 — 세 패널 모두 PC에서는
      서로 다른 position:absolute 좌표(top:130px/170px/50% 등, css/layout.css)를 쓰지만,
      모바일에서는 동일하게 전체화면 시트로 덮어쓴다. 여닫는 트리거/렌더 함수는
@@ -2463,6 +3019,13 @@
     cursor: pointer;
   }
   .mobile-tab-btn.active {
+    color: var(--gnmap-blue);
+    font-weight: bold;
+  }
+  /* STEP16.5: "알림"(alert) 탭은 하단 nav 버튼이 없어(더보기>감독일정관리/헤더 벨로만 진입) 위
+     .active 규칙이 어떤 버튼도 매칭하지 못한다. 감독일정관리 화면에서는 "더보기"가 active로 보이도록
+     한다(activateMobileTab()/기존 active class 토글 로직은 건드리지 않고, 여기서만 시각적으로 보정). */
+  #app[data-mobile-tab="alert"] .mobile-tab-btn[data-tab="more"] {
     color: var(--gnmap-blue);
     font-weight: bold;
   }
