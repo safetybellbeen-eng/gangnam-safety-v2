@@ -6,7 +6,7 @@ import { initMap, clearMarkers } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
-import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu } from './ui.js';
+import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu, getAppSettings } from './ui.js';
 import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
 
 const VIEWS = [
@@ -127,13 +127,13 @@ function activateMobileTab(tab) {
   // 패널 자체의 데이터/렌더 로직(admin.js/import.js/supervision.js)은 전혀 건드리지 않으며,
   // 여기서는 기존 열기/닫기 버튼과 동일하게 표시 여부(inline style)만 되돌린다.
   if ((previousTab === 'alert' || previousTab === 'more') && tab !== previousTab) {
-    ['admin-panel', 'upload-panel', 'supervision-panel'].forEach(id => {
+    ['admin-panel', 'upload-panel', 'supervision-panel', 'app-settings-panel', 'password-change-panel', 'notification-settings-panel'].forEach(id => {
       const panelEl = document.getElementById(id);
       if (panelEl) panelEl.style.display = 'none';
     });
     // STEP16.5(모바일 감독일정관리): 다음에 다시 들어올 때는 항상 목록 화면부터 시작한다(등록/수정
     // 도중 상태로 남아있지 않도록). 사용자가 보던 월/선택 날짜/필터(supervisionMobileMonthCursor/
-    // supervisionMobileSelectedDate/supervisionMobileQuickFilter)는 그대로 유지한다.
+    // supervisionMobileSelectedDate/supervisionMobileStatusFilter/supervisionMobileTypeFilter)는 그대로 유지한다.
     state.supervisionMobileView = 'list';
     state.supervisionMobileSelectedId = null;
   }
@@ -164,6 +164,31 @@ function clearError(el) {
 
 // 로그인 직후 profile.status에 따라 화면을 분기한다.
 // 보안 판단(누가 실제로 데이터에 접근 가능한가)은 RLS가 하고, 이 분기는 안내 화면 표시 목적일 뿐이다.
+// STEP16.6(모바일 앱 설정 "지도 시작 위치"). location.js의 requestCurrentLocation()은
+// state.map이 이미 있어야 마커를 찍을 수 있어 지도 생성 "이전" 시점에는 재사용할 수 없으므로,
+// 여기서는 좌표만 필요한 최소한의 별도 1회 조회를 직접 수행한다(마커/상태 갱신 없음, 순수
+// 좌표 조회). 설정이 'current'가 아니거나 Geolocation을 못 쓰면 즉시 null(→ 기존 GANGNAM_CENTER
+// 폴백)로 resolve한다. 절대 reject하지 않아 initMap 체인이 끊기지 않는다.
+function resolvePreferredMapStartCenter() {
+  const settings = getAppSettings();
+  if (settings.mapStartLocation !== 'current' || !navigator.geolocation) {
+    return Promise.resolve(null);
+  }
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => { if (!settled) { settled = true; resolve(value); } };
+    const timer = setTimeout(() => finish(null), 4000);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        clearTimeout(timer);
+        finish({ lat: position.coords.latitude, lng: position.coords.longitude });
+      },
+      () => { clearTimeout(timer); finish(null); },
+      { enableHighAccuracy: true, timeout: 4000, maximumAge: 30000 }
+    );
+  });
+}
+
 function routeByProfile() {
   const profile = state.profile;
 
@@ -198,7 +223,11 @@ function routeByProfile() {
       }
       // approved 상태에서만 지도를 초기화한다. pending/rejected/disabled는 여기 도달하지 않는다.
       // 지도 초기화가 끝난 뒤에만 사업장을 조회해 마커/목록을 그린다. 조회 실패해도 지도는 유지된다.
-      initMap('map-container')
+      // STEP16.6(모바일 앱 설정 "지도 시작 위치"): 설정이 'current'일 때만 initMap 전에 짧게
+      // (최대 4초) 위치를 시도해 그 좌표를 초기 중심으로 넘긴다 — 실패/시간초과해도 기존처럼
+      // GANGNAM_CENTER로 자동 폴백하므로 지도 초기화 자체가 지연/실패하지 않는다.
+      resolvePreferredMapStartCenter()
+        .then((startCenter) => initMap('map-container', startCenter))
         .then(() => Promise.all([loadActiveSites(), loadFavorites(), loadNotes()]))
         .then(([sites]) => {
           state.sites = sites;
@@ -206,6 +235,12 @@ function routeByProfile() {
           bindSearchAndSort('site-list');
           renderSiteList('site-list'); // 내부에서 marker도 함께 렌더한다 (getFilteredSortedSites 기준, 즐겨찾기 별표 포함)
           activateMobileTab(state.mobileActiveTab || 'map'); // STEP15-B. 모바일 하단 탭 초기 표시 상태 적용(PC에서는 CSS로 무효화됨)
+          // STEP16.6(모바일 앱 설정 "현재 위치 자동 표시"): 켜져 있으면 기존 수동 버튼과 동일한
+          // requestCurrentLocation()을 지도 준비 직후 1회 자동 호출한다(새 위치 로직 없음).
+          // 기본값 false라 이 설정을 건드리지 않은 사용자는 기존 동작(버튼 클릭 시에만) 그대로다.
+          if (getAppSettings().autoShowLocation) {
+            requestCurrentLocation();
+          }
         })
         .catch(err => {
           console.error('지도/사업장 초기화 실패:', err);
