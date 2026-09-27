@@ -43,7 +43,9 @@
 }
 
 /* STEP16.20: 지도를 기본 배율 이상으로 축소하면(js/map.js updateBoundaryDisplayForZoom)
-   개별 핀 대신 이 라벨("동이름 개수")만 동 경계 안에 보여 핀 밀집을 완화한다. */
+   개별 핀 대신 이 라벨("동이름 개수")만 동 경계 안에 보여 핀 밀집을 완화한다.
+   STEP16.21: 라벨을 누르면 그 동으로 확대되므로(js/map.js focusOnDong) pointer-events를
+   막지 않고 클릭 가능함을 나타내는 커서로 바꾼다. */
 .gnmap-dong-label {
   padding: 3px 8px;
   border-radius: 999px;
@@ -54,5 +56,5 @@
   font-weight: 700;
   white-space: nowrap;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-  pointer-events: none;
+  cursor: pointer;
 }
