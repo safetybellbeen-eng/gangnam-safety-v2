@@ -1421,8 +1421,11 @@ function renderAdminMobileHost(host, containerId) {
   bellBtn.addEventListener('click', () => {
     const panel = document.getElementById(containerId);
     if (panel) panel.style.display = 'none';
-    const alertTabBtn = document.querySelector('.mobile-tab-btn[data-tab="alert"]');
-    if (alertTabBtn) alertTabBtn.click();
+    // STEP16.5 후속: 하단 "알림" 탭 버튼이 제거되어 더 이상 존재하지 않는다(더보기>감독일정관리/
+    // 상단 헤더 벨로 통일). 기존과 동일하게 alert 탭으로 전환하되, 헤더 벨(#mobile-header-alert-btn)
+    // 클릭을 위임해 activateMobileTab('alert')를 그대로 재사용한다(app.js 로직 변경 없음).
+    const headerAlertBtn = document.getElementById('mobile-header-alert-btn');
+    if (headerAlertBtn) headerAlertBtn.click();
   });
   header.appendChild(bellBtn);
   view.appendChild(header);
@@ -2180,6 +2183,794 @@ async function handleDeleteSupervision(containerId, id) {
 }
 
 // ============================================================
+// 모바일 "감독일정관리" TARGET UI (목록/캘린더/등록/수정/상세).
+// supervision.js의 CRUD(createSupervision/updateSupervision/deleteSupervision/loadSupervisions)와
+// computeSupervisionStatus()(날짜 기반 예정/진행중/완료 자동계산)는 전혀 새로 만들지 않고 그대로
+// 재사용한다. PC의 #supervision-panel-header/#supervision-filter-bar/#supervision-list-wrap/
+// #supervision-form(STEP14/PC)은 DOM에서 지우지 않고 mobile.css가 화면 폭에서만 숨긴다.
+//
+// supervision_type('inspection'|'supervision'|null) — status와 완전히 별개인 "감독 유형" 축
+// (사용자 최종 결정, 2026-09-27). 기존 행은 NULL 허용, 신규 등록부터 필수값으로 검증한다.
+// ============================================================
+const SUPERVISION_MOBILE_HOST_ID = 'supervision-mobile-host';
+const SUPERVISION_TYPE_LABEL = { inspection: '점검', supervision: '감독' };
+const SUPERVISION_TYPE_VALUES = ['inspection', 'supervision'];
+const SV_WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
+const SV_ICON_PLUS = ['<path d="M12 5v14M5 12h14"/>'];
+const SV_ICON_CHEVRON_LEFT = ['<path d="M15 5.5 9 12l6 6.5"/>'];
+const SV_ICON_CHEVRON_RIGHT = ['<path d="M9 5.5 15 12l-6 6.5"/>'];
+const SV_ICON_CALENDAR = ['<rect x="4" y="5" width="16" height="15" rx="2"/>', '<path d="M4 10h16"/>', '<path d="M8 3v4M16 3v4"/>'];
+const SV_ICON_USER = ['<circle cx="12" cy="8" r="3.4"/>', '<path d="M5 20c0-4 3.2-6.5 7-6.5s7 2.5 7 6.5"/>'];
+
+function svIcon(paths) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.8');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  paths.forEach(p => svg.insertAdjacentHTML('beforeend', p));
+  return svg;
+}
+
+function svLabel(text, required) {
+  const label = document.createElement('div');
+  label.className = 'sv-mobile-field-label';
+  label.textContent = text;
+  if (required) {
+    const star = document.createElement('span');
+    star.className = 'sv-mobile-required';
+    star.textContent = '*';
+    label.appendChild(star);
+  }
+  return label;
+}
+
+function svParseYMD(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+function svFormatYMD(date) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+function svFormatDateKR(dateStr) {
+  if (!dateStr) return '-';
+  const d = svParseYMD(dateStr);
+  const w = SV_WEEKDAY_LABELS[d.getDay()];
+  return `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}. (${w})`;
+}
+function svFormatDateRangeKR(start, end) {
+  if (!start || !end) return '-';
+  if (start === end) return svFormatDateKR(start);
+  return `${svFormatDateKR(start)} ~ ${svFormatDateKR(end)}`;
+}
+// 등록일(created_at, timestamptz)을 실제 start/end와 동일한 'YYYY. MM. DD. (요일)' 형식으로
+// 표시한다(TARGET처럼 시간은 표시하지 않는다 — 시각 단위 실사용 필드가 아니므로).
+function svFormatTimestampDateKR(iso) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '-';
+  return svFormatDateKR(svFormatYMD(d));
+}
+function svOverlapsDate(sv, dateStr) {
+  return sv.start_date <= dateStr && dateStr <= sv.end_date;
+}
+function svOverlapsMonth(sv, year, month) {
+  const monthStart = svFormatYMD(new Date(year, month, 1));
+  const monthEnd = svFormatYMD(new Date(year, month + 1, 0));
+  return sv.start_date <= monthEnd && sv.end_date >= monthStart;
+}
+function svMatchesQuickFilter(sv, filter) {
+  if (filter === 'all') return true;
+  if (filter === 'done') return computeSupervisionStatus(sv.start_date, sv.end_date) === 'done';
+  return sv.supervision_type === filter; // 'inspection' | 'supervision'
+}
+// 캘린더 dot/bar 색 우선순위: 완료(초록) > 감독(amber) > 점검(파랑) > 유형 미지정(회색).
+// (사용자 최종 결정 §7: status=done이면 유형과 무관하게 항상 초록.)
+function svDisplayColorClass(sv) {
+  if (computeSupervisionStatus(sv.start_date, sv.end_date) === 'done') return 'sv-status-done';
+  if (sv.supervision_type === 'supervision') return 'sv-type-supervision';
+  if (sv.supervision_type === 'inspection') return 'sv-type-inspection';
+  return 'sv-type-none';
+}
+
+function getSupervisionMobileMonthCursor() {
+  if (!state.supervisionMobileMonthCursor) {
+    const today = new Date();
+    state.supervisionMobileMonthCursor = { year: today.getFullYear(), month: today.getMonth() };
+  }
+  return state.supervisionMobileMonthCursor;
+}
+function getSupervisionMobileSelectedDate() {
+  if (!state.supervisionMobileSelectedDate) {
+    state.supervisionMobileSelectedDate = todayDateString();
+  }
+  return state.supervisionMobileSelectedDate;
+}
+
+// 6주(42칸) grid를 만들되, 마지막 줄이 전부 다음 달이면 잘라서 화면 공간을 아낀다(TARGET처럼
+// 5주로 끝나는 달이 대부분). 기간이 월 경계를 넘는 일정도 각 달의 grid에 실제 날짜로만
+// 계산되므로(§35) 정상 표시된다.
+function buildSvMonthMatrix(year, month) {
+  const firstOfMonth = new Date(year, month, 1);
+  const gridStart = new Date(year, month, 1 - firstOfMonth.getDay());
+  const cells = [];
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(gridStart);
+    d.setDate(gridStart.getDate() + i);
+    cells.push(d);
+  }
+  const lastRowAllNextMonth = cells.slice(35).every(d => d.getMonth() !== month);
+  return lastRowAllNextMonth ? cells.slice(0, 35) : cells;
+}
+
+// 진입점 — app.js가 (1) 알림 탭 진입 시, (2) 더보기>감독일정관리/헤더 벨 진입 시 호출한다.
+// 매번 loadSupervisions()로 새로 조회한다(PC 패널과 완전히 독립적으로 그린다 — 타이밍 경쟁 방지).
+export async function renderSupervisionMobileHost() {
+  if (!document.getElementById(SUPERVISION_MOBILE_HOST_ID)) return;
+  const rows = await loadSupervisions();
+  state.supervisions = rows;
+
+  const host = document.getElementById(SUPERVISION_MOBILE_HOST_ID);
+  if (!host) return; // 조회 중 탭을 벗어났을 수 있다.
+  host.innerHTML = '';
+  const view = document.createElement('div');
+  view.className = 'supervision-mobile-view';
+  host.appendChild(view);
+
+  if (state.supervisionMobileView === 'form') {
+    renderSupervisionMobileForm(view, rows);
+  } else if (state.supervisionMobileView === 'detail') {
+    renderSupervisionMobileDetail(view, rows);
+  } else {
+    renderSupervisionMobileList(view, rows);
+  }
+}
+
+function renderSupervisionMobileList(view, rows) {
+  const { year, month } = getSupervisionMobileMonthCursor();
+  const selectedDate = getSupervisionMobileSelectedDate();
+  const rerender = () => { view.innerHTML = ''; renderSupervisionMobileList(view, rows); };
+
+  const header = document.createElement('div');
+  header.className = 'sv-mobile-header';
+  const titleWrap = document.createElement('div');
+  titleWrap.className = 'sv-mobile-header-titlewrap';
+  const titleEl = document.createElement('h2');
+  titleEl.className = 'sv-mobile-title';
+  titleEl.textContent = '감독일정관리';
+  titleWrap.appendChild(titleEl);
+  const subtitleEl = document.createElement('p');
+  subtitleEl.className = 'sv-mobile-subtitle';
+  subtitleEl.textContent = '예정된 감독 일정을 확인하고 관리합니다.';
+  titleWrap.appendChild(subtitleEl);
+  header.appendChild(titleWrap);
+
+  // 등록/수정/삭제는 admin만(RLS 최종 방어) — "+" 버튼도 admin에게만 보인다.
+  if (isAdmin()) {
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'sv-mobile-add-btn';
+    addBtn.setAttribute('aria-label', '감독일정 등록');
+    addBtn.appendChild(svIcon(SV_ICON_PLUS));
+    addBtn.addEventListener('click', () => {
+      state.supervisionMobileView = 'form';
+      state.supervisionMobileFormOrigin = 'list';
+      state.supervisionMobileSelectedId = null;
+      renderSupervisionMobileHost();
+    });
+    header.appendChild(addBtn);
+  }
+  view.appendChild(header);
+
+  const monthBar = document.createElement('div');
+  monthBar.className = 'sv-mobile-month-bar';
+  const prevBtn = document.createElement('button');
+  prevBtn.type = 'button';
+  prevBtn.className = 'sv-mobile-month-nav-btn';
+  prevBtn.setAttribute('aria-label', '이전 달');
+  prevBtn.appendChild(svIcon(SV_ICON_CHEVRON_LEFT));
+  prevBtn.addEventListener('click', () => {
+    const d = new Date(year, month - 1, 1);
+    state.supervisionMobileMonthCursor = { year: d.getFullYear(), month: d.getMonth() };
+    rerender();
+  });
+  monthBar.appendChild(prevBtn);
+  const monthLabel = document.createElement('span');
+  monthLabel.className = 'sv-mobile-month-label';
+  monthLabel.textContent = `${year}년 ${month + 1}월`;
+  monthBar.appendChild(monthLabel);
+  const nextBtn = document.createElement('button');
+  nextBtn.type = 'button';
+  nextBtn.className = 'sv-mobile-month-nav-btn';
+  nextBtn.setAttribute('aria-label', '다음 달');
+  nextBtn.appendChild(svIcon(SV_ICON_CHEVRON_RIGHT));
+  nextBtn.addEventListener('click', () => {
+    const d = new Date(year, month + 1, 1);
+    state.supervisionMobileMonthCursor = { year: d.getFullYear(), month: d.getMonth() };
+    rerender();
+  });
+  monthBar.appendChild(nextBtn);
+  const todayBtn = document.createElement('button');
+  todayBtn.type = 'button';
+  todayBtn.className = 'sv-mobile-today-btn';
+  todayBtn.textContent = '오늘';
+  todayBtn.addEventListener('click', () => {
+    const today = new Date();
+    state.supervisionMobileMonthCursor = { year: today.getFullYear(), month: today.getMonth() };
+    state.supervisionMobileSelectedDate = todayDateString();
+    rerender();
+  });
+  monthBar.appendChild(todayBtn);
+  view.appendChild(monthBar);
+
+  const quickFilter = state.supervisionMobileQuickFilter;
+  // 필터 chip의 카운트는 "현재 표시 중인 달"(§13) 기준 — quickFilter 선택과 무관하게 매번 4개 다 계산.
+  const monthRows = rows.filter(sv => svOverlapsMonth(sv, year, month));
+  const countAll = monthRows.length;
+  const countInspection = monthRows.filter(sv => sv.supervision_type === 'inspection').length;
+  const countSupervision = monthRows.filter(sv => sv.supervision_type === 'supervision').length;
+  const countDone = monthRows.filter(sv => computeSupervisionStatus(sv.start_date, sv.end_date) === 'done').length;
+
+  const filteredRows = rows.filter(sv => svMatchesQuickFilter(sv, quickFilter));
+
+  const calendarWrap = document.createElement('div');
+  calendarWrap.className = 'sv-mobile-calendar';
+  const weekdayRow = document.createElement('div');
+  weekdayRow.className = 'sv-mobile-weekday-row';
+  SV_WEEKDAY_LABELS.forEach(w => {
+    const el = document.createElement('div');
+    el.className = 'sv-mobile-weekday';
+    el.textContent = w;
+    weekdayRow.appendChild(el);
+  });
+  calendarWrap.appendChild(weekdayRow);
+
+  const cells = buildSvMonthMatrix(year, month);
+  const todayStr = todayDateString();
+  const colorPriority = ['sv-status-done', 'sv-type-supervision', 'sv-type-inspection', 'sv-type-none'];
+  for (let i = 0; i < cells.length; i += 7) {
+    const weekRow = document.createElement('div');
+    weekRow.className = 'sv-mobile-week-row';
+    cells.slice(i, i + 7).forEach(d => {
+      const dateStr = svFormatYMD(d);
+      const cellBtn = document.createElement('button');
+      cellBtn.type = 'button';
+      cellBtn.className = 'sv-mobile-day-cell'
+        + (d.getMonth() !== month ? ' is-outside' : '')
+        + (dateStr === todayStr ? ' is-today' : '')
+        + (dateStr === selectedDate ? ' is-selected' : '');
+
+      const num = document.createElement('span');
+      num.className = 'sv-mobile-day-num';
+      num.textContent = String(d.getDate());
+      cellBtn.appendChild(num);
+
+      const dayMatches = filteredRows.filter(sv => svOverlapsDate(sv, dateStr));
+      const bar = document.createElement('span');
+      if (dayMatches.length > 0) {
+        const classes = dayMatches.map(svDisplayColorClass);
+        const chosen = colorPriority.find(p => classes.includes(p)) || 'sv-type-none';
+        bar.className = 'sv-mobile-day-bar ' + chosen;
+      } else {
+        bar.className = 'sv-mobile-day-bar sv-empty';
+      }
+      cellBtn.appendChild(bar);
+
+      cellBtn.addEventListener('click', () => {
+        state.supervisionMobileSelectedDate = dateStr;
+        if (d.getMonth() !== month) {
+          state.supervisionMobileMonthCursor = { year: d.getFullYear(), month: d.getMonth() };
+        }
+        rerender();
+      });
+      weekRow.appendChild(cellBtn);
+    });
+    calendarWrap.appendChild(weekRow);
+  }
+  view.appendChild(calendarWrap);
+
+  const legend = document.createElement('div');
+  legend.className = 'sv-mobile-legend';
+  [['sv-type-inspection', '점검'], ['sv-type-supervision', '감독'], ['sv-status-done', '완료']].forEach(([cls, label]) => {
+    const item = document.createElement('span');
+    item.className = 'sv-mobile-legend-item';
+    const dot = document.createElement('span');
+    dot.className = 'sv-mobile-legend-dot ' + cls;
+    item.appendChild(dot);
+    const text = document.createElement('span');
+    text.textContent = label;
+    item.appendChild(text);
+    legend.appendChild(item);
+  });
+  view.appendChild(legend);
+
+  const filterBar = document.createElement('div');
+  filterBar.className = 'sv-mobile-filter-bar';
+  [
+    ['all', `전체 (${countAll})`],
+    ['inspection', `점검 (${countInspection})`],
+    ['supervision', `감독 (${countSupervision})`],
+    ['done', `완료 (${countDone})`],
+  ].forEach(([key, label]) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'sv-mobile-filter-chip' + (quickFilter === key ? ' active' : '');
+    chip.textContent = label;
+    chip.addEventListener('click', () => {
+      state.supervisionMobileQuickFilter = key;
+      rerender();
+    });
+    filterBar.appendChild(chip);
+  });
+  view.appendChild(filterBar);
+
+  const dateRow = document.createElement('div');
+  dateRow.className = 'sv-mobile-selected-date-row';
+  const dateLabel = document.createElement('span');
+  dateLabel.className = 'sv-mobile-selected-date-label';
+  dateLabel.textContent = svFormatDateKR(selectedDate);
+  dateRow.appendChild(dateLabel);
+  const dayRows = filteredRows.filter(sv => svOverlapsDate(sv, selectedDate));
+  const countLabel = document.createElement('span');
+  countLabel.className = 'sv-mobile-selected-date-count';
+  countLabel.textContent = `총 ${dayRows.length}건`;
+  dateRow.appendChild(countLabel);
+  view.appendChild(dateRow);
+
+  if (dayRows.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'sv-mobile-empty';
+    const emptyIcon = svIcon(SV_ICON_CALENDAR);
+    emptyIcon.style.width = '32px';
+    emptyIcon.style.height = '32px';
+    empty.appendChild(emptyIcon);
+    const emptyText = document.createElement('p');
+    emptyText.textContent = '등록된 감독 일정이 없습니다.';
+    empty.appendChild(emptyText);
+    if (isAdmin()) {
+      const cta = document.createElement('button');
+      cta.type = 'button';
+      cta.className = 'sv-mobile-empty-cta';
+      cta.appendChild(svIcon(SV_ICON_PLUS));
+      const ctaText = document.createElement('span');
+      ctaText.textContent = '감독일정 등록';
+      cta.appendChild(ctaText);
+      cta.addEventListener('click', () => {
+        state.supervisionMobileView = 'form';
+        state.supervisionMobileFormOrigin = 'list';
+        state.supervisionMobileSelectedId = null;
+        renderSupervisionMobileHost();
+      });
+      empty.appendChild(cta);
+    }
+    view.appendChild(empty);
+  } else {
+    const sortedDayRows = [...dayRows].sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    const listEl = document.createElement('div');
+    listEl.className = 'sv-mobile-card-list';
+    sortedDayRows.forEach(sv => listEl.appendChild(buildSupervisionMobileCard(sv)));
+    view.appendChild(listEl);
+  }
+}
+
+function buildSupervisionMobileCard(sv) {
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = 'sv-mobile-card';
+  card.addEventListener('click', () => {
+    state.supervisionMobileSelectedId = sv.id;
+    state.supervisionMobileView = 'detail';
+    renderSupervisionMobileHost();
+  });
+
+  const top = document.createElement('div');
+  top.className = 'sv-mobile-card-top';
+  if (sv.supervision_type) {
+    const typeBadge = document.createElement('span');
+    typeBadge.className = 'sv-mobile-badge sv-type-' + sv.supervision_type;
+    typeBadge.textContent = SUPERVISION_TYPE_LABEL[sv.supervision_type];
+    top.appendChild(typeBadge);
+  }
+  const liveStatus = computeSupervisionStatus(sv.start_date, sv.end_date);
+  const statusBadge = document.createElement('span');
+  statusBadge.className = 'sv-mobile-badge sv-mobile-badge-status sv-status-' + liveStatus;
+  statusBadge.textContent = SUPERVISION_STATUS_LABEL[liveStatus];
+  top.appendChild(statusBadge);
+  const chevron = document.createElement('span');
+  chevron.className = 'sv-mobile-card-chevron';
+  chevron.appendChild(svIcon(SV_ICON_CHEVRON_RIGHT));
+  top.appendChild(chevron);
+  card.appendChild(top);
+
+  const titleEl = document.createElement('p');
+  titleEl.className = 'sv-mobile-card-title';
+  titleEl.textContent = sv.title;
+  card.appendChild(titleEl);
+
+  const dateMeta = document.createElement('div');
+  dateMeta.className = 'sv-mobile-card-meta-row';
+  dateMeta.appendChild(svIcon(SV_ICON_CALENDAR));
+  const dateText = document.createElement('span');
+  dateText.textContent = svFormatDateRangeKR(sv.start_date, sv.end_date);
+  dateMeta.appendChild(dateText);
+  card.appendChild(dateMeta);
+
+  const managerMeta = document.createElement('div');
+  managerMeta.className = 'sv-mobile-card-meta-row';
+  managerMeta.appendChild(svIcon(SV_ICON_USER));
+  const managerText = document.createElement('span');
+  managerText.textContent = `담당 감독관  ${sv.manager_name || '-'}`;
+  managerMeta.appendChild(managerText);
+  card.appendChild(managerMeta);
+
+  return card;
+}
+
+// 담당 감독관 선택 bottom sheet. admin.js의 loadUsers()를 그대로 재사용하고(새 DB 조회 없음),
+// 여기서는 승인된(approved) 사용자만 후보로 보여준다 — 이 폼 자체가 admin 전용 등록/수정
+// 화면 안에서만 열린다. 기존 admin-sheet-overlay/admin-sheet 스타일을 그대로 재사용한다.
+async function openSupervisionManagerSheet(onSelect) {
+  const overlay = document.createElement('div');
+  overlay.className = 'admin-sheet-overlay';
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+  const sheet = document.createElement('div');
+  sheet.className = 'admin-sheet';
+  const titleEl = document.createElement('div');
+  titleEl.className = 'admin-sheet-name';
+  titleEl.textContent = '담당 감독관 선택';
+  sheet.appendChild(titleEl);
+
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.className = 'sv-manager-sheet-search';
+  searchInput.placeholder = '이름 검색';
+  sheet.appendChild(searchInput);
+
+  const listWrap = document.createElement('div');
+  sheet.appendChild(listWrap);
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+
+  const allUsers = await loadUsers();
+  // name이 없는 계정(예: 초기 시드 관리자)은 표시할 담당자명 자체가 없으므로 후보에서 제외한다
+  // (선택 시 빈 문자열이 저장되는 것을 막기 위함 — 가짜 이름을 채우지 않는다).
+  const approvedUsers = (allUsers || []).filter(u => u.status === 'approved' && u.name);
+
+  function renderOptions(query) {
+    listWrap.innerHTML = '';
+    const q = (query || '').trim();
+    const filtered = q ? approvedUsers.filter(u => (u.name || '').includes(q)) : approvedUsers;
+    if (filtered.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'sv-manager-empty';
+      empty.textContent = '선택 가능한 사용자가 없습니다.';
+      listWrap.appendChild(empty);
+      return;
+    }
+    filtered.forEach(u => {
+      const opt = document.createElement('button');
+      opt.type = 'button';
+      opt.className = 'sv-manager-option';
+      opt.textContent = displayValue(u.name);
+      opt.addEventListener('click', () => {
+        onSelect(u.name);
+        overlay.remove();
+      });
+      listWrap.appendChild(opt);
+    });
+  }
+  renderOptions('');
+  searchInput.addEventListener('input', () => renderOptions(searchInput.value));
+}
+
+// 등록/수정 공용 폼(§30 "동일 form을 재사용" — edit는 existing이 있을 때만).
+function renderSupervisionMobileForm(view, rows) {
+  const editingId = state.supervisionMobileSelectedId;
+  const existing = editingId ? rows.find(r => r.id === editingId) : null;
+  const isEdit = !!existing;
+
+  const subheader = document.createElement('div');
+  subheader.className = 'sv-mobile-subheader';
+  const backBtn = document.createElement('button');
+  backBtn.type = 'button';
+  backBtn.className = 'sv-mobile-back-btn';
+  backBtn.setAttribute('aria-label', '뒤로가기');
+  backBtn.appendChild(svIcon(SV_ICON_CHEVRON_LEFT));
+  backBtn.addEventListener('click', () => {
+    state.supervisionMobileView = (isEdit && state.supervisionMobileFormOrigin === 'detail') ? 'detail' : 'list';
+    renderSupervisionMobileHost();
+  });
+  subheader.appendChild(backBtn);
+  const subTitle = document.createElement('span');
+  subTitle.className = 'sv-mobile-subheader-title';
+  subTitle.textContent = isEdit ? '감독일정 수정' : '감독일정 등록';
+  subheader.appendChild(subTitle);
+  view.appendChild(subheader);
+
+  const form = document.createElement('div');
+  form.className = 'sv-mobile-form';
+
+  let selectedType = existing ? (existing.supervision_type || null) : null;
+  let selectedManagerName = existing ? (existing.manager_name || '') : '';
+
+  const titleField = document.createElement('div');
+  titleField.className = 'sv-mobile-field';
+  titleField.appendChild(svLabel('감독명', true));
+  const titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.placeholder = '감독명을 입력해주세요.';
+  titleInput.value = existing ? existing.title : '';
+  titleField.appendChild(titleInput);
+  form.appendChild(titleField);
+
+  const periodField = document.createElement('div');
+  periodField.className = 'sv-mobile-field';
+  periodField.appendChild(svLabel('감독기간', true));
+  const rangeWrap = document.createElement('div');
+  rangeWrap.className = 'sv-mobile-date-range';
+  const startInput = document.createElement('input');
+  startInput.type = 'date';
+  startInput.min = SUPERVISION_MIN_DATE;
+  startInput.max = SUPERVISION_MAX_DATE;
+  startInput.value = existing ? existing.start_date : '';
+  const sep = document.createElement('span');
+  sep.className = 'sv-mobile-date-range-sep';
+  sep.textContent = '~';
+  const endInput = document.createElement('input');
+  endInput.type = 'date';
+  endInput.min = SUPERVISION_MIN_DATE;
+  endInput.max = SUPERVISION_MAX_DATE;
+  endInput.value = existing ? existing.end_date : '';
+  rangeWrap.appendChild(startInput);
+  rangeWrap.appendChild(sep);
+  rangeWrap.appendChild(endInput);
+  periodField.appendChild(rangeWrap);
+  form.appendChild(periodField);
+
+  const typeField = document.createElement('div');
+  typeField.className = 'sv-mobile-field';
+  typeField.appendChild(svLabel('감독 유형', true));
+  const typeToggle = document.createElement('div');
+  typeToggle.className = 'sv-mobile-type-toggle';
+  const typeButtons = {};
+  SUPERVISION_TYPE_VALUES.forEach(typeVal => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sv-mobile-type-btn' + (selectedType === typeVal ? ' active' : '');
+    btn.textContent = SUPERVISION_TYPE_LABEL[typeVal];
+    btn.addEventListener('click', () => {
+      selectedType = typeVal;
+      SUPERVISION_TYPE_VALUES.forEach(v => typeButtons[v].classList.toggle('active', v === typeVal));
+    });
+    typeButtons[typeVal] = btn;
+    typeToggle.appendChild(btn);
+  });
+  typeField.appendChild(typeToggle);
+  form.appendChild(typeField);
+
+  const managerField = document.createElement('div');
+  managerField.className = 'sv-mobile-field';
+  managerField.appendChild(svLabel('담당 감독관', true));
+  const managerBtn = document.createElement('button');
+  managerBtn.type = 'button';
+  managerBtn.className = 'sv-mobile-manager-select-btn' + (selectedManagerName ? '' : ' is-placeholder');
+  managerBtn.appendChild(svIcon(SV_ICON_USER));
+  const managerBtnText = document.createElement('span');
+  managerBtnText.textContent = selectedManagerName || '담당 감독관을 선택해주세요.';
+  managerBtn.appendChild(managerBtnText);
+  const managerChevron = document.createElement('span');
+  managerChevron.className = 'sv-mobile-card-chevron';
+  managerChevron.appendChild(svIcon(SV_ICON_CHEVRON_RIGHT));
+  managerBtn.appendChild(managerChevron);
+  managerBtn.addEventListener('click', () => {
+    openSupervisionManagerSheet((name) => {
+      selectedManagerName = name;
+      managerBtnText.textContent = name;
+      managerBtn.classList.remove('is-placeholder');
+    });
+  });
+  managerField.appendChild(managerBtn);
+  form.appendChild(managerField);
+
+  const errorEl = document.createElement('p');
+  errorEl.className = 'sv-mobile-field-error';
+  form.appendChild(errorEl);
+
+  const submitBtn = document.createElement('button');
+  submitBtn.type = 'button';
+  submitBtn.className = 'sv-mobile-submit-btn';
+  submitBtn.textContent = isEdit ? '변경사항 저장' : '감독일정 등록';
+  form.appendChild(submitBtn);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'sv-mobile-cancel-btn';
+  cancelBtn.textContent = '취소';
+  cancelBtn.addEventListener('click', () => {
+    state.supervisionMobileView = (isEdit && state.supervisionMobileFormOrigin === 'detail') ? 'detail' : 'list';
+    renderSupervisionMobileHost();
+  });
+  form.appendChild(cancelBtn);
+
+  submitBtn.addEventListener('click', async () => {
+    errorEl.textContent = '';
+    const titleVal = titleInput.value.trim();
+    const startVal = startInput.value;
+    const endVal = endInput.value;
+    if (!titleVal) { errorEl.textContent = '감독명을 입력해주세요.'; return; }
+    if (!startVal) { errorEl.textContent = '시작일을 입력해주세요.'; return; }
+    if (!endVal) { errorEl.textContent = '종료일을 입력해주세요.'; return; }
+    if (startVal < SUPERVISION_MIN_DATE || startVal > SUPERVISION_MAX_DATE || endVal < SUPERVISION_MIN_DATE || endVal > SUPERVISION_MAX_DATE) {
+      errorEl.textContent = `시작일/종료일은 ${SUPERVISION_MIN_DATE} ~ ${SUPERVISION_MAX_DATE} 범위 내에서 입력해주세요.`;
+      return;
+    }
+    if (endVal < startVal) { errorEl.textContent = '종료일은 시작일보다 빠를 수 없습니다.'; return; }
+    if (!selectedType) { errorEl.textContent = '감독 유형을 선택해주세요.'; return; }
+
+    submitBtn.disabled = true;
+    cancelBtn.disabled = true;
+    const status = computeSupervisionStatus(startVal, endVal);
+    const fields = {
+      title: titleVal,
+      manager_name: selectedManagerName || null,
+      start_date: startVal,
+      end_date: endVal,
+      status,
+      supervision_type: selectedType,
+    };
+    const result = isEdit ? await updateSupervision(existing.id, fields) : await createSupervision(fields);
+    if (!result.success) {
+      errorEl.textContent = result.message;
+      submitBtn.disabled = false;
+      cancelBtn.disabled = false;
+      return;
+    }
+    if (isEdit) {
+      state.supervisionMobileSelectedId = result.row.id;
+      state.supervisionMobileView = 'detail';
+    } else {
+      state.supervisionMobileView = 'list';
+      state.supervisionMobileSelectedId = null;
+    }
+    await renderSupervisionMobileHost();
+  });
+
+  view.appendChild(form);
+}
+
+function renderSupervisionMobileDetail(view, rows) {
+  const sv = rows.find(r => r.id === state.supervisionMobileSelectedId);
+
+  const subheader = document.createElement('div');
+  subheader.className = 'sv-mobile-subheader';
+  const backBtn = document.createElement('button');
+  backBtn.type = 'button';
+  backBtn.className = 'sv-mobile-back-btn';
+  backBtn.setAttribute('aria-label', '뒤로가기');
+  backBtn.appendChild(svIcon(SV_ICON_CHEVRON_LEFT));
+  backBtn.addEventListener('click', () => {
+    state.supervisionMobileView = 'list';
+    renderSupervisionMobileHost();
+  });
+  subheader.appendChild(backBtn);
+  const subTitle = document.createElement('span');
+  subTitle.className = 'sv-mobile-subheader-title';
+  subTitle.textContent = '감독일정 상세';
+  subheader.appendChild(subTitle);
+  view.appendChild(subheader);
+
+  if (!sv) {
+    const empty = document.createElement('p');
+    empty.className = 'sv-mobile-empty';
+    empty.textContent = '해당 감독일정을 찾을 수 없습니다. 삭제되었을 수 있습니다.';
+    view.appendChild(empty);
+    return;
+  }
+
+  const liveStatus = computeSupervisionStatus(sv.start_date, sv.end_date);
+
+  const hero = document.createElement('div');
+  hero.className = 'sv-mobile-detail-hero';
+  const badges = document.createElement('div');
+  badges.className = 'sv-mobile-detail-hero-badges';
+  if (sv.supervision_type) {
+    const typeBadge = document.createElement('span');
+    typeBadge.className = 'sv-mobile-badge sv-type-' + sv.supervision_type;
+    typeBadge.textContent = SUPERVISION_TYPE_LABEL[sv.supervision_type];
+    badges.appendChild(typeBadge);
+  }
+  const statusBadge = document.createElement('span');
+  statusBadge.className = 'sv-mobile-badge sv-mobile-badge-status sv-status-' + liveStatus;
+  statusBadge.textContent = SUPERVISION_STATUS_LABEL[liveStatus];
+  badges.appendChild(statusBadge);
+  hero.appendChild(badges);
+
+  const heroTitle = document.createElement('h3');
+  heroTitle.className = 'sv-mobile-detail-hero-title';
+  heroTitle.textContent = sv.title;
+  hero.appendChild(heroTitle);
+
+  const heroDate = document.createElement('div');
+  heroDate.className = 'sv-mobile-detail-hero-date';
+  heroDate.appendChild(svIcon(SV_ICON_CALENDAR));
+  const heroDateText = document.createElement('span');
+  heroDateText.textContent = svFormatDateRangeKR(sv.start_date, sv.end_date);
+  heroDate.appendChild(heroDateText);
+  hero.appendChild(heroDate);
+  view.appendChild(hero);
+
+  const infoCard = document.createElement('div');
+  infoCard.className = 'sv-mobile-info-card';
+  const infoTitle = document.createElement('div');
+  infoTitle.className = 'sv-mobile-info-card-title';
+  infoTitle.textContent = '감독 정보';
+  infoCard.appendChild(infoTitle);
+  [
+    ['감독명', sv.title],
+    ['감독 기간', svFormatDateRangeKR(sv.start_date, sv.end_date)],
+    ['감독 유형', sv.supervision_type ? SUPERVISION_TYPE_LABEL[sv.supervision_type] : '미지정'],
+    ['담당 감독관', displayValue(sv.manager_name)],
+    ['등록일', svFormatTimestampDateKR(sv.created_at)],
+  ].forEach(([label, value]) => {
+    const row = document.createElement('div');
+    row.className = 'sv-mobile-info-row';
+    const labelEl = document.createElement('span');
+    labelEl.className = 'sv-mobile-info-row-label';
+    labelEl.textContent = label;
+    row.appendChild(labelEl);
+    const valueEl = document.createElement('span');
+    valueEl.className = 'sv-mobile-info-row-value';
+    valueEl.textContent = value;
+    row.appendChild(valueEl);
+    infoCard.appendChild(row);
+  });
+  view.appendChild(infoCard);
+
+  if (isAdmin()) {
+    const actions = document.createElement('div');
+    actions.className = 'sv-mobile-detail-actions';
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'sv-mobile-edit-btn';
+    editBtn.textContent = '수정하기';
+    editBtn.addEventListener('click', () => {
+      state.supervisionMobileView = 'form';
+      state.supervisionMobileFormOrigin = 'detail';
+      renderSupervisionMobileHost();
+    });
+    actions.appendChild(editBtn);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'sv-mobile-delete-btn';
+    deleteBtn.textContent = '삭제하기';
+    deleteBtn.addEventListener('click', async () => {
+      // §31: 즉시 삭제 금지, confirm 후에만 기존 deleteSupervision() 재사용.
+      if (!window.confirm('이 감독일정을 삭제하시겠습니까?')) return;
+      deleteBtn.disabled = true;
+      const result = await deleteSupervision(sv.id);
+      if (!result.success) {
+        console.error('감독일정 삭제 실패:', result.message);
+        deleteBtn.disabled = false;
+        return;
+      }
+      state.supervisionMobileView = 'list';
+      state.supervisionMobileSelectedId = null;
+      await renderSupervisionMobileHost();
+    });
+    actions.appendChild(deleteBtn);
+    view.appendChild(actions);
+  }
+}
+
+// ============================================================
 // 모바일 "사업장 데이터 관리" TARGET UI.
 // 기존 PC 엑셀 업로드/검증/geocoding/import/이력 로직(parseExcelFile, runGeocodingForParsedRows,
 // previewImportImpact/importSitesToDatabase, loadUploadHistory 등)만 그대로 재사용한다.
@@ -2246,8 +3037,11 @@ function buildUploadMobileHeader() {
   bellBtn.addEventListener('click', () => {
     const panel = document.getElementById('upload-panel');
     if (panel) panel.style.display = 'none';
-    const alertTabBtn = document.querySelector('.mobile-tab-btn[data-tab="alert"]');
-    if (alertTabBtn) alertTabBtn.click();
+    // STEP16.5 후속: 하단 "알림" 탭 버튼이 제거되어 더 이상 존재하지 않는다(더보기>감독일정관리/
+    // 상단 헤더 벨로 통일). 기존과 동일하게 alert 탭으로 전환하되, 헤더 벨(#mobile-header-alert-btn)
+    // 클릭을 위임해 activateMobileTab('alert')를 그대로 재사용한다(app.js 로직 변경 없음).
+    const headerAlertBtn = document.getElementById('mobile-header-alert-btn');
+    if (headerAlertBtn) headerAlertBtn.click();
   });
   header.appendChild(bellBtn);
 
