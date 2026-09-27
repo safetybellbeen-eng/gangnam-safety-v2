@@ -806,6 +806,59 @@ function getRoutePlanSites() {
   return state.routePlanSiteIds.map(id => state.sites.find(s => s.id === id)).filter(Boolean);
 }
 
+// ============================================================
+// STEP16.16: 경로 탭 상태(선택 현장/출발지) 로컬 저장 — 새로고침/재접속 시 사라지던 문제 수정.
+// 기존 STEP16.6 앱 설정과 동일하게 이 기기의 localStorage만 쓰고(새 DB 테이블 없음),
+// 계정별로 섞이지 않도록 키에 state.user.id를 포함한다(같은 기기를 여러 감독관이 쓸 수 있음).
+// 읽기/쓰기 모두 try/catch로 감싸 localStorage를 쓸 수 없는 환경에서도 앱이 죽지 않는다.
+// ============================================================
+const ROUTE_PLAN_STORAGE_PREFIX = 'gnmap_v2_route_plan_';
+
+function getRoutePlanStorageKey() {
+  const uid = state.user && state.user.id;
+  return uid ? `${ROUTE_PLAN_STORAGE_PREFIX}${uid}` : null;
+}
+
+// 세 화면(경로 만들기/방문 순서/경로 상세)의 렌더 함수가 매번 호출한다 — 이 화면들에서
+// 상태를 바꾸는 모든 경로(현장 추가/삭제/순서변경/출발지 설정)가 결국 재렌더로 이어지므로,
+// 개별 조작마다 저장 호출을 흩어놓지 않고 이 한 지점에서만 저장해도 빠짐없이 반영된다.
+function saveRoutePlanState() {
+  const key = getRoutePlanStorageKey();
+  if (!key) return;
+  const payload = {
+    siteIds: state.routePlanSiteIds,
+    currentLocation: state.currentLocation,
+    currentLocationAddress: state.currentLocationAddress,
+    routeStartMode: state.routeStartMode,
+  };
+  try { localStorage.setItem(key, JSON.stringify(payload)); } catch (e) { /* 저장 불가 환경은 조용히 무시 */ }
+}
+
+// 로그인 직후(사업장 목록 로드 이후, 어떤 경로 화면을 그리기 전) app.js가 1회 호출한다.
+export function restoreRoutePlanFromStorage() {
+  const key = getRoutePlanStorageKey();
+  if (!key) return;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (Array.isArray(saved.siteIds)) {
+      state.routePlanSiteIds = saved.siteIds.filter(id => typeof id === 'string' || typeof id === 'number');
+    }
+    if (saved.currentLocation && Number.isFinite(saved.currentLocation.lat) && Number.isFinite(saved.currentLocation.lng)) {
+      state.currentLocation = { lat: saved.currentLocation.lat, lng: saved.currentLocation.lng };
+    }
+    if (typeof saved.currentLocationAddress === 'string') {
+      state.currentLocationAddress = saved.currentLocationAddress;
+    }
+    if (saved.routeStartMode === 'gps' || saved.routeStartMode === 'manual') {
+      state.routeStartMode = saved.routeStartMode;
+    }
+  } catch (e) {
+    // 저장된 값이 손상된 경우 조용히 무시하고 기본(빈) 상태로 시작한다.
+  }
+}
+
 // "경로 만들기"/"방문 순서" 화면에서 공용으로 쓰는 선택 현장 카드(번호+이름/주소+드래그
 // 손잡이+삭제). showWarnOnly가 아니라 항상 좌표 없는 현장에는 안내문을 보여준다(§31 —
 // 좌표 없는 현장은 지도에는 못 그리지만 목록/순서에서는 빠지지 않는다).
@@ -898,11 +951,17 @@ function openSitePickerSheet(onConfirm) {
   function renderOptions(query) {
     listWrap.innerHTML = '';
     const q = (query || '').trim();
-    const candidates = state.sites.filter(s => {
+    let candidates = state.sites.filter(s => {
       if (!q) return true;
       return (s.site_name || '').includes(q) || (s.company_name || '').includes(q) ||
         (s.address || '').includes(q) || (s.dong || '').includes(q);
     });
+    // STEP16.16: 즐겨찾기 현장을 목록 맨 위로 정렬한다. 같은 그룹(즐겨찾기/일반) 안에서는
+    // 기존 순서(state.sites 순서)를 그대로 유지하는 stable sort.
+    candidates = candidates
+      .map((s, idx) => ({ s, idx, fav: isFavorite(s.id) }))
+      .sort((a, b) => (b.fav === a.fav ? a.idx - b.idx : (b.fav ? 1 : -1)))
+      .map(x => x.s);
     if (candidates.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'sv-manager-empty';
@@ -929,6 +988,13 @@ function openSitePickerSheet(onConfirm) {
       const nameEl = document.createElement('div');
       nameEl.className = 'route-picker-row-name';
       nameEl.textContent = site.site_name || site.company_name || '-';
+      if (isFavorite(site.id)) {
+        const favMark = document.createElement('span');
+        favMark.className = 'route-picker-row-fav';
+        favMark.setAttribute('aria-label', '즐겨찾기 현장');
+        favMark.textContent = ' ★';
+        nameEl.appendChild(favMark);
+      }
       textWrap.appendChild(nameEl);
       const addrEl = document.createElement('div');
       addrEl.className = 'route-picker-row-addr';
@@ -1120,6 +1186,7 @@ function openRouteAddressSearchSheet(containerId) {
 export function renderMobileRouteView(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
+  saveRoutePlanState();
   container.innerHTML = '';
 
   const selectedSites = getRoutePlanSites();
@@ -1159,7 +1226,9 @@ export function renderMobileRouteView(containerId) {
   const startBtn = document.createElement('button');
   startBtn.type = 'button';
   startBtn.className = 'route-start-btn';
-  startBtn.textContent = state.currentLocation ? '위치 변경' : '현재 위치 가져오기';
+  // STEP16.16: 상태와 무관하게 "현재 위치"로 통일(이전엔 이미 정해진 뒤엔 "위치 변경"이었음).
+  // 버튼 글자 폭도 줄어들어 옆 "주소 검색" 버튼과 함께 출발지 카드 폭을 덜 차지한다.
+  startBtn.textContent = '현재 위치';
   startBtn.disabled = state.locationRequestInFlight;
   startBtn.addEventListener('click', () => handleRouteLocationRequest(containerId));
   startBtnGroup.appendChild(startBtn);
@@ -1167,7 +1236,7 @@ export function renderMobileRouteView(containerId) {
   const addrSearchBtn = document.createElement('button');
   addrSearchBtn.type = 'button';
   addrSearchBtn.className = 'route-start-btn route-start-btn-secondary';
-  addrSearchBtn.textContent = '주소로 검색';
+  addrSearchBtn.textContent = '주소 검색';
   addrSearchBtn.addEventListener('click', () => openRouteAddressSearchSheet(containerId));
   startBtnGroup.appendChild(addrSearchBtn);
 
@@ -1204,7 +1273,29 @@ export function renderMobileRouteView(containerId) {
       state.routePlanSiteIds = mapDragOrderToIds(newOrderIds, selectedSites);
       renderMobileRouteView(containerId);
     });
+  }
 
+  // 방문 순서 만들기(선택 현장과 출발지가 모두 있어야 활성화).
+  // STEP16.16: 출발지 없이 방문 순서/경로 상세로 넘어가면 미니맵이 임시로 첫 현장 좌표를
+  // 중심으로 쓰는데, 그 상태로 진행하는 건 사용자가 "안 정해도 되는구나"로 오해하기 쉬워
+  // 아예 진행 자체를 막고 이유를 안내한다.
+  // STEP16.17: "방문 순서 만들기"(주 동작)를 "전체 삭제"(부 동작)보다 위로 올려 우선순위를 명확히 한다.
+  const ctaBtn = document.createElement('button');
+  ctaBtn.type = 'button';
+  ctaBtn.className = 'route-cta-btn';
+  ctaBtn.textContent = '방문 순서 만들기';
+  ctaBtn.disabled = selectedSites.length === 0 || !state.currentLocation;
+  ctaBtn.addEventListener('click', () => openRouteOrderPanel());
+  container.appendChild(ctaBtn);
+
+  if (selectedSites.length > 0 && !state.currentLocation) {
+    const hint = document.createElement('p');
+    hint.className = 'route-cta-hint';
+    hint.textContent = '출발지를 먼저 정해주세요.';
+    container.appendChild(hint);
+  }
+
+  if (selectedSites.length > 0) {
     const clearBtn = document.createElement('button');
     clearBtn.type = 'button';
     clearBtn.className = 'route-clear-all-btn';
@@ -1215,15 +1306,6 @@ export function renderMobileRouteView(containerId) {
     });
     container.appendChild(clearBtn);
   }
-
-  // 방문 순서 만들기(선택 현장이 있어야 활성화)
-  const ctaBtn = document.createElement('button');
-  ctaBtn.type = 'button';
-  ctaBtn.className = 'route-cta-btn';
-  ctaBtn.textContent = '방문 순서 만들기';
-  ctaBtn.disabled = selectedSites.length === 0;
-  ctaBtn.addEventListener('click', () => openRouteOrderPanel());
-  container.appendChild(ctaBtn);
 }
 
 // ② 방문 순서 — #route-order-panel(전체화면 패널, "경로" 탭에 머무른 채 연다).
@@ -1237,6 +1319,7 @@ export function openRouteOrderPanel() {
 export async function renderRouteOrderPanel(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
+  saveRoutePlanState();
   container.innerHTML = '';
 
   const { header, backBtn } = buildSettingsSubHeader('방문 순서');
@@ -1327,8 +1410,11 @@ function buildRouteTimelineStop(site, index, total, onDelete) {
   handle.textContent = '☰';
   topRow.appendChild(handle);
   const nameEl = document.createElement('span');
-  nameEl.className = 'route-timeline-name';
+  // STEP16.16: "경로 만들기"/"방문 순서" 카드(route-site-text-clickable)와 동일하게, 이름을
+  // 누르면 기존 site-detail-panel 상세보기가 뜨도록 한다.
+  nameEl.className = 'route-timeline-name route-site-text-clickable';
   nameEl.textContent = site.site_name || site.company_name || '-';
+  nameEl.addEventListener('click', () => selectSite(site.id));
   topRow.appendChild(nameEl);
   const deleteBtn = document.createElement('button');
   deleteBtn.type = 'button';
@@ -1340,8 +1426,9 @@ function buildRouteTimelineStop(site, index, total, onDelete) {
   body.appendChild(topRow);
 
   const addrEl = document.createElement('div');
-  addrEl.className = 'route-site-addr';
+  addrEl.className = 'route-site-addr route-site-text-clickable';
   addrEl.textContent = displayValue(site.address);
+  addrEl.addEventListener('click', () => selectSite(site.id));
   body.appendChild(addrEl);
 
   const hasCoord = isValidSiteCoord(site);
@@ -1386,6 +1473,7 @@ function buildRouteTimelineStop(site, index, total, onDelete) {
 export async function renderRouteDetailPanel(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
+  saveRoutePlanState();
   container.innerHTML = '';
 
   const { header, backBtn } = buildSettingsSubHeader('경로 상세');

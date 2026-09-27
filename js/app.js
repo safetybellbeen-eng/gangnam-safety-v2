@@ -6,7 +6,7 @@ import { initMap, clearMarkers } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
-import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu, getAppSettings } from './ui.js';
+import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage } from './ui.js';
 import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
 
 const VIEWS = [
@@ -245,6 +245,12 @@ function routeByProfile() {
         .then(() => Promise.all([loadActiveSites(), loadFavorites(), loadNotes()]))
         .then(([sites]) => {
           state.sites = sites;
+          // STEP16.16: 경로 탭에서 저장해둔 선택 현장/출발지를 복원한다. 반드시 아래
+          // activateMobileTab()보다 먼저 호출해야 한다 — 그 안에서 route 탭이면 바로
+          // renderMobileRouteView()를 그리는데, 그 렌더 함수가 시작할 때 현재 state를
+          // 그대로 저장(saveRoutePlanState)해버리므로 복원 전에 렌더가 먼저 일어나면
+          // 저장된 값이 빈 상태로 덮어써진다.
+          restoreRoutePlanFromStorage();
           renderDongOptions(); // state.sites 기준으로 동 select 옵션을 채운 뒤 이벤트 바인딩
           bindSearchAndSort('site-list');
           renderSiteList('site-list'); // 내부에서 marker도 함께 렌더한다 (getFilteredSortedSites 기준, 즐겨찾기 별표 포함)
@@ -292,8 +298,10 @@ async function handleLogout() {
   state.siteNotes = new Map();
   state.noteInFlight = new Set();
   state.currentLocation = null;
+  state.currentLocationAddress = null;
   state.locationRequestInFlight = false;
   state.routeStartMode = null;
+  state.routePlanSiteIds = [];
   state.adminUsers = [];
   state.adminUserInFlight = new Set();
   state.adminMessage = '';
