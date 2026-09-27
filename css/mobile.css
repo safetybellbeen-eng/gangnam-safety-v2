@@ -2050,6 +2050,14 @@
     padding: 16px;
   }
 
+  /* STEP16.16: 경로 탭(방문 순서/경로 상세 포함)에서 현장을 눌러 연 상세정보(#site-detail-panel,
+     기본 z-index 70)가, 바로 위 규칙의 route-order-panel/route-detail-panel(z-index 90)에
+     가려지지 않도록 그 위로 올린다. data-mobile-tab이 "route"일 때만 적용되어 다른 탭(지도 등)의
+     기존 겹침 순서에는 영향이 없다. */
+  #app[data-mobile-tab="route"] #site-detail-panel {
+    z-index: 95;
+  }
+
   /* STEP15-D: 경로/더보기 탭 공통 제목·안내 문구 스타일(카드/목록 톤은 기존 site-list-item과 통일). */
   .mobile-view-title {
     font-size: 16px;
@@ -2105,21 +2113,23 @@
     font-size: var(--gnmap-fs-card-title);
     font-weight: var(--gnmap-fw-bold);
     color: var(--gnmap-navy);
-    margin-bottom: var(--gnmap-space-2);
+    margin-bottom: var(--gnmap-space-1);
   }
+  /* STEP16.17: 출발지 카드의 여백/버튼이 텍스트 영역보다 커서 불필요한 빈 공간이 보이던
+     것을 줄여 공간 활용도를 높인다(패딩·행간·버튼 높이를 한 단계씩 축소). */
   .route-start-card {
     background: #fff;
     border: 1px solid var(--gnmap-border);
     border-radius: var(--gnmap-radius-md);
     box-shadow: var(--gnmap-shadow-sm);
-    padding: var(--gnmap-space-4);
-    margin-bottom: var(--gnmap-space-3);
+    padding: var(--gnmap-space-3);
+    margin-bottom: var(--gnmap-space-2);
   }
   .route-start-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--gnmap-space-3);
+    gap: var(--gnmap-space-2);
   }
   .route-start-text { flex: 1; min-width: 0; }
   .route-start-label {
@@ -2137,8 +2147,14 @@
   }
   .route-start-btn {
     flex-shrink: 0;
-    min-height: var(--gnmap-tap-min);
-    padding: 0 var(--gnmap-space-3);
+    /* STEP16.17: tap-min(44px)을 그대로 쓰면 세로로 2개 쌓았을 때 왼쪽 텍스트 영역보다
+       훨씬 커져 카드에 빈 공간이 생긴다. 36px로 줄여 좌우 균형을 맞춘다. */
+    min-height: 36px;
+    /* STEP16.16: 두 버튼(현재 위치/주소 검색) 폭을 짧은 글자 기준의 고정폭으로 맞춰서,
+       카드 안에서 출발지 텍스트(route-start-text)가 눌리지 않게 한다. */
+    width: 84px;
+    padding: 0 var(--gnmap-space-2);
+    text-align: center;
     border: 1px solid var(--gnmap-blue);
     background: #fff;
     color: var(--gnmap-blue);
@@ -2147,11 +2163,13 @@
     font-weight: var(--gnmap-fw-semibold);
   }
   .route-start-btn:disabled { opacity: 0.5; }
-  /* STEP16.14: 출발지 버튼 2개(현재 위치 / 주소로 검색)를 세로로 쌓는 그룹. */
+  /* STEP16.14: 출발지 버튼 2개(현재 위치 / 주소 검색)를 세로로 쌓는 그룹. 폭은 위
+     .route-start-btn의 고정폭을 그대로 따른다(카드 폭을 많이 차지하지 않도록).
+     STEP16.17: 버튼 사이 간격도 한 단계 줄여(8px→6px) 더 콤팩트하게 한다. */
   .route-start-btn-group {
     display: flex;
     flex-direction: column;
-    gap: var(--gnmap-space-2);
+    gap: 6px;
     flex-shrink: 0;
   }
   .route-start-btn-secondary {
@@ -2262,16 +2280,6 @@
     font-size: 18px;
     line-height: 1;
   }
-  .route-clear-all-btn {
-    width: 100%;
-    min-height: 38px;
-    border: none;
-    background: transparent;
-    color: var(--gnmap-red);
-    font-size: var(--gnmap-fs-secondary);
-    font-weight: var(--gnmap-fw-semibold);
-    margin-bottom: var(--gnmap-space-3);
-  }
   .route-cta-btn {
     width: 100%;
     min-height: 48px;
@@ -2282,9 +2290,29 @@
     font-size: var(--gnmap-fs-body);
     font-weight: var(--gnmap-fw-bold);
   }
+  /* STEP16.17: 방문 순서 만들기(주 동작) 아래로 옮기면서, 배경 없이 글자만 있던 기존
+     스타일이 눈에 잘 안 띄어 옅은 배경(회색)을 넣어 버튼임을 알아볼 수 있게 했다. */
+  .route-clear-all-btn {
+    width: 100%;
+    min-height: 44px;
+    border: none;
+    border-radius: var(--gnmap-radius-md);
+    background: var(--gnmap-gray-bg);
+    color: var(--gnmap-red);
+    font-size: var(--gnmap-fs-secondary);
+    font-weight: var(--gnmap-fw-semibold);
+    margin-top: var(--gnmap-space-2);
+  }
   .route-cta-btn:disabled {
     background: var(--gnmap-gray-bg);
     color: var(--gnmap-text-meta);
+  }
+  /* STEP16.16: "방문 순서 만들기"가 출발지 미설정으로 비활성일 때의 안내 문구. */
+  .route-cta-hint {
+    text-align: center;
+    font-size: var(--gnmap-fs-caption);
+    color: var(--gnmap-text-sub);
+    margin-top: var(--gnmap-space-2);
   }
 
   /* 방문 순서/경로 상세 — 미니맵 */
@@ -2412,6 +2440,9 @@
     font-size: var(--gnmap-fs-caption);
     color: var(--gnmap-amber);
   }
+  /* STEP16.16: 즐겨찾기 현장 표시 — 기존 즐겨찾기 별(.favorite-toggle-btn.is-favorite)과
+     동일하게 정부 블루로 강조한다(새 색상 추가 없음). */
+  .route-picker-row-fav { color: var(--gnmap-blue); }
   .route-picker-confirm-btn {
     width: 100%;
     min-height: 46px;
