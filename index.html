@@ -550,6 +550,11 @@
     <div id="app-settings-panel" style="display:none"></div>
     <div id="password-change-panel" style="display:none"></div>
     <div id="notification-settings-panel" style="display:none"></div>
+    <!-- STEP16.23(더보기 > 현장 메모 목록/작성). 위 계정/설정 패널들과 동일한 패턴(display만
+         토글, js/ui.js의 renderSiteNotesPanel/renderSiteNotesWritePanel이 매번 새로 그림).
+         데이터는 기존 gnmap_v2_site_notes/notes.js를 그대로 재사용하며 새 테이블이 아니다. -->
+    <div id="site-notes-panel" style="display:none"></div>
+    <div id="site-notes-write-panel" style="display:none"></div>
     <!-- STEP16.13(모바일 "경로" 탭 — 방문 순서/경로 상세). "경로" 탭(data-mobile-tab="route")에
          머무른 채 열리는 전체화면 패널. 위 account-info-panel 등과 동일한 패턴(display 토글만,
          js/app.js가 탭 이탈 시 닫는다). -->
