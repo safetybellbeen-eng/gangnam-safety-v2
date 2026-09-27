@@ -2,6 +2,7 @@
 // REST API/geocoding/marker/GeoJSON 경계는 이번 STEP 범위가 아니다 (CLAUDE.md 준수).
 import { CONFIG } from './config.js';
 import { state } from './state.js';
+import { isFavorite } from './favorites.js';
 
 const GANGNAM_CENTER = { lat: 37.4979, lng: 127.0276 }; // 강남구 중심 좌표
 const DEFAULT_LEVEL = 6;
@@ -29,24 +30,36 @@ const markerImageCache = new Map();
 // 방식으로 "얇음"을 만들고, 아래쪽 뾰족한 끝과 중앙 흰 원은 기존과 동일하게 유지한다.
 // 그라데이션/그림자/테두리 등 장식은 추가하지 않는다. data URI(SVG)로 만들어 별도 이미지
 // 파일을 관리하지 않고, 색상만 바뀐 버전을 즉시 만들 수 있게 한다.
-function getQualityMarkerImage(locationQuality) {
+// STEP16.19: 즐겨찾기 현장을 지도에서 구분할 수 있도록, 즐겨찾기면 핀 오른쪽 위에 작은
+// 별 배지를 얹는다. 캔버스를 22→26폭으로 넓혀 배지가 핀 몸통과 겹치지 않게 하고, 그만큼
+// anchor(offset.x)도 11→13으로 다시 계산해 핀 끝(바닥 중앙)이 실제 좌표를 계속 정확히
+// 가리키게 한다(핀 자체 모양/크기는 기존과 동일, 좌우 여백만 추가됨).
+function getQualityMarkerImage(locationQuality, favorite) {
   const color = QUALITY_MARKER_COLOR[locationQuality];
   if (!color) return null; // 매핑 없는 값(UNRESOLVED 등)은 커스텀 이미지를 만들지 않고 호출부에서 기본 마커로 폴백한다.
 
-  if (markerImageCache.has(color)) return markerImageCache.get(color);
+  const cacheKey = color + (favorite ? ':fav' : '');
+  if (markerImageCache.has(cacheKey)) return markerImageCache.get(cacheKey);
 
+  const badge = favorite
+    ? '<circle cx="21" cy="6" r="6" fill="#fff" stroke="' + color + '" stroke-width="1"/>' +
+      '<text x="21" y="9" font-size="9" text-anchor="middle" fill="#f5a623">★</text>'
+    : '';
   const svg =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="30" viewBox="0 0 22 30">' +
+    '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="30" viewBox="0 0 26 30">' +
+    '<g transform="translate(2,0)">' +
     '<path d="M11 1C6.03 1 2 4.64 2 9.1c0 6.3 9 20.4 9 20.4s9-14.1 9-20.4C20 4.64 15.97 1 11 1z" fill="' + color + '"/>' +
     '<circle cx="11" cy="9.1" r="3.1" fill="#fff"/>' +
+    '</g>' +
+    badge +
     '</svg>';
   const src = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
   const image = new kakao.maps.MarkerImage(
     src,
-    new kakao.maps.Size(22, 30),
-    { offset: new kakao.maps.Point(11, 30) } // 핀 뾰족한 끝(바닥 중앙, 새 크기 기준)이 실제 좌표를 가리키도록 anchor 재조정.
+    new kakao.maps.Size(26, 30),
+    { offset: new kakao.maps.Point(13, 30) } // 핀 뾰족한 끝(바닥 중앙, 새 크기 기준)이 실제 좌표를 가리키도록 anchor 재조정.
   );
-  markerImageCache.set(color, image);
+  markerImageCache.set(cacheKey, image);
   return image;
 }
 
@@ -56,22 +69,33 @@ function getQualityMarkerImage(locationQuality) {
 // 무관하게 핀 전체(fill)를 정부 blue(--gnmap-blue와 동일한 #1a73e8)로 바꾼다 — 색상 하나만
 // 쓰므로 더 이상 quality별로 캐시할 필요가 없다. 닫으면(closeDetail) getQualityMarkerImage()로
 // 원래 크기/quality색으로 되돌린다.
-let selectedMarkerImage = null;
-function getSelectedMarkerImage() {
-  if (selectedMarkerImage) return selectedMarkerImage;
+// STEP16.19: 선택 핀도 즐겨찾기면 같은 방식(오른쪽 위 별 배지)으로 표시한다. 캔버스를
+// 28→32폭으로 넓히고 anchor(offset.x)를 14→16으로 재계산해 핀 끝이 계속 정확히 가리키게 한다.
+const selectedMarkerImageCache = new Map();
+function getSelectedMarkerImage(favorite) {
+  const cacheKey = favorite ? 'fav' : 'plain';
+  if (selectedMarkerImageCache.has(cacheKey)) return selectedMarkerImageCache.get(cacheKey);
 
+  const badge = favorite
+    ? '<circle cx="26" cy="7" r="6.5" fill="#fff" stroke="#1a73e8" stroke-width="1"/>' +
+      '<text x="26" y="10" font-size="10" text-anchor="middle" fill="#f5a623">★</text>'
+    : '';
   const svg =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="38" viewBox="0 0 28 38">' +
+    '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="38" viewBox="0 0 32 38">' +
+    '<g transform="translate(2,0)">' +
     '<path d="M14 2.5C8.2 2.5 3.5 6.9 3.5 12.3c0 7.9 10.5 23.7 10.5 23.7s10.5-15.8 10.5-23.7C24.5 6.9 19.8 2.5 14 2.5z" fill="#1a73e8" stroke="#0d47a1" stroke-width="1.5"/>' +
     '<circle cx="14" cy="12.3" r="4.2" fill="#fff"/>' +
+    '</g>' +
+    badge +
     '</svg>';
   const src = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
-  selectedMarkerImage = new kakao.maps.MarkerImage(
+  const image = new kakao.maps.MarkerImage(
     src,
-    new kakao.maps.Size(28, 38),
-    { offset: new kakao.maps.Point(14, 38) } // 뾰족한 끝이 좌표를 가리키도록(기본 핀과 동일한 원칙, 커진 크기에 맞춰 재계산).
+    new kakao.maps.Size(32, 38),
+    { offset: new kakao.maps.Point(16, 38) } // 뾰족한 끝이 좌표를 가리키도록(기본 핀과 동일한 원칙, 커진 크기에 맞춰 재계산).
   );
-  return selectedMarkerImage;
+  selectedMarkerImageCache.set(cacheKey, image);
+  return image;
 }
 
 // state.selectedSiteId에 해당하는 마커를 "선택됨" 이미지로 바꾼다. 마커가 아직 없거나
@@ -82,7 +106,23 @@ export function highlightSelectedMarker() {
   if (siteId === null || siteId === undefined) return;
   const marker = state.siteMarkers.get(siteId);
   if (!marker || typeof marker.setImage !== 'function') return;
-  marker.setImage(getSelectedMarkerImage());
+  marker.setImage(getSelectedMarkerImage(isFavorite(siteId)));
+}
+
+// STEP16.19: 즐겨찾기 토글 직후 지도 위 해당 마커 한 개만 즉시 갱신한다(전체 재렌더 없이).
+// 상세가 열려 선택된 마커라면 "선택됨" 이미지 기준으로, 아니면 quality 색 기준으로 갱신한다.
+export function refreshFavoriteMarker(siteId) {
+  if (siteId === null || siteId === undefined) return;
+  const marker = state.siteMarkers.get(siteId);
+  if (!marker || typeof marker.setImage !== 'function') return;
+  const favorite = isFavorite(siteId);
+  if (state.selectedSiteId === siteId) {
+    marker.setImage(getSelectedMarkerImage(favorite));
+    return;
+  }
+  const site = state.sites.find(s => s.id === siteId);
+  const image = getQualityMarkerImage(site ? site.location_quality : null, favorite);
+  if (image) marker.setImage(image);
 }
 
 // 특정 사업장의 마커를 원래(기본) 이미지로 되돌린다. 상세를 닫거나 다른 핀을 선택했을 때
@@ -92,7 +132,7 @@ export function clearMarkerHighlight(siteId) {
   const marker = state.siteMarkers.get(siteId);
   if (!marker || typeof marker.setImage !== 'function') return;
   const site = state.sites.find(s => s.id === siteId);
-  const image = getQualityMarkerImage(site ? site.location_quality : null);
+  const image = getQualityMarkerImage(site ? site.location_quality : null, isFavorite(siteId));
   if (image) marker.setImage(image);
 }
 
@@ -179,7 +219,7 @@ export function renderMarkers(sites, onMarkerClick) {
     // STEP15-E.1-2: location_quality에 매핑된 색이 있으면 커스텀 핀 이미지를 쓰고,
     // 없으면(이론상 도달하지 않음) 기존 기본 파란 마커로 안전하게 폴백한다.
     const markerOptions = { position: new kakao.maps.LatLng(lat, lng) };
-    const qualityImage = getQualityMarkerImage(site.location_quality);
+    const qualityImage = getQualityMarkerImage(site.location_quality, isFavorite(site.id));
     if (qualityImage) markerOptions.image = qualityImage;
 
     const marker = new kakao.maps.Marker(markerOptions);

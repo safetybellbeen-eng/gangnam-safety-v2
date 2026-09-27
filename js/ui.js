@@ -2,7 +2,7 @@
 // XSS 방지: DB 값(site_name/company_name/address 등)은 innerHTML 문자열 조립에 쓰지 않고
 // 전부 textContent 또는 createElement 기반 DOM 생성으로만 넣는다.
 import { state } from './state.js';
-import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight, initRouteMap, relayoutRouteMap, renderRouteMarkers, panToRouteSite } from './map.js';
+import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight, refreshFavoriteMarker, initRouteMap, relayoutRouteMap, renderRouteMarkers, panToRouteSite } from './map.js';
 import { getFilteredSortedSites, getDongOptions, loadActiveSites } from './sites.js';
 import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
@@ -118,6 +118,8 @@ async function handleFavoriteToggle(siteId, triggerBtn) {
   if (!success) return; // 실패 시 기존 state/표시 그대로 유지
 
   const nowFavorite = isFavorite(siteId);
+  // STEP16.19: 지도 위 해당 사업장 마커도 즉시 별표 배지 상태로 갱신한다(전체 재렌더 없이).
+  refreshFavoriteMarker(siteId);
   document.querySelectorAll(`.site-list-item[data-site-id="${siteId}"] .favorite-toggle-btn`)
     .forEach(btn => {
       btn.textContent = nowFavorite ? '★' : '☆';
