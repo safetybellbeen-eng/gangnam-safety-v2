@@ -200,6 +200,32 @@ const AUTH_ERROR_MAP = [
   { test: /network|fetch failed|failed to fetch/i, ko: '네트워크 연결을 확인해주세요.' },
 ];
 
+// STEP16.6(모바일 비밀번호 변경). Supabase Auth는 "현재 비밀번호가 맞는지"만 별도로 확인하는
+// API가 없으므로, Supabase가 권장하는 방식대로 현재 비밀번호로 재로그인(signInWithPassword)을
+// 먼저 시도해 검증한 뒤에만 실제 변경(updateUser)을 수행한다 — TARGET처럼 "현재 비밀번호"를
+// 입력받아놓고 검증 없이 새 비밀번호만 반영하는 일은 하지 않는다. 비밀번호 값 자체는 이 함수
+// 안에서만 쓰이고 어디에도(DB/localStorage/console) 저장/로그하지 않는다.
+// 반환: { success:true } | { success:false, message }
+export async function changePassword(currentPassword, newPassword) {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user || !user.email) {
+    return { success: false, message: '로그인 상태를 확인할 수 없습니다. 다시 로그인해주세요.' };
+  }
+
+  // 1) 현재 비밀번호 검증 — 실제 재인증. 실패하면 새 비밀번호로 진행하지 않는다.
+  const { error: reauthError } = await sb.auth.signInWithPassword({ email: user.email, password: currentPassword });
+  if (reauthError) {
+    return { success: false, message: '현재 비밀번호가 올바르지 않습니다.' };
+  }
+
+  // 2) 실제 비밀번호 변경.
+  const { error: updateError } = await sb.auth.updateUser({ password: newPassword });
+  if (updateError) {
+    return { success: false, message: translateAuthError(updateError, '비밀번호 변경 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.') };
+  }
+  return { success: true };
+}
+
 export function translateAuthError(err, fallback) {
   const message = (err && err.message) || '';
   const matched = AUTH_ERROR_MAP.find((row) => row.test.test(message));
