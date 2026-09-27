@@ -22,6 +22,7 @@ export const state = {
   siteNotesFilter: 'all',        // 'all' | 'recent-created' | 'recent-updated'
   siteNotesSearchQuery: '',      // 현장명/메모 내용 검색어
   siteNotesWriteSiteId: null,    // "현장 메모 작성" 화면에서 현재 선택된 site id (미선택 시 null)
+  siteNotesWriteLocked: false,   // true면 목록 카드 클릭으로 진입(수정 전용) — 현장 선택 잠금 + 삭제 버튼 노출
   currentLocation: null,     // { lat, lng } 사용자가 버튼을 눌러 가져온 현재 위치. 자동 추적 없음.
   currentLocationMarker: null, // 현재 위치 표시 객체 (사업장 marker와 분리 관리, location.js 전용)
   locationRequestInFlight: false, // Geolocation 요청 진행 중 여부 (버튼 중복 클릭 방지)

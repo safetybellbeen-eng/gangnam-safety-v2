@@ -451,12 +451,13 @@ function renderSiteNotesPanel(containerId) {
 }
 
 // 메모 미리보기 2줄 말줄임 + 날짜 + "수정됨"(updated_at이 created_at보다 1초 이상 뒤일 때만) 배지.
-// 카드를 누르면 새 상세/수정 화면을 만들지 않고 기존 개인 메모 팝업(openNoteModal)을 그대로 연다.
+// 사용자 요청(더보기 개편): 카드를 누르면 팝업(openNoteModal)이 아니라 감독일정관리와 동일하게
+// 전체화면 화면 전환(현장 메모 작성/수정 화면, locked=현장 변경 불가 + 삭제 버튼 노출)으로 연다.
 function buildSiteNoteCard(n) {
   const card = document.createElement('button');
   card.type = 'button';
   card.className = 'sv-mobile-card site-notes-card';
-  card.addEventListener('click', () => openNoteModal(n.site.id));
+  card.addEventListener('click', () => openSiteNotesWritePanel(n.site.id, { locked: true }));
 
   const top = document.createElement('div');
   top.className = 'sv-mobile-card-top';
@@ -505,8 +506,9 @@ function buildSiteNoteCard(n) {
 // 고르면(UNIQUE(user_id, site_id)) 그 메모를 그대로 불러와 보여주고, 저장은 saveNote()의
 // 기존 insert-or-update 로직에 맡긴다(이 화면이 insert/update를 직접 분기하지 않는다).
 // ============================================================
-function openSiteNotesWritePanel(siteId) {
+function openSiteNotesWritePanel(siteId, opts = {}) {
   state.siteNotesWriteSiteId = siteId;
+  state.siteNotesWriteLocked = !!opts.locked;
   const listPanel = document.getElementById('site-notes-panel');
   if (listPanel) listPanel.style.display = 'none';
   const writePanel = document.getElementById('site-notes-write-panel');
@@ -519,7 +521,8 @@ function closeSiteNotesWritePanel() {
   const writePanel = document.getElementById('site-notes-write-panel');
   if (writePanel) writePanel.style.display = 'none';
   state.siteNotesWriteSiteId = null;
-  openSiteNotesPanel(); // 목록으로 복귀 + 최신 데이터로 다시 렌더(방금 저장한 메모 즉시 반영).
+  state.siteNotesWriteLocked = false;
+  openSiteNotesPanel(); // 목록으로 복귀 + 최신 데이터로 다시 렌더(방금 저장/삭제한 메모 즉시 반영).
 }
 
 function renderSiteNotesWritePanel(containerId) {
@@ -527,7 +530,8 @@ function renderSiteNotesWritePanel(containerId) {
   if (!container) return;
   container.innerHTML = '';
 
-  const { header, backBtn } = buildSettingsSubHeader('현장 메모 작성');
+  const locked = !!state.siteNotesWriteLocked;
+  const { header, backBtn } = buildSettingsSubHeader(locked ? '현장 메모 수정' : '현장 메모 작성');
   backBtn.addEventListener('click', () => closeSiteNotesWritePanel());
   container.appendChild(header);
 
@@ -557,16 +561,24 @@ function renderSiteNotesWritePanel(containerId) {
   selectChevron.className = 'site-notes-select-field-chevron';
   selectChevron.appendChild(svIcon(SV_ICON_CHEVRON_RIGHT));
   selectBtn.appendChild(selectChevron);
-  selectBtn.addEventListener('click', () => {
-    openSiteNoteSitePickerSheet((site) => {
-      state.siteNotesWriteSiteId = site.id;
-      renderSiteNotesWritePanel(containerId);
+  if (locked) {
+    // 카드를 눌러 기존 메모를 수정하러 들어온 경우, UNIQUE(user_id, site_id) 제약상 현장을
+    // 바꾸면 다른 메모와 충돌할 수 있으므로 현장 선택 필드를 잠근다(선택 시트 자체를 열지 않음).
+    selectBtn.disabled = true;
+    selectBtn.classList.add('is-locked');
+    selectChevron.style.display = 'none';
+  } else {
+    selectBtn.addEventListener('click', () => {
+      openSiteNoteSitePickerSheet((site) => {
+        state.siteNotesWriteSiteId = site.id;
+        renderSiteNotesWritePanel(containerId);
+      });
     });
-  });
+  }
   siteField.appendChild(selectBtn);
 
   const existingNote = selectedSite ? getNote(selectedSite.id) : null;
-  if (existingNote) {
+  if (existingNote && !locked) {
     const hint = document.createElement('p');
     hint.className = 'site-notes-existing-hint';
     hint.textContent = '이미 작성된 메모가 있어 불러왔습니다. 내용을 수정하고 저장할 수 있습니다.';
@@ -623,6 +635,34 @@ function renderSiteNotesWritePanel(containerId) {
   });
   guideCard.appendChild(guideList);
   container.appendChild(guideCard);
+
+  // 삭제 버튼 — 감독일정관리 상세 화면과 동일하게(.sv-mobile-delete-btn), 카드를 눌러 기존
+  // 메모를 수정하러 들어온 경우(locked)에만 노출한다. deleteNote()는 renderNoteSection에서
+  // 쓰는 것과 동일한 기존 로직을 그대로 호출한다(새 삭제 로직 없음).
+  if (locked && existingNote) {
+    const deleteActions = document.createElement('div');
+    deleteActions.className = 'sv-mobile-detail-actions site-notes-delete-actions';
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'sv-mobile-delete-btn';
+    deleteBtn.textContent = '메모 삭제';
+    deleteBtn.addEventListener('click', async () => {
+      if (!window.confirm('이 메모를 삭제하시겠습니까?')) return;
+      const siteId = state.siteNotesWriteSiteId;
+      if (state.noteInFlight.has(siteId)) return;
+      state.noteInFlight.add(siteId);
+      deleteBtn.disabled = true;
+      try {
+        const success = await deleteNote(siteId);
+        if (success) closeSiteNotesWritePanel();
+        else deleteBtn.disabled = false;
+      } finally {
+        state.noteInFlight.delete(siteId);
+      }
+    });
+    deleteActions.appendChild(deleteBtn);
+    container.appendChild(deleteActions);
+  }
 
   // 저장 버튼
   const saveBtnWrap = document.createElement('div');
@@ -2824,16 +2864,12 @@ export function renderMobileMoreMenu(containerId) {
     container.appendChild(group);
   }
 
-  // 감독일정관리 — 기존 헤더 벨(#mobile-header-alert-btn, activateMobileTab('alert'))과 동일한
-  // 진입점을 더보기 화면에도 추가한 것으로, 새 로직 없이 기존 클릭을 위임한다.
-  addMenuCard(null, [
+  // 사용자 요청: 감독일정관리 + 현장 메모를 관리자 메뉴와 동일한 방식(제목 있는 그룹)으로
+  // "점검 관리" 아래 한데 묶는다. 감독일정관리는 기존 헤더 벨(#mobile-header-alert-btn,
+  // activateMobileTab('alert'))과 동일한 진입점을 위임하고, 현장 메모는 gnmap_v2_site_notes/
+  // notes.js CRUD를 그대로 쓰는 통합 화면을 연다(둘 다 기존 로직 그대로, 그룹 묶음만 변경).
+  addMenuCard('점검 관리', [
     { label: '감독일정관리', icon: 'calendar', onClick: () => document.getElementById('mobile-header-alert-btn').click() },
-  ]);
-
-  // STEP16.23: "현장 메모" — 기존 현장 상세의 개인 메모(gnmap_v2_site_notes, notes.js CRUD)를
-  // 한곳에서 조회/작성/수정하는 통합 화면. 관리자 전용이 아니라 일반 승인 사용자도 노출된다
-  // (RLS도 본인 것만 CRUD하도록 이미 열려 있음 — 새 정책 불필요).
-  addMenuCard(null, [
     { label: '현장 메모', icon: 'doc', onClick: () => openSiteNotesPanel() },
   ]);
 
@@ -2848,7 +2884,7 @@ export function renderMobileMoreMenu(containerId) {
     panel.style.display = 'block';
     renderFn(panelId);
   }
-  addMenuCard(null, [
+  addMenuCard('기타 설정', [
     { label: '앱 설정', icon: 'gear', onClick: () => openMobileOnlyPanel('app-settings-panel', renderAppSettingsPanel) },
     { label: '비밀번호 변경', icon: 'lock', onClick: () => openMobileOnlyPanel('password-change-panel', renderPasswordChangePanel) },
     { label: '알림 설정', icon: 'bell', onClick: () => openMobileOnlyPanel('notification-settings-panel', renderNotificationSettingsPanel) },
