@@ -104,12 +104,28 @@
   }
   .pc-auth-topbar img {
     display: block;
-    height: 26px;
-    width: auto;
+    height: 30px;
+    width: 30px;
+    object-fit: contain;
   }
-  .pc-auth-topbar-title {
-    font-size: 15px;
+  /* 이미지(moel-ci-full.png)에 박혀 있던 불투명 흰 배경 문제를 피하기 위해 아이콘은
+     투명 PNG(moel-ci.png) 단독으로 쓰고, "고용노동부"/"산업안전 순찰지도"는 실제 텍스트로
+     둔다(스플래시 화면과 동일 패턴). */
+  .pc-auth-topbar-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    line-height: 1.2;
+  }
+  .pc-auth-topbar-text strong {
+    font-size: 11px;
     font-weight: 700;
+    color: var(--pc-navy);
+  }
+  .pc-auth-topbar-text em {
+    font-style: normal;
+    font-size: 15px;
+    font-weight: 800;
     color: var(--pc-navy);
   }
 
