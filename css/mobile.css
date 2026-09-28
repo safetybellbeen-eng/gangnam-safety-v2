@@ -3619,6 +3619,12 @@
     line-height: 1;
     z-index: 5;
   }
+  /* 사용자 요청: "×" 대신 "‹ 뒤로가기" 아이콘으로 통일(js/ui.js buildMobilePanelCloseBtn,
+     index.html #btn-upload-close) — 원 안의 아이콘 크기만 지정한다. */
+  .mobile-panel-close-btn svg {
+    width: 18px;
+    height: 18px;
+  }
 
   /* 감독일정 패널은 원래부터 #btn-supervision-close가 있었으므로 위치(header의 flex
      space-between으로 이미 우측 정렬됨)는 그대로 두고, 크기/모양만 다른 탭과 통일한다. */
