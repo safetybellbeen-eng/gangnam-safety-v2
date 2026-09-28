@@ -86,6 +86,50 @@
   color: #555;
 }
 
+/* STEP16.28: 검색창의 "주소/장소 검색 결과"(등록 사업장이 아닌 일반 주소·장소, Kakao
+   Places 키워드 검색). #site-list(등록 사업장 결과) 바로 아래에 별도 섹션으로 표시한다.
+   검색어가 없거나 2글자 미만, 결과가 없으면 비어 있다. */
+#site-address-search-results:empty {
+  display: none;
+}
+.address-search-results-heading {
+  padding: 10px 12px 4px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #888;
+  border-top: 1px solid #eee;
+}
+.address-search-result-item {
+  padding: 10px 12px;
+  border-bottom: 1px solid #eee;
+}
+.address-search-result-name {
+  font-weight: bold;
+}
+.address-search-result-address {
+  font-size: 13px;
+  color: #555;
+  margin-top: 2px;
+}
+.address-search-result-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.address-search-result-btn {
+  border: 1px solid #ccc;
+  background: #fff;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.address-search-result-btn-primary {
+  border-color: #1a73e8;
+  color: #1a73e8;
+  font-weight: bold;
+}
+
 #site-detail-panel {
   position: absolute;
   z-index: 10;

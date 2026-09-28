@@ -58,3 +58,18 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
   cursor: pointer;
 }
+
+/* STEP16.28: "커맨드센터"(강남지청) 고정 마커 위 라벨. 클러스터러 밖에서 지도에 직접 붙는
+   마커라 확대/축소와 무관하게 항상 떠 있으며, 다른 사업장 핀과 확실히 구분되도록 진한 남색
+   배지로 표시한다. */
+.hq-marker-label {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #0b2f6b;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}

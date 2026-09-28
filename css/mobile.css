@@ -248,6 +248,24 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  /* STEP16.28: 알림벨을 감싸는 우측 wrapper — "M.D 업로드" 배지를 벨 왼쪽에 나란히 두기 위함.
+     #mobile-app-header의 justify-content:space-between은 그대로(자식이 brand/이 wrapper
+     2개인 구조는 바뀌지 않음)라 기존 레이아웃/위치에 영향이 없다. */
+  #mobile-app-header-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  #mobile-header-upload-date {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gnmap-blue);
+    background: rgba(37, 99, 235, 0.08);
+    padding: 3px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
   /* STEP16.5-A: 터치 타겟은 접근성 기준 tap-min(44px)을 유지한다(버튼 자체 크기는 그대로,
      아이콘만 살짝 줄여 헤더 전체 높이를 줄이는 데 기여). 클릭 동작/위치는 변경 없음. */
   #mobile-header-alert-btn {
@@ -1317,6 +1335,11 @@
      공사금액/점검/산재표/기본순서 필터 + ★즐겨찾기 토글)를 숨기고, 대신 내부 탭
      (#favorite-subtabs: 즐겨찾기 현장/메모 있는 현장)만 보여준다. */
   #app[data-mobile-tab="favorite"] #site-search-bar {
+    display: none;
+  }
+  /* STEP16.28: 주소/장소 검색 결과도 검색창과 함께 즐겨찾기 탭에서는 숨긴다(검색어 자체가
+     입력될 수 없는 화면이므로). */
+  #app[data-mobile-tab="favorite"] #site-address-search-results {
     display: none;
   }
   #app[data-mobile-tab="favorite"] #favorite-subtabs {
