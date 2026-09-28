@@ -3074,6 +3074,11 @@
     font-weight: var(--gnmap-fw-bold);
     vertical-align: middle;
   }
+  /* STEP16.31: 마스터관리자 배지는 일반 관리자 배지와 색을 구분한다. */
+  .admin-mobile-role-badge-master {
+    background: #fdecc8;
+    color: #92600a;
+  }
   .admin-mobile-badge {
     flex-shrink: 0;
     margin-left: auto;
