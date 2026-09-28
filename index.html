@@ -81,8 +81,12 @@
          기본값은 숨김(css/desktop.css)이고 @media(min-width:769px) 안에서만 보인다. -->
     <div class="pc-auth-bg" aria-hidden="true"></div>
     <div class="pc-auth-topbar">
-      <img src="assets/icons/moel-ci-full.png" alt="고용노동부">
-      <span class="pc-auth-topbar-title">산업안전 순찰지도</span>
+      <!-- STEP: moel-ci-full.png는 흰 배경이 그대로 박힌 불투명 PNG라 하늘색 배경 위에서
+           흰 사각형 박스로 보이는 문제가 있었다. 이미 투명 배경으로 만들어져 있는
+           moel-ci.png(아이콘 단독)로 바꾸고 "고용노동부" 텍스트는 이미지 대신 실제 텍스트로
+           새로 추가한다(스플래시 화면과 동일한 방식, 새 이미지 가공 불필요). -->
+      <img src="assets/icons/moel-ci.png" alt="">
+      <span class="pc-auth-topbar-text"><strong>고용노동부</strong><em>산업안전 순찰지도</em></span>
     </div>
     <div class="pc-auth-hero">
       <h2 class="pc-auth-hero-title">고용노동부<br>산업안전 순찰지도</h2>
@@ -194,8 +198,8 @@
          #mobile-signup-card를 그대로 재사용한다. -->
     <div class="pc-auth-bg" aria-hidden="true"></div>
     <div class="pc-auth-topbar">
-      <img src="assets/icons/moel-ci-full.png" alt="고용노동부">
-      <span class="pc-auth-topbar-title">산업안전 순찰지도</span>
+      <img src="assets/icons/moel-ci.png" alt="">
+      <span class="pc-auth-topbar-text"><strong>고용노동부</strong><em>산업안전 순찰지도</em></span>
     </div>
     <div class="pc-auth-hero">
       <h2 class="pc-auth-hero-title">고용노동부<br>산업안전 순찰지도</h2>
