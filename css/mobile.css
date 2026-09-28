@@ -1623,6 +1623,24 @@
     color: var(--gnmap-navy);
     margin: 0 0 4px;
   }
+  .sv-mobile-title-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .sv-mobile-title-row .sv-mobile-title {
+    margin: 0 0 4px;
+  }
+  .sv-mobile-title-count {
+    font-size: 13px;
+    font-weight: var(--gnmap-fw-semibold, 600);
+    color: var(--gnmap-blue);
+    background: rgba(37, 99, 235, 0.08);
+    padding: 2px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
   .sv-mobile-subtitle {
     font-size: 13px;
     color: var(--gnmap-text-sub);
@@ -5064,34 +5082,9 @@
      bottom sheet, 빈 상태 등)는 기존 sv-mobile 접두사 클래스, settings-notice-card,
      upload-mobile-primary-btn, admin-sheet 계열 클래스를 그대로 재사용하고, 여기서는 이
      화면에만 필요한 것만 추가한다.
-     (수정: 이전 버전의 이 주석 문구 안에 별표와 슬래시가 연달아 나오는 부분이 있어 주석이
-     그 지점에서 조기 종료되고, 뒤 텍스트가 잘못된 선택자로 파싱되는 바람에 다음
-     site-notes-summary 규칙 전체가 무효화되어 있었다. "전체 메모"와 건수 배지가 파란 상자
-     없이 세로로 어긋나 보인 원인이 바로 이것이었다.) */
-  .site-notes-summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    margin: 0 16px 12px;
-    padding: 12px 14px;
-    background: var(--gnmap-blue-light);
-    border-radius: var(--gnmap-radius-md);
-  }
-  .site-notes-summary-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    font-weight: var(--gnmap-fw-semibold);
-    color: var(--gnmap-navy);
-  }
-  .site-notes-summary-label svg { width: 18px; height: 18px; color: var(--gnmap-blue); }
-  .site-notes-summary-count {
-    font-size: 15px;
-    font-weight: var(--gnmap-fw-bold);
-    color: var(--gnmap-blue);
-  }
+     (STEP16.27: 전체 메모 건수 배지는 더 이상 별도 파란 상자(site-notes-summary)로 표시하지
+     않고, 제목 "현장 메모" 옆 sv-mobile-title-count 배지로 옮겼다. 관련 규칙은
+     sv-mobile-header-titlewrap 근처를 참고.) */
   .site-notes-search-wrap {
     position: relative;
     margin: 0 16px 12px;
