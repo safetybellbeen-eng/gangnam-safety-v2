@@ -1,0 +1,733 @@
+/* desktop.css — PC(데스크톱) 전용 인증 화면(스플래시/로그인/회원가입).
+   base.css/layout.css/components.css/map.css/mobile.css는 전혀 건드리지 않는다.
+   이 STEP의 범위는 스플래시·로그인·회원가입 3개 화면뿐이다(지도/현장/즐겨찾기/더보기/
+   관리자/감독일정/현장메모/엑셀업로드 UI는 변경하지 않음).
+
+   구조 원칙:
+   1) 새로 추가한 pc-* 요소는 파일 맨 위(미디어쿼리 밖)에서 기본 display:none으로 숨기고,
+      아래 @media(min-width:769px) 안에서만 다시 보이게 한다 — 모바일(css/mobile.css의
+      max-width:768px 쿼리)과 절대 겹치지 않는다.
+   2) 기존 로그인/회원가입 DOM(#login-form, #mobile-login-card, #signup-form,
+      #mobile-signup-card 등)은 새로 만들지 않고 재사용하며, 이 파일의
+      @media(min-width:769px) 안에서만 데스크톱 전용으로 재스타일링한다 — Auth 로직/JS는
+      전혀 건드리지 않는다.
+   3) 769px 미만에서는 이 파일의 모든 규칙이 비활성화되어 기존 모바일 최종 결과물에
+      영향이 없다. */
+
+.pc-auth-bg,
+.pc-auth-topbar,
+.pc-auth-hero,
+#pc-feature-cards,
+#pc-login-card-title,
+#pc-signup-subtitle,
+#pc-splash-content {
+  display: none;
+}
+
+@media (min-width: 769px) {
+  /* ================= 공통 토큰 ================= */
+  :root {
+    --pc-navy: #16234a;
+    --pc-navy-deep: #101a38;
+    --pc-blue: #2450e0;
+    --pc-blue-dark: #1a3fc4;
+    --pc-text-sub: #5b6472;
+    --pc-border: #d7dee8;
+    --pc-radius: 14px;
+  }
+
+  html, body {
+    height: 100%;
+  }
+
+  /* base.css가 전역 reset을 두지 않아(주석만 있는 골격 파일) 컴포넌트마다 box-sizing이
+     제각각이었다. width+padding을 함께 쓰는 아래 카드/입력 규칙들이 의도한 폭대로
+     렌더링되도록 로그인/회원가입 화면 내부에서만 border-box로 통일한다(다른 화면 무영향). */
+  #view-login *,
+  #view-login *::before,
+  #view-login *::after,
+  #view-signup *,
+  #view-signup *::before,
+  #view-signup *::after {
+    box-sizing: border-box;
+  }
+
+  /* ================= 공용 배경/상단바/Hero (로그인·회원가입 공유) ================= */
+  /* components.css의 `#app section{max-width:360px;margin:40px auto;...}`보다 반드시
+     이겨야 하므로 `#app`을 함께 붙여 specificity를 (2,0,0)으로 올린다
+     (`#app section`은 (1,0,1)이라 `#view-login` 단독(1,0,0)으로는 지는 문제가 있었다). */
+  #app #view-login,
+  #app #view-signup {
+    position: relative;
+    min-height: 100vh;
+    overflow: hidden;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    background: #eaf1fb;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
+  }
+
+  /* 기존 STEP3B 테스트용 h1("강남구 사업장 안전지도 V2")은 새 PC Hero 타이틀로 대체되므로
+     PC에서만 숨긴다(모바일은 이미 숨김 처리되어 있어 무관, 요소 자체는 삭제하지 않음). */
+  #view-login > h1 {
+    display: none;
+  }
+
+  .pc-auth-bg {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background-image: url('../assets/images/desktop-auth-bg.jpg');
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center 62%;
+  }
+  /* Section 5: 1366~1920 사이에서 롯데타워/스카이라인이 Hero 텍스트·로그인 카드와 겹치지
+     않도록 폭에 따라 배경 위치를 미세 조정한다(단순 cover+center로 방치하지 않음). */
+  @media (min-width: 1600px) {
+    .pc-auth-bg { background-position: center 58%; }
+  }
+  @media (max-width: 1023px) {
+    .pc-auth-bg { background-position: center 68%; }
+  }
+
+  .pc-auth-topbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: absolute;
+    z-index: 2;
+    top: clamp(20px, 3vh, 36px);
+    left: clamp(24px, 4vw, 64px);
+  }
+  .pc-auth-topbar img {
+    display: block;
+    height: 26px;
+    width: auto;
+  }
+  .pc-auth-topbar-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--pc-navy);
+  }
+
+  .pc-auth-hero {
+    display: block;
+    position: absolute;
+    z-index: 2;
+    left: clamp(24px, 4vw, 64px);
+    top: 34%;
+    max-width: 480px;
+  }
+  .pc-auth-hero-title {
+    margin: 0 0 14px;
+    font-size: clamp(30px, 3vw, 40px);
+    line-height: 1.25;
+    font-weight: 800;
+    color: var(--pc-navy);
+  }
+  .pc-auth-hero-title br + * ,
+  .pc-auth-hero-title {
+    color: var(--pc-navy);
+  }
+  .pc-hero-divider {
+    width: 34px;
+    height: 3px;
+    background: var(--pc-navy);
+    margin: 0 0 16px;
+  }
+  .pc-hero-tagline-main {
+    margin: 0 0 6px;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--pc-navy);
+  }
+  .pc-hero-tagline-sub {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--pc-text-sub);
+  }
+
+  /* ================= 로그인 카드 (#mobile-login-card 재사용) ================= */
+  #view-login #mobile-login-card {
+    display: grid;
+    grid-template-areas:
+      "title"
+      "form"
+      "error"
+      "remember"
+      "bottom";
+    row-gap: 4px;
+    position: absolute;
+    z-index: 2;
+    top: 50%;
+    left: 57%;
+    transform: translateY(-50%);
+    width: min(400px, 34vw);
+    min-width: 340px;
+    max-width: none;
+    margin: 0;
+    padding: 40px 36px 32px;
+    background: rgba(255, 255, 255, 0.97);
+    border: 1px solid #e7ecf3;
+    border-radius: var(--pc-radius);
+    box-shadow: 0 18px 48px rgba(15, 35, 75, 0.16);
+  }
+
+  #pc-login-card-title {
+    display: block;
+    grid-area: title;
+    margin: 0 0 22px;
+  }
+  #pc-login-card-title h3 {
+    margin: 0 0 6px;
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--pc-navy);
+  }
+  #pc-login-card-title p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--pc-text-sub);
+  }
+
+  #view-login #mobile-login-card #login-form {
+    grid-area: form;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  /* 아이디/비밀번호 필드: label-text(제목행) + icon+input(입력행)을 grid로 배치해
+     DOM(icon, label-text, input 순서)을 바꾸지 않고도 TARGET처럼 "라벨 위 / 입력창 아래"
+     구조를 만든다. */
+  #view-login .mobile-login-field {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-areas: "lbl" "inp";
+    row-gap: 8px;
+    font-size: 13px;
+  }
+  #view-login .mobile-login-field-label-text {
+    display: block;
+    grid-area: lbl;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--pc-navy);
+  }
+  #view-login .mobile-login-field > .mobile-icon-svg-wrap {
+    display: flex !important;
+    grid-area: inp;
+    justify-self: start;
+    align-self: center;
+    margin-left: 14px;
+    z-index: 2;
+    color: #98a3b3;
+    pointer-events: none;
+  }
+  #view-login .mobile-login-field .mobile-icon-svg {
+    width: 18px;
+    height: 18px;
+  }
+  #view-login .mobile-login-field input {
+    grid-area: inp;
+    width: 100%;
+    height: 48px;
+    box-sizing: border-box;
+    padding: 0 44px 0 40px;
+    border: 1px solid var(--pc-border);
+    border-radius: 10px;
+    font-size: 14px;
+    color: var(--pc-navy);
+    background: #fff;
+  }
+  #view-login .mobile-login-field input::placeholder {
+    color: #9aa3b0;
+  }
+  #view-login .mobile-login-field input:focus {
+    outline: none;
+    border-color: var(--pc-blue);
+    box-shadow: 0 0 0 3px rgba(36, 80, 224, 0.15);
+  }
+  #view-login #mobile-login-password-toggle {
+    display: flex !important;
+    grid-area: inp;
+    justify-self: end;
+    align-self: center;
+    margin-right: 12px;
+    z-index: 2;
+    border: none;
+    background: none;
+    padding: 4px;
+    cursor: pointer;
+    color: #98a3b3;
+  }
+  #view-login #mobile-login-password-toggle .mobile-icon-svg-wrap {
+    display: flex !important;
+  }
+  #view-login #mobile-login-password-toggle .mobile-icon-svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  #view-login .form-error {
+    grid-area: error;
+    margin: 0;
+    font-size: 12.5px;
+  }
+
+  #view-login #mobile-login-remember-group {
+    grid-area: remember;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 2px 0 4px;
+  }
+  #view-login #mobile-login-remember-label,
+  #view-login #mobile-login-autologin-label {
+    display: flex !important;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--pc-text-sub);
+    cursor: pointer;
+  }
+
+  #view-login #mobile-login-card #login-form button[type="submit"] {
+    margin-top: 6px;
+    height: 50px;
+    border: none;
+    border-radius: 10px;
+    background: var(--pc-blue);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  #view-login #mobile-login-card #login-form button[type="submit"]:hover {
+    background: var(--pc-blue-dark);
+  }
+  #view-login #mobile-login-card #login-form button[type="submit"]:disabled {
+    background: #a9b6d6;
+    cursor: not-allowed;
+  }
+
+  /* 하단 줄: "비밀번호를 잊으셨다면 관리자에게 문의해주세요."(실제 기능 없음, 안내문만
+     유지 — Section 6 "가짜 기능 추가 금지")와 회원가입 링크를 같은 줄 좌/우로 배치.
+     두 요소 모두 grid-area를 공유시켜 별도 wrapper 없이 한 행으로 겹쳐 정렬한다. */
+  #view-login #mobile-login-password-help {
+    display: block !important;
+    grid-area: bottom;
+    align-self: center;
+    justify-self: start;
+    margin: 14px 0 0;
+    font-size: 12.5px;
+    color: var(--pc-text-sub);
+  }
+  #view-login #mobile-login-quick-row {
+    display: block !important;
+    grid-area: bottom;
+    align-self: center;
+    justify-self: end;
+    margin: 14px 0 0;
+  }
+  #view-login #mobile-login-quick-row #show-signup {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 4px;
+    border: none;
+    background: none;
+    padding: 0;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--pc-blue);
+    cursor: pointer;
+  }
+  #view-login #mobile-login-quick-row #show-signup .mobile-icon-svg-wrap {
+    display: none !important;
+  }
+
+  /* ================= 우측 기능 카드 3개 ================= */
+  #pc-feature-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: absolute;
+    z-index: 2;
+    top: 50%;
+    left: calc(57% + min(400px, 34vw) + 40px);
+    transform: translateY(-50%);
+    width: 230px;
+  }
+  .pc-feature-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 18px;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid #e7ecf3;
+    border-radius: 12px;
+    box-shadow: 0 8px 22px rgba(15, 35, 75, 0.08);
+  }
+  .pc-feature-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: #eaf0fe;
+    color: var(--pc-blue);
+  }
+  .pc-feature-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+  .pc-feature-card strong {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--pc-navy);
+    line-height: 1.35;
+  }
+  .pc-feature-card p {
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--pc-text-sub);
+  }
+
+  /* 1440px 미만에서는 우측 카드가 로그인 폼을 침범할 수 있어 숨긴다(Section 11 — 로그인
+     폼이 항상 최우선). 1366px 폭 테스트도 이 규칙으로 커버된다. */
+  @media (max-width: 1440px) {
+    #pc-feature-cards {
+      display: none;
+    }
+    #view-login #mobile-login-card {
+      left: 62%;
+    }
+  }
+  @media (max-width: 1180px) {
+    #view-login #mobile-login-card {
+      left: auto;
+      right: 6%;
+    }
+    .pc-auth-hero {
+      max-width: 420px;
+    }
+  }
+  /* 1366×768처럼 세로 공간이 좁으면 카드가 화면 밖으로 넘치지 않게 상단 고정 + 자연스러운
+     스크롤을 허용한다(Section 11 — 폼을 억지로 축소하지 않는다). */
+  @media (max-height: 800px) {
+    #view-login #mobile-login-card,
+    #view-signup #mobile-signup-card {
+      position: absolute;
+      top: 24px;
+      transform: none;
+    }
+    #view-login,
+    #view-signup {
+      padding-bottom: 60px;
+    }
+  }
+
+  /* ================= 회원가입 화면 ================= */
+  #view-signup > h1 {
+    position: absolute;
+    z-index: 2;
+    top: clamp(60px, 10vh, 110px);
+    right: clamp(24px, 6vw, 96px);
+    margin: 0;
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--pc-navy);
+  }
+  #pc-signup-subtitle {
+    display: block;
+    position: absolute;
+    z-index: 2;
+    top: calc(clamp(60px, 10vh, 110px) + 42px);
+    right: clamp(24px, 6vw, 96px);
+    margin: 0;
+    font-size: 13.5px;
+    color: var(--pc-text-sub);
+  }
+
+  #view-signup #mobile-signup-card {
+    position: absolute;
+    z-index: 2;
+    top: clamp(60px, 10vh, 110px);
+    right: clamp(24px, 6vw, 96px);
+    margin: 84px 0 0;
+    width: min(460px, 38vw);
+    min-width: 360px;
+    max-height: calc(100vh - clamp(60px, 10vh, 110px) - 40px);
+    overflow-y: auto;
+    background: rgba(255, 255, 255, 0.97);
+    border: 1px solid #e7ecf3;
+    border-radius: var(--pc-radius);
+    padding: 28px 32px 30px;
+    box-shadow: 0 18px 48px rgba(15, 35, 75, 0.16);
+  }
+  #app #mobile-signup-card #signup-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  #view-signup .mobile-signup-field {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--pc-navy);
+  }
+  #view-signup .mobile-required-star {
+    display: inline;
+  }
+  #view-signup .signup-label-pc-only {
+    display: inline;
+  }
+  #view-signup .mobile-signup-label-text {
+    display: none;
+  }
+  #view-signup .mobile-signup-field-input-wrap {
+    display: flex !important;
+    position: relative;
+    align-items: center;
+    margin-top: 8px;
+  }
+  #view-signup .mobile-signup-field-input-wrap > .mobile-icon-svg-wrap {
+    display: flex !important;
+    position: absolute;
+    left: 14px;
+    z-index: 2;
+    color: #98a3b3;
+    pointer-events: none;
+  }
+  #view-signup .mobile-icon-svg {
+    width: 18px;
+    height: 18px;
+  }
+  #view-signup .mobile-signup-field-input-wrap input,
+  #view-signup .mobile-signup-field-input-wrap select {
+    width: 100%;
+    height: 46px;
+    box-sizing: border-box;
+    padding: 0 44px 0 40px;
+    border: 1px solid var(--pc-border);
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--pc-navy);
+    background: #fff;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  #view-signup select#signup-org {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b6472' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 16px;
+  }
+  #view-signup .mobile-signup-field-input-wrap input::placeholder {
+    color: #9aa3b0;
+    font-weight: 400;
+  }
+  #view-signup .mobile-signup-field-input-wrap input:focus,
+  #view-signup .mobile-signup-field-input-wrap select:focus {
+    outline: none;
+    border-color: var(--pc-blue);
+    box-shadow: 0 0 0 3px rgba(36, 80, 224, 0.15);
+  }
+  #view-signup #mobile-signup-password-toggle,
+  #view-signup #mobile-signup-password-confirm-toggle {
+    display: flex !important;
+    position: absolute;
+    right: 12px;
+    z-index: 2;
+    border: none;
+    background: none;
+    padding: 4px;
+    cursor: pointer;
+    color: #98a3b3;
+  }
+
+  #view-signup .mobile-signup-match-msg {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+  }
+  #view-signup .mobile-signup-rules {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 11.5px;
+    color: #98a3b0;
+  }
+  #view-signup .mobile-signup-hint {
+    display: block;
+    margin-top: 6px;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: #98a3b0;
+  }
+
+  #view-signup .mobile-signup-privacy-field {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+  #view-signup .mobile-signup-privacy-check-wrap {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--pc-navy);
+  }
+  #view-signup .mobile-signup-privacy-check-wrap input[type="checkbox"] {
+    margin-top: 2px;
+  }
+
+  #app #mobile-signup-card #signup-form button[type="submit"] {
+    margin-top: 4px;
+    height: 50px;
+    border: none;
+    border-radius: 10px;
+    background: var(--pc-blue);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  #app #mobile-signup-card #signup-form button[type="submit"]:hover {
+    background: var(--pc-blue-dark);
+  }
+  #view-signup #signup-error {
+    margin: 0;
+    font-size: 12.5px;
+  }
+
+  #view-signup #show-login {
+    display: block !important;
+    margin: 16px auto 0;
+    border: none;
+    background: none;
+    padding: 0;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--pc-blue);
+    cursor: pointer;
+    text-align: center;
+  }
+
+  @media (max-width: 1180px) {
+    #view-signup > h1,
+    #pc-signup-subtitle,
+    #view-signup #mobile-signup-card {
+      right: 5%;
+    }
+  }
+
+  /* ================= PC 스플래시 ================= */
+  #mobile-splash {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: #eaf1fb;
+    opacity: 1;
+    transition: opacity 0.4s ease;
+  }
+  #mobile-splash::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background-image: url('../assets/images/desktop-auth-bg.jpg');
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center 62%;
+  }
+  #mobile-splash.mobile-splash-hide {
+    opacity: 0;
+    pointer-events: none;
+  }
+  #mobile-splash-img {
+    display: none;
+  }
+  #pc-splash-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    transform: translateY(-8%);
+  }
+  #pc-splash-ci {
+    display: block;
+    width: 88px;
+    height: 88px;
+    margin-bottom: 18px;
+  }
+  #pc-splash-agency {
+    margin: 0 0 4px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--pc-navy);
+  }
+  #pc-splash-title {
+    margin: 0 0 16px;
+    font-size: 34px;
+    font-weight: 800;
+    color: var(--pc-navy);
+  }
+  #pc-splash-content .pc-hero-divider {
+    margin: 0 auto 16px;
+  }
+  #pc-splash-tagline-main {
+    margin: 0 0 6px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--pc-navy);
+  }
+  #pc-splash-tagline-sub {
+    margin: 0 0 28px;
+    font-size: 13px;
+    color: var(--pc-text-sub);
+  }
+  #pc-splash-spinner {
+    width: 30px;
+    height: 30px;
+    margin: 0 auto 12px;
+    border: 3px solid #cdd8ee;
+    border-top-color: var(--pc-blue);
+    border-radius: 50%;
+    animation: pc-splash-spin 0.8s linear infinite;
+  }
+  #pc-splash-loading {
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--pc-text-sub);
+  }
+  @keyframes pc-splash-spin {
+    to { transform: rotate(360deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #mobile-splash {
+      transition: none;
+    }
+    #pc-splash-spinner {
+      animation-duration: 1.6s;
+    }
+  }
+}
