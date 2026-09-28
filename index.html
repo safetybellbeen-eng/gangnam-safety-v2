@@ -469,12 +469,18 @@
           <span id="mobile-app-header-title">산업안전 순찰지도</span>
         </span>
       </div>
-      <button type="button" id="mobile-header-alert-btn" aria-label="알림">
-        <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M18 16v-5a6 6 0 1 0-12 0v5l-1.5 2.5h15L18 16Z"/>
-          <path d="M9.5 20a2.5 2.5 0 0 0 5 0"/>
-        </svg>
-      </button>
+      <div id="mobile-app-header-right">
+        <!-- STEP16.28: 가장 최근 엑셀 업로드 일시. 알림벨 왼쪽에 짧게("M.D 업로드") 표시하고,
+             업로드 이력이 없거나 조회 실패 시 js/ui.js renderHeaderUploadDate()가 display:none으로
+             숨긴다(기본값도 숨김 — 값이 채워지기 전 빈 배지가 잠깐 보이지 않도록). -->
+        <span id="mobile-header-upload-date" style="display:none"></span>
+        <button type="button" id="mobile-header-alert-btn" aria-label="알림">
+          <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 16v-5a6 6 0 1 0-12 0v5l-1.5 2.5h15L18 16Z"/>
+            <path d="M9.5 20a2.5 2.5 0 0 0 5 0"/>
+          </svg>
+        </button>
+      </div>
     </div>
     <h1>인증 완료</h1>
     <p id="approved-role-badge"></p>
@@ -674,6 +680,10 @@
         <button type="button" id="favorite-subtab-notes" class="favorite-subtab-btn">메모 있는 현장</button>
       </div>
       <div id="site-list"></div>
+      <!-- STEP16.28: 검색어가 등록된 사업장뿐 아니라 일반 주소/장소와도 일치할 수 있으므로,
+           #site-list(등록 사업장 결과) 아래에 Kakao 주소/장소 검색 결과를 별도 섹션으로 보여준다.
+           검색어가 없거나 결과가 없으면 비워둔다(js/ui.js renderAddressSearchResults). -->
+      <div id="site-address-search-results"></div>
     </div>
     <div id="map-container">
       <!-- STEP15-E.1-2: 정확도 범례. #map-container 내부에 넣지만 Kakao Map은 이 컨테이너에
