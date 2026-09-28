@@ -17,27 +17,6 @@
   padding: 8px;
   border-bottom: 1px solid #ddd;
 }
-/* STEP16.32: "현장/업체명" / "주소/장소명" 검색 모드 토글. PC/모바일 공통(#site-search-bar와
-   동일하게 항상 보임 — 모바일 전용 UI가 아니라 검색 자체의 동작을 바꾸는 컨트롤이라서). */
-#site-search-mode-row {
-  display: flex;
-  gap: 6px;
-}
-.site-search-mode-btn {
-  border: 1px solid #ccc;
-  background: #fff;
-  border-radius: 14px;
-  padding: 3px 10px;
-  font-size: 12px;
-  color: #555;
-  cursor: pointer;
-}
-.site-search-mode-btn.active {
-  border-color: #1a73e8;
-  background: #eef5ff;
-  color: #1a73e8;
-  font-weight: bold;
-}
 #site-search-input-wrap {
   position: relative;
   display: flex;

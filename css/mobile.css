@@ -623,6 +623,13 @@
   #app[data-mobile-tab="map"] #site-sort-filter {
     display: none;
   }
+  /* STEP16.33: 사용자 요청 — "현장" 탭에서는 검색모드(현장/업체명 ↔ 주소/장소명) 선택 자체를
+     없앤다. 이 탭은 항상 등록된 사업장(현장/업체명/주소)만 검색되고, Kakao 주소/장소 검색은
+     아예 동작하지 않는다(js/app.js activateMobileTab()이 탭 진입 시 state.siteSearchMode를
+     'site'로 강제 리셋 — setSiteSearchMode 참고). */
+  #app[data-mobile-tab="site"] #site-search-mode-filter {
+    display: none;
+  }
   /* 사용자 요청: toggle 그룹(즐겨찾기/점검/산재표) 앞에 얇은 구분선을 두어 "조건 선택"과
      시각적으로 분리한다. DOM 구조는 바꾸지 않고 기존 wrapper에 border-left만 추가한다. */
   #site-toggle-filter-row {
