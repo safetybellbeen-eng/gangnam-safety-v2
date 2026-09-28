@@ -119,3 +119,21 @@ export async function loadUploadHistory(limit = 10) {
     return [];
   }
 }
+
+// STEP16.28: 상단 헤더(알림벨 왼쪽)에 표시할 "가장 최근 엑셀 업로드 일시"를 모든 승인된
+// 일반 사용자도 볼 수 있도록, gnmap_v2_upload_history 테이블을 직접 select하지 않고
+// 전용 RPC(gnmap_v2_get_last_upload_at, SECURITY DEFINER, timestamptz 1개 값만 반환)를 호출한다.
+// 테이블 자체의 select 권한(관리자 전용, policies.sql)은 그대로다.
+export async function loadLastUploadAt() {
+  try {
+    const { data, error } = await sb.rpc('gnmap_v2_get_last_upload_at');
+    if (error) {
+      console.error('최근 업로드 일시 조회 실패:', error);
+      return null;
+    }
+    return data || null; // ISO 문자열(timestamptz) 또는 null
+  } catch (e) {
+    console.error('최근 업로드 일시 조회 예외:', e);
+    return null;
+  }
+}

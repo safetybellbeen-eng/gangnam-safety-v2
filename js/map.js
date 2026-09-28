@@ -425,7 +425,11 @@ function loadKakaoSdk() {
       return;
     }
     const script = document.createElement('script');
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${CONFIG.KAKAO_JS_KEY}&libraries=clusterer&autoload=false`;
+    // STEP16.28: services 라이브러리 추가 — kakao.maps.services.Geocoder(주소→좌표, 커맨드센터
+    // 마커용)와 kakao.maps.services.Places(키워드/주소 검색, 검색창의 "일반 주소" 검색용)를
+    // 프론트에서 바로 쓰기 위함이다. 둘 다 Kakao Maps JS SDK 키(appkey, 이미 공개되어 있는 JS
+    // 키)로 동작하며 REST API Key(비공개, Edge Function 전용)는 전혀 사용하지 않는다.
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${CONFIG.KAKAO_JS_KEY}&libraries=services,clusterer&autoload=false`;
     script.onload = () => {
       window.kakao.maps.load(() => resolve(window.kakao));
     };
@@ -468,6 +472,107 @@ export async function initMap(containerId, startCenter) {
   });
 
   return state.map;
+}
+
+// ============================================================
+// STEP16.28-1: "커맨드센터"(서울강남지청, 성담빌딩) 고정 마커.
+// - 일반 사업장 마커와 달리 클러스터러에 넣지 않고 지도에 직접 붙인다 — 확대/축소로 클러스터링
+//   되거나 숨겨지지 않고 항상 그대로 보인다(사용자 요청: "확대하든 축소하든 잘 보일 수 있도록").
+// - 좌표는 하드코딩하지 않고 kakao.maps.services.Geocoder로 주소를 직접 조회해 정확한 좌표를
+//   쓴다(loadKakaoSdk에서 추가한 services 라이브러리 사용). 최초 1회만 조회하고 이후에는
+//   캐시된 마커를 재사용한다(initMap이 지도당 1회만 호출되므로 사실상 앱 생명주기 동안 1회).
+// - 사업장 데이터(gnmap_v2_sites)와는 무관한 순수 지도 표시 요소이며 DB에 저장하지 않는다.
+// ============================================================
+const HQ_ADDRESS = '서울 강남구 테헤란로 411';
+const HQ_LABEL = '강남지청 (커맨드센터)';
+let hqMarker = null;
+let hqLabelOverlay = null;
+let hqRenderRequested = false;
+
+function buildHqMarkerImage() {
+  // 일반 사업장 핀(24x35 내외)보다 눈에 띄게 크고 색이 다른 별 모양 마커 — 확대/축소와 무관하게
+  // 클러스터러 밖에서 항상 단독으로 렌더링되므로, 배지 형태의 진한 남색 별 아이콘으로 구분한다.
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="58" viewBox="0 0 48 58">
+      <path d="M24 2C13 2 4 11 4 22c0 15 20 34 20 34s20-19 20-34C44 11 35 2 24 2Z" fill="#0b2f6b" stroke="#ffffff" stroke-width="2"/>
+      <circle cx="24" cy="22" r="12" fill="#ffffff"/>
+      <path d="M24 13.5l2.47 5.01 5.53.8-4 3.9.94 5.5L24 25.99l-4.94 2.72.94-5.5-4-3.9 5.53-.8L24 13.5Z" fill="#0b2f6b"/>
+    </svg>
+  `.trim();
+  const src = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+  return new kakao.maps.MarkerImage(src, new kakao.maps.Size(48, 58), { offset: new kakao.maps.Point(24, 58) });
+}
+
+export function renderHqMarker() {
+  if (!state.map || hqRenderRequested) return;
+  hqRenderRequested = true;
+
+  if (!window.kakao || !kakao.maps.services || !kakao.maps.services.Geocoder) {
+    console.warn('[커맨드센터 마커] kakao.maps.services를 사용할 수 없습니다(SDK 로드 옵션 확인 필요).');
+    return;
+  }
+
+  const geocoder = new kakao.maps.services.Geocoder();
+  geocoder.addressSearch(HQ_ADDRESS, (result, status) => {
+    if (status !== kakao.maps.services.Status.OK || !result || !result[0]) {
+      console.warn('[커맨드센터 마커] 주소 지오코딩 실패:', HQ_ADDRESS, status);
+      return;
+    }
+    const lat = Number(result[0].y);
+    const lng = Number(result[0].x);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    const position = new kakao.maps.LatLng(lat, lng);
+
+    if (hqMarker) hqMarker.setMap(null);
+    hqMarker = new kakao.maps.Marker({
+      position,
+      image: buildHqMarkerImage(),
+      map: state.map, // 클러스터러가 아닌 지도에 직접 부착 — 항상 표시.
+      zIndex: 999
+    });
+
+    if (hqLabelOverlay) hqLabelOverlay.setMap(null);
+    const labelEl = document.createElement('div');
+    labelEl.className = 'hq-marker-label';
+    labelEl.textContent = HQ_LABEL;
+    hqLabelOverlay = new kakao.maps.CustomOverlay({
+      position,
+      content: labelEl,
+      yAnchor: 2.55, // 마커 핀 꼭대기 위에 라벨이 오도록
+      zIndex: 1000
+    });
+    hqLabelOverlay.setMap(state.map);
+  });
+}
+
+// ============================================================
+// STEP16.28-2: 검색창의 "일반 주소" 검색 — kakao.maps.services.Places(키워드 검색)를 그대로
+// 프론트에서 호출한다. REST API Key(비공개)를 쓰는 gnmap-v2-geocode Edge Function(관리자 전용,
+// Excel import 좌표 확인용)과는 완전히 별개이며, 여기서는 JS SDK 공개 키만 사용하므로 일반
+// 사용자도 바로 쓸 수 있다. Promise로 감싸 ui.js에서 await로 쓰기 쉽게 한다.
+// ============================================================
+export function searchPlacesKeyword(query) {
+  return new Promise((resolve) => {
+    if (!window.kakao || !kakao.maps.services || !kakao.maps.services.Places) {
+      resolve([]);
+      return;
+    }
+    const places = new kakao.maps.services.Places();
+    places.keywordSearch(query, (result, status) => {
+      if (status !== kakao.maps.services.Status.OK || !Array.isArray(result)) {
+        resolve([]);
+        return;
+      }
+      resolve(result.map(r => ({
+        name: r.place_name || r.address_name || query,
+        roadAddress: r.road_address_name || '',
+        address: r.address_name || '',
+        lat: Number(r.y),
+        lng: Number(r.x)
+      })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng)));
+    });
+  });
 }
 
 // 사업장 배열로 마커를 그린다. 기존 마커는 전부 정리한 뒤 새로 생성한다 (중복 방지, 재호출 가능).

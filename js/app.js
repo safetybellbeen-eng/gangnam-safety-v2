@@ -2,11 +2,11 @@
 // 지도/사업장 등 실제 기능은 이후 STEP에서 추가한다 (CLAUDE.md 12절: 대규모 UI 금지).
 import { state } from './state.js';
 import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, verifySignupCode, checkIdExists, checkLoginLock, translateAuthError } from './auth.js';
-import { initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites } from './map.js';
+import { initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites, renderHqMarker } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
-import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView } from './ui.js';
+import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView, renderHeaderUploadDate } from './ui.js';
 import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
 
 const VIEWS = [
@@ -234,6 +234,10 @@ function routeByProfile() {
       // 감독일정 상황판은 approved 전체가 볼 수 있다(등록/수정/삭제만 admin — renderSupervisionPanel 내부에서 분기).
       document.getElementById('btn-supervision-panel').style.display = 'inline-block';
       showView('view-approved');
+      // STEP16.28: 상단 헤더의 "가장 최근 엑셀 업로드 일시" 배지 — 지도/사업장 로딩과 무관한
+      // 부가 정보라 await 없이 별도로 요청한다(실패해도 헤더 배지만 숨겨질 뿐 나머지 화면에
+      // 영향 없음, renderHeaderUploadDate 내부에서 에러를 흡수).
+      renderHeaderUploadDate();
       // STEP15-C.2: initMap()보다 먼저 data-mobile-tab을 적용해, 모바일에서 Kakao 지도가
       // display:none인 #map-container(크기 0) 위에 생성되지 않도록 한다(흰 화면의 실제 원인 — 아래 보고 참고).
       // PC에서는 이 속성이 어떤 CSS에도 영향을 주지 않으므로 PC 동작은 그대로다.
@@ -248,6 +252,10 @@ function routeByProfile() {
       // GANGNAM_CENTER로 자동 폴백하므로 지도 초기화 자체가 지연/실패하지 않는다.
       resolvePreferredMapStartCenter()
         .then((startCenter) => initMap('map-container', startCenter))
+        // STEP16.28: 지도 초기화 직후 "커맨드센터"(강남지청) 고정 마커를 1회 요청한다. 내부에서
+        // 주소를 지오코딩해 좌표를 얻는 비동기 작업이라 여기서 await하지 않고(체인을 지연시키지
+        // 않음) 결과가 오면 지도 위에 직접 표시된다.
+        .then((map) => { renderHqMarker(); return map; })
         // STEP16.20: renderGangnamBoundaries()(경계선 그리기, 내부에서 경계 GeoJSON을 fetch)를
         // 사업장 조회와 병렬로 실행한다 — 서로 의존하지 않고, 둘 다 끝난 뒤 assignDongToSites()가
         // 이미 로드된 경계 데이터를 재사용(캐시된 Promise)해 즉시 판정할 수 있게 하기 위함이다.

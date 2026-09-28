@@ -2,14 +2,14 @@
 // XSS 방지: DB 값(site_name/company_name/address 등)은 innerHTML 문자열 조립에 쓰지 않고
 // 전부 textContent 또는 createElement 기반 DOM 생성으로만 넣는다.
 import { state } from './state.js';
-import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight, refreshFavoriteMarker, initRouteMap, relayoutRouteMap, renderRouteMarkers, panToRouteSite } from './map.js';
+import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight, refreshFavoriteMarker, initRouteMap, relayoutRouteMap, renderRouteMarkers, panToRouteSite, searchPlacesKeyword } from './map.js';
 import { getFilteredSortedSites, getDongOptions, loadActiveSites } from './sites.js';
 import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
 import { loadUsers, setUserStatus, setUserRole, resetUserPassword, deleteRejectedProfile } from './admin.js';
 import { parseExcelFile } from './excel.js';
 import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, buildLotQueries, runJusoNormalize, buildJusoQuery, runKakaoJusoRecovery, runRoadApproximateRecovery, extractApproximateStructure, reverseGeocode, geocodeKeyword } from './geocoding.js';
-import { importSitesToDatabase, previewImportImpact, loadUploadHistory } from './import.js';
+import { importSitesToDatabase, previewImportImpact, loadUploadHistory, loadLastUploadAt } from './import.js';
 import { loadSupervisions, createSupervision, updateSupervision, deleteSupervision } from './supervision.js';
 import { isAdmin, changePassword } from './auth.js';
 import { requestCurrentLocation } from './location.js';
@@ -3049,6 +3049,111 @@ export function renderAccountInfoPanel(containerId) {
 
 let searchDebounceTimer = null;
 let searchSortEventsbound = false;
+let addressSearchDebounceTimer = null;
+let addressSearchToken = 0;
+
+// ============================================================
+// STEP16.28-2: 검색창에 등록된 사업장뿐 아니라 일반 주소/장소도 검색되게 한다.
+// map.js의 searchPlacesKeyword(kakao.maps.services.Places, JS SDK 공개 키만 사용 — REST Key
+// 불필요)를 그대로 호출해 #site-list(등록 사업장 결과) 아래 별도 섹션에 보여준다. 각 결과에는
+// "주소복사"/"길찾기" 버튼만 붙이고, 사업장 데이터(gnmap_v2_sites)에는 전혀 저장/반영하지 않는다
+// (순수 조회/편의 기능).
+// ============================================================
+function renderAddressSearchResults(query) {
+  const container = document.getElementById('site-address-search-results');
+  if (!container) return;
+  clearTimeout(addressSearchDebounceTimer);
+  const trimmed = (query || '').trim();
+  if (trimmed.length < 2) {
+    container.innerHTML = '';
+    return;
+  }
+  const myToken = ++addressSearchToken;
+  addressSearchDebounceTimer = setTimeout(async () => {
+    let results = [];
+    try {
+      results = await searchPlacesKeyword(trimmed);
+    } catch (err) {
+      console.warn('[주소 검색] 실패:', err);
+    }
+    if (myToken !== addressSearchToken) return; // 그 사이 검색어가 바뀌었으면 이 결과는 버린다(경쟁 상태 방지).
+    container.innerHTML = '';
+    if (!results || results.length === 0) return;
+
+    const heading = document.createElement('div');
+    heading.className = 'address-search-results-heading';
+    heading.textContent = '주소/장소 검색 결과';
+    container.appendChild(heading);
+
+    const list = document.createElement('div');
+    list.className = 'address-search-results-list';
+    results.slice(0, 8).forEach(r => {
+      const item = document.createElement('div');
+      item.className = 'address-search-result-item';
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'address-search-result-name';
+      nameEl.textContent = r.name;
+      item.appendChild(nameEl);
+
+      const addrText = r.roadAddress || r.address || '-';
+      const addrEl = document.createElement('div');
+      addrEl.className = 'address-search-result-address';
+      addrEl.textContent = addrText;
+      item.appendChild(addrEl);
+
+      const actions = document.createElement('div');
+      actions.className = 'address-search-result-actions';
+
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'address-search-result-btn';
+      copyBtn.textContent = '주소복사';
+      copyBtn.addEventListener('click', async () => {
+        const text = addrText !== '-' ? addrText : r.name;
+        const original = copyBtn.textContent;
+        const showResult = (ok) => {
+          copyBtn.textContent = ok ? '복사됨' : '실패';
+          copyBtn.disabled = true;
+          setTimeout(() => { copyBtn.textContent = original; copyBtn.disabled = false; }, 1400);
+        };
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+          } else {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+          }
+          showResult(true);
+        } catch (err) {
+          console.error('주소 복사 실패:', err);
+          showResult(false);
+        }
+      });
+      actions.appendChild(copyBtn);
+
+      const dirBtn = document.createElement('button');
+      dirBtn.type = 'button';
+      dirBtn.className = 'address-search-result-btn address-search-result-btn-primary';
+      dirBtn.textContent = '길찾기';
+      dirBtn.addEventListener('click', () => {
+        const url = buildKakaoDirectionsUrl(r.name, r.lat, r.lng);
+        window.open(url, '_blank', 'noopener,noreferrer');
+      });
+      actions.appendChild(dirBtn);
+
+      item.appendChild(actions);
+      list.appendChild(item);
+    });
+    container.appendChild(list);
+  }, 350);
+}
 
 // 사용자 요청: "관할" 필터 버튼(summary)에 현재 선택 상태를 보여준다.
 // 0개 선택 = "관할"(기본표기, 전체), 1개 = 그 동 이름, 2개 이상 = "OO동 외 N".
@@ -3234,6 +3339,7 @@ export function bindSearchAndSort(containerId) {
       state.searchQuery = searchInput.value.trim();
       renderSiteList(containerId);
     }, 200);
+    renderAddressSearchResults(searchInput.value); // 등록 사업장 검색과 별개로, 자체 디바운스로 주소/장소 검색도 함께 실행한다.
   });
 
   if (searchClearBtn) {
@@ -3243,6 +3349,7 @@ export function bindSearchAndSort(containerId) {
       state.searchQuery = '';
       searchClearBtn.style.display = 'none';
       renderSiteList(containerId); // 검색어만 비우고 관할/금액/점검/산재표/즐겨찾기/정렬은 그대로 유지된다.
+      renderAddressSearchResults('');
     });
   }
 
@@ -5219,6 +5326,40 @@ function getUploadLocationBuckets(rows) {
     else if (row._geocodeStatus) needsReview++;
   });
   return { resolved, needsReview };
+}
+
+// STEP16.28: 상단 헤더(#mobile-app-header, 알림벨 왼쪽)에 "가장 최근 엑셀 업로드 일시"를
+// 짧게 표시한다("M.D 업로드"). 전체 일시는 title 툴팁으로만 제공한다(헤더 공간이 좁아서).
+// 업로드 이력이 아예 없거나(iso===null) 조회에 실패하면 조용히 숨긴다(에러를 사용자에게
+// 노출하지 않음 — 이 배지는 참고용 편의 기능일 뿐 핵심 기능이 아니다).
+function formatHeaderUploadDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${mm}.${dd} 업로드`;
+}
+
+export async function renderHeaderUploadDate() {
+  const el = document.getElementById('mobile-header-upload-date');
+  if (!el) return;
+  let iso = null;
+  try {
+    iso = await loadLastUploadAt();
+  } catch (e) {
+    console.warn('[헤더 업로드 날짜] 조회 실패:', e);
+  }
+  const text = formatHeaderUploadDate(iso);
+  if (!text) {
+    el.style.display = 'none';
+    el.textContent = '';
+    el.removeAttribute('title');
+    return;
+  }
+  el.textContent = text;
+  el.title = `최근 엑셀 업로드: ${formatUploadDateTime(iso)}`;
+  el.style.display = '';
 }
 
 function formatUploadDateTime(iso) {
