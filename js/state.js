@@ -8,6 +8,7 @@ export const state = {
   selectedSiteId: null,   // 현재 선택된 사업장 id (목록/마커 클릭으로 갱신)
   siteMarkers: new Map(), // siteId -> kakao.maps.Marker (마커 재검색 없이 클릭 시 즉시 매칭)
   searchQuery: '',        // 검색어 (site_name/company_name/address/dong 대상)
+  siteSearchMode: 'site', // STEP16.32: 'site'(현장/업체명 — 등록 사업장 검색) | 'address'(주소/장소명 — Kakao 검색). 검색창 맨 앞 토글로 전환.
   sortMode: 'default',    // 'default' | 'name-asc' | 'company-asc' | 'amount-desc' | 'amount-asc'
   selectedDongs: [],       // 사용자 요청: "관할" 필터. 복수 선택된 dong 값 배열. 빈 배열=전체(필터 없음).
   amountFilter: 'all',     // 'all' | 'under-5b' | '5b-12b' | 'over-12b' (사용자 요청: 50억/120억 기준 3구간)

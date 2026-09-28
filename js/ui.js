@@ -338,37 +338,34 @@ function renderSiteNotesPanel(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
   container.innerHTML = '';
-  container.appendChild(buildMobilePanelCloseBtn(containerId));
 
-  const header = document.createElement('div');
-  header.className = 'sv-mobile-header';
-  const titleWrap = document.createElement('div');
-  titleWrap.className = 'sv-mobile-header-titlewrap';
-  const titleRow = document.createElement('div');
-  titleRow.className = 'sv-mobile-title-row';
-  const titleEl = document.createElement('h2');
-  titleEl.className = 'sv-mobile-title';
-  titleEl.textContent = '현장 메모';
-  titleRow.appendChild(titleEl);
+  // STEP16.32: 앱설정/비밀번호변경 등과 동일한 "‹ 현장 메모" 상단 표시로 통일한다.
+  // 건수 배지(STEP16.27)는 제목 옆에, 작성(+) 버튼은 오른쪽 끝에 그대로 유지한다.
+  const { header, backBtn } = buildSettingsSubHeader('현장 메모');
+  backBtn.addEventListener('click', () => {
+    const panel = document.getElementById(containerId);
+    if (panel) panel.style.display = 'none';
+  });
   const allNotes = getSiteNotesJoined();
   const titleCountEl = document.createElement('span');
   titleCountEl.className = 'sv-mobile-title-count';
   titleCountEl.textContent = `전체 ${allNotes.length}건`;
-  titleRow.appendChild(titleCountEl);
-  titleWrap.appendChild(titleRow);
-  const subtitleEl = document.createElement('p');
-  subtitleEl.className = 'sv-mobile-subtitle';
-  subtitleEl.textContent = '현장에서 작성한 메모를 한곳에서 관리합니다.';
-  titleWrap.appendChild(subtitleEl);
-  header.appendChild(titleWrap);
+  header.appendChild(titleCountEl);
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
   addBtn.className = 'sv-mobile-add-btn';
+  addBtn.style.marginLeft = 'auto';
   addBtn.setAttribute('aria-label', '현장 메모 작성');
   addBtn.appendChild(svIcon(SV_ICON_PLUS));
   addBtn.addEventListener('click', () => openSiteNotesWritePanel(null));
   header.appendChild(addBtn);
   container.appendChild(header);
+
+  const subtitleEl = document.createElement('p');
+  subtitleEl.className = 'sv-mobile-subtitle';
+  subtitleEl.style.padding = '0 16px 12px';
+  subtitleEl.textContent = '현장에서 작성한 메모를 한곳에서 관리합니다.';
+  container.appendChild(subtitleEl);
 
   const searchWrap = document.createElement('div');
   searchWrap.className = 'site-notes-search-wrap';
@@ -2280,25 +2277,6 @@ function buildMobileMoreIcon(name) {
   return svg;
 }
 
-// STEP15-E.6: 회원관리/엑셀업로드/업로드이력/감독일정 패널이 mobile-view-more 위에 전체화면으로
-// 덮일 때, 다시 "더보기" 목록으로 돌아갈 수 있는 닫기(×) 버튼이 없던 패널(admin-panel)에
-// 최소한으로 하나 추가한다. 클릭 시 해당 패널의 표시 여부(style.display)만 되돌릴 뿐,
-// 새 router/history나 별도 상태를 만들지 않는다 — 기존 #btn-supervision-close와 동일한 방식.
-// 사용자 요청: "×" 닫기 대신 앱설정/비밀번호 변경/알림 설정과 같은 "‹ 뒤로가기" 표시로
-// 통일한다. 위치/크기/동작(패널 display만 되돌림)은 그대로 두고 아이콘과 라벨만 바꾼다.
-function buildMobilePanelCloseBtn(panelId) {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'mobile-panel-close-btn';
-  btn.setAttribute('aria-label', '뒤로가기');
-  btn.appendChild(svIcon(SV_ICON_CHEVRON_LEFT));
-  btn.addEventListener('click', () => {
-    const panel = document.getElementById(panelId);
-    if (panel) panel.style.display = 'none';
-  });
-  return btn;
-}
-
 function buildSettingsSubHeader(title) {
   // §4: 새 Header component를 만들지 않고 기존 감독일정 모바일 sub-page 헤더
   // (.sv-mobile-subheader/.sv-mobile-back-btn/.sv-mobile-subheader-title)를 그대로 재사용한다.
@@ -3065,6 +3043,13 @@ function renderAddressSearchResults(query) {
   const container = document.getElementById('site-address-search-results');
   if (!container) return;
   clearTimeout(addressSearchDebounceTimer);
+  // STEP16.32: "현장/업체명" 모드에서는 주소/장소 검색을 아예 실행하지 않는다(등록 사업장
+  // 검색과 결과가 섞여 보이는 것을 막기 위한 명시적 모드 분리).
+  if (state.siteSearchMode !== 'address') {
+    container.innerHTML = '';
+    clearAddressSearchPin();
+    return;
+  }
   const trimmed = (query || '').trim();
   if (trimmed.length < 2) {
     container.innerHTML = '';
@@ -3322,6 +3307,25 @@ export function bindSearchAndSort(containerId) {
 
   const searchInput = document.getElementById('site-search-input');
   const dongFilterEl = document.getElementById('site-dong-filter');
+  const searchModeBtns = Array.from(document.querySelectorAll('.site-search-mode-btn'));
+  const SEARCH_MODE_PLACEHOLDER = {
+    site: '사업장명, 업체명, 주소, 동으로 검색',
+    address: '주소 또는 장소명으로 검색',
+  };
+  // STEP16.32: "현장/업체명" ↔ "주소/장소명" 검색 모드 전환. state.siteSearchMode만 바꾸고
+  // 현재 입력값 그대로 두 렌더 함수(getFilteredSortedSites를 쓰는 renderSiteList,
+  // renderAddressSearchResults)를 다시 호출해 즉시 반영한다(입력값/다른 필터는 유지).
+  searchModeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.mode === 'address' ? 'address' : 'site';
+      if (state.siteSearchMode === mode) return;
+      state.siteSearchMode = mode;
+      searchModeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+      if (searchInput) searchInput.placeholder = SEARCH_MODE_PLACEHOLDER[mode];
+      renderSiteList(containerId);
+      renderAddressSearchResults(searchInput ? searchInput.value : '');
+    });
+  });
   const dongFilterClearBtn = document.getElementById('site-dong-filter-clear');
   const searchClearBtn = document.getElementById('site-search-clear-btn');
   const favoriteFilterBtn = document.getElementById('site-favorite-filter-btn');
@@ -3460,10 +3464,10 @@ export async function renderAdminPanel(containerId) {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
 
-  // STEP15-E.6: 회원관리 패널은 모바일 "더보기" 탭에서 열면 전체화면으로 덮이는데
-  // 기존에는 닫고 돌아갈 버튼이 없었다. 여기서 닫기(×) 버튼을 하나 추가한다 — PC에서는
-  // css/mobile.css 기본값(.mobile-panel-close-btn)이 항상 숨기므로 PC 화면은 그대로다.
-  container.appendChild(buildMobilePanelCloseBtn(containerId));
+  // STEP16.32: 더보기 하위 화면 상단 표시를 앱설정/비밀번호변경 등과 동일한 "‹ 타이틀"
+  // 형식으로 통일한다 — 기존 floating 닫기 버튼(buildMobilePanelCloseBtn) + 별도 브랜드/벨
+  // 헤더 대신, 모바일 전용 래퍼(renderAdminMobileHost의 .admin-mobile-view, PC에서는
+  // css/mobile.css 기본값으로 항상 숨김) 안에 buildSettingsSubHeader를 넣는다.
 
   const msgEl = document.createElement('p');
   msgEl.id = 'admin-message';
@@ -3688,46 +3692,17 @@ function renderAdminMobileHost(host, containerId) {
   const view = document.createElement('div');
   view.className = 'admin-mobile-view';
 
-  // 헤더: 고용노동부 CI + 산업안전 순찰지도 브랜딩(기존 asset 재사용) + 알림 벨.
-  // 벨은 기존 "알림" 하단 탭(activateMobileTab('alert'))으로 실제 이동한다 — 새 알림
-  // 데이터가 없으므로 read/unread 점(dot)은 절대 하드코딩하지 않는다(요청사항 5/31).
-  const header = document.createElement('div');
-  header.className = 'admin-mobile-header';
-  const brand = document.createElement('div');
-  brand.className = 'admin-mobile-brand';
-  const logoImg = document.createElement('img');
-  logoImg.src = 'assets/icons/moel-ci-full.png';
-  logoImg.alt = '고용노동부';
-  brand.appendChild(logoImg);
-  const brandTitle = document.createElement('span');
-  brandTitle.textContent = '산업안전 순찰지도';
-  brand.appendChild(brandTitle);
-  header.appendChild(brand);
-
-  const bellBtn = document.createElement('button');
-  bellBtn.type = 'button';
-  bellBtn.className = 'admin-mobile-bell';
-  bellBtn.setAttribute('aria-label', '알림');
-  bellBtn.appendChild(buildAdminSvg('<path d="M18 16v-5a6 6 0 1 0-12 0v5l-1.5 2.5h15L18 16Z"/><path d="M9.5 20a2.5 2.5 0 0 0 5 0"/>'));
-  bellBtn.addEventListener('click', () => {
+  // STEP16.32: 앱설정/비밀번호변경 등과 동일한 "‹ 회원관리" 상단 표시로 통일한다.
+  const { header: subHeader, backBtn } = buildSettingsSubHeader('회원관리');
+  backBtn.addEventListener('click', () => {
     const panel = document.getElementById(containerId);
     if (panel) panel.style.display = 'none';
-    // STEP16.5 후속: 하단 "알림" 탭 버튼이 제거되어 더 이상 존재하지 않는다(더보기>감독일정관리/
-    // 상단 헤더 벨로 통일). 기존과 동일하게 alert 탭으로 전환하되, 헤더 벨(#mobile-header-alert-btn)
-    // 클릭을 위임해 activateMobileTab('alert')를 그대로 재사용한다(app.js 로직 변경 없음).
-    const headerAlertBtn = document.getElementById('mobile-header-alert-btn');
-    if (headerAlertBtn) headerAlertBtn.click();
   });
-  header.appendChild(bellBtn);
-  view.appendChild(header);
-
-  const title = document.createElement('h2');
-  title.className = 'admin-mobile-title';
-  title.textContent = '회원관리';
-  view.appendChild(title);
+  view.appendChild(subHeader);
 
   const desc = document.createElement('p');
-  desc.className = 'admin-mobile-desc';
+  desc.className = 'sv-mobile-subtitle';
+  desc.style.padding = '0 16px 12px';
   desc.textContent = '산업안전 순찰지도를 이용하는 사용자를 관리합니다.';
   view.appendChild(desc);
 
@@ -3979,6 +3954,17 @@ function openAdminActionSheet(u, currentUserId, listEl, containerId) {
     infoBtn.addEventListener('click', renderInfoView);
     sheet.appendChild(infoBtn);
 
+    // STEP16.32: "회원 권한 부여"(역할 변경)는 마스터관리자에게만 모바일에서도 노출한다.
+    // 자기 자신 행은 서버(gnmap_v2_set_user_role)도 차단하므로 버튼 자체를 보여주지 않는다.
+    if (isMaster() && !isSelf) {
+      const roleBtn = document.createElement('button');
+      roleBtn.type = 'button';
+      roleBtn.className = 'admin-sheet-action';
+      roleBtn.textContent = '회원 권한 변경';
+      roleBtn.addEventListener('click', renderRoleView);
+      sheet.appendChild(roleBtn);
+    }
+
     getAdminActionsForStatus(u.status, isSelf).forEach(action => {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -4036,6 +4022,42 @@ function openAdminActionSheet(u, currentUserId, listEl, containerId) {
     backBtn.className = 'admin-sheet-cancel';
     backBtn.textContent = '닫기';
     backBtn.addEventListener('click', closeSheet);
+    sheet.appendChild(backBtn);
+  }
+
+  // STEP16.32: 모바일에서 역할(사용자/관리자/마스터관리자)을 선택하는 화면. 마스터관리자만
+  // 이 화면에 진입할 수 있고(renderMainMenu에서 노출 여부를 이미 가렸다), 실제 변경 권한은
+  // DB RPC(gnmap_v2_set_user_role, is_gnmap_v2_master() 검증)가 최종적으로 확인한다.
+  function renderRoleView() {
+    sheet.innerHTML = '';
+    const nameEl = document.createElement('div');
+    nameEl.className = 'admin-sheet-name';
+    nameEl.textContent = '회원 권한 변경';
+    sheet.appendChild(nameEl);
+
+    ['user', 'admin', 'master'].forEach(r => {
+      const isCurrent = r === u.role;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'admin-sheet-action';
+      btn.textContent = adminRoleLabel(r) + (isCurrent ? ' (현재)' : '');
+      btn.disabled = isCurrent;
+      btn.addEventListener('click', () => {
+        renderConfirmView({
+          type: 'role',
+          key: r,
+          label: '권한 변경',
+          confirm: `이 회원의 권한을 "${adminRoleLabel(r)}"(으)로 변경하시겠습니까?`,
+        });
+      });
+      sheet.appendChild(btn);
+    });
+
+    const backBtn = document.createElement('button');
+    backBtn.type = 'button';
+    backBtn.className = 'admin-sheet-cancel';
+    backBtn.textContent = '취소';
+    backBtn.addEventListener('click', renderMainMenu);
     sheet.appendChild(backBtn);
   }
 
@@ -4167,6 +4189,19 @@ function openAdminActionSheet(u, currentUserId, listEl, containerId) {
         }
         // 삭제는 전체 카운트가 줄어드는 조치이므로 승인/거절과 동일하게 목록을 다시 그린다
         // (아래 공통 마무리 코드로 흘러가도록 여기서는 return하지 않는다).
+      } else if (action.type === 'role') {
+        const result = await setUserRole(u.id, action.key);
+        state.adminMessage = result.message;
+        if (!result.ok) {
+          loadingMsg.textContent = result.message || '권한 변경에 실패했습니다.';
+          const backBtn = document.createElement('button');
+          backBtn.type = 'button';
+          backBtn.className = 'admin-sheet-cancel';
+          backBtn.textContent = '닫기';
+          backBtn.addEventListener('click', closeSheet);
+          sheet.appendChild(backBtn);
+          return;
+        }
       } else {
         const result = await setUserStatus(u.id, action.key);
         state.adminMessage = result.message;
@@ -4634,25 +4669,24 @@ function renderSupervisionMobileList(view, rows) {
   const selectedDate = getSupervisionMobileSelectedDate();
   const rerender = () => { view.innerHTML = ''; renderSupervisionMobileList(view, rows); };
 
-  const header = document.createElement('div');
-  header.className = 'sv-mobile-header';
-  const titleWrap = document.createElement('div');
-  titleWrap.className = 'sv-mobile-header-titlewrap';
-  const titleEl = document.createElement('h2');
-  titleEl.className = 'sv-mobile-title';
-  titleEl.textContent = '감독일정관리';
-  titleWrap.appendChild(titleEl);
-  const subtitleEl = document.createElement('p');
-  subtitleEl.className = 'sv-mobile-subtitle';
-  subtitleEl.textContent = '예정된 감독 일정을 확인하고 관리합니다.';
-  titleWrap.appendChild(subtitleEl);
-  header.appendChild(titleWrap);
+  // STEP16.32: 앱설정/현장메모 등과 동일한 "‹ 감독일정관리" 상단 표시로 통일한다.
+  // 주의: 이 화면은 "알림" 탭(data-mobile-tab="alert")으로 열리는데, css/mobile.css가 그
+  // 상태에서 #supervision-panel을 display:block !important로 고정해두므로(하단 탭 전환이 곧
+  // 닫기라는 기존 설계), 여기서 style.display만 바꿔서는 실제로 닫히지 않는다. 기존 설계와
+  // 동일하게 "더보기" 하단 탭 버튼 클릭을 위임해 실제로 탭을 벗어나야 한다 — app.js의
+  // activateMobileTab()이 탭 이탈 시 이 패널을 포함해 함께 정리한다(app.js 로직 변경 없음).
+  const { header, backBtn } = buildSettingsSubHeader('감독일정관리');
+  backBtn.addEventListener('click', () => {
+    const moreTabBtn = document.querySelector('.mobile-tab-btn[data-tab="more"]');
+    if (moreTabBtn) moreTabBtn.click();
+  });
 
   // 등록/수정/삭제는 admin만(RLS 최종 방어) — "+" 버튼도 admin에게만 보인다.
   if (isAdmin()) {
     const addBtn = document.createElement('button');
     addBtn.type = 'button';
     addBtn.className = 'sv-mobile-add-btn';
+    addBtn.style.marginLeft = 'auto';
     addBtn.setAttribute('aria-label', '감독일정 등록');
     addBtn.appendChild(svIcon(SV_ICON_PLUS));
     addBtn.addEventListener('click', () => {
@@ -4664,6 +4698,12 @@ function renderSupervisionMobileList(view, rows) {
     header.appendChild(addBtn);
   }
   view.appendChild(header);
+
+  const subtitleEl = document.createElement('p');
+  subtitleEl.className = 'sv-mobile-subtitle';
+  subtitleEl.style.padding = '0 16px 12px';
+  subtitleEl.textContent = '예정된 감독 일정을 확인하고 관리합니다.';
+  view.appendChild(subtitleEl);
 
   const monthBar = document.createElement('div');
   monthBar.className = 'sv-mobile-month-bar';
@@ -5406,40 +5446,6 @@ function formatUploadFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
-function buildUploadMobileHeader() {
-  const header = document.createElement('div');
-  header.className = 'admin-mobile-header';
-
-  const brand = document.createElement('div');
-  brand.className = 'admin-mobile-brand';
-  const logoImg = document.createElement('img');
-  logoImg.src = 'assets/icons/moel-ci-full.png';
-  logoImg.alt = '고용노동부';
-  brand.appendChild(logoImg);
-  const brandTitle = document.createElement('span');
-  brandTitle.textContent = '산업안전 순찰지도';
-  brand.appendChild(brandTitle);
-  header.appendChild(brand);
-
-  const bellBtn = document.createElement('button');
-  bellBtn.type = 'button';
-  bellBtn.className = 'admin-mobile-bell';
-  bellBtn.setAttribute('aria-label', '알림');
-  bellBtn.appendChild(buildAdminSvg('<path d="M18 16v-5a6 6 0 1 0-12 0v5l-1.5 2.5h15L18 16Z"/><path d="M9.5 20a2.5 2.5 0 0 0 5 0"/>'));
-  bellBtn.addEventListener('click', () => {
-    const panel = document.getElementById('upload-panel');
-    if (panel) panel.style.display = 'none';
-    // STEP16.5 후속: 하단 "알림" 탭 버튼이 제거되어 더 이상 존재하지 않는다(더보기>감독일정관리/
-    // 상단 헤더 벨로 통일). 기존과 동일하게 alert 탭으로 전환하되, 헤더 벨(#mobile-header-alert-btn)
-    // 클릭을 위임해 activateMobileTab('alert')를 그대로 재사용한다(app.js 로직 변경 없음).
-    const headerAlertBtn = document.getElementById('mobile-header-alert-btn');
-    if (headerAlertBtn) headerAlertBtn.click();
-  });
-  header.appendChild(bellBtn);
-
-  return header;
-}
-
 // "검증 결과 자세히 보기" 바텀시트 — state.uploadParsedRows 중 VALID가 아닌 행만 나열한다.
 // 기존 admin-sheet 스타일(admin-sheet-overlay/admin-sheet)을 그대로 재사용한다.
 function openUploadDetailSheet() {
@@ -5844,15 +5850,18 @@ export function renderUploadMobileHost() {
   const view = document.createElement('div');
   view.className = 'upload-mobile-view';
 
-  view.appendChild(buildUploadMobileHeader());
-
-  const title = document.createElement('h2');
-  title.className = 'admin-mobile-title';
-  title.textContent = '사업장 데이터 관리';
-  view.appendChild(title);
+  // STEP16.32: 앱설정/비밀번호변경 등과 동일한 "‹ 사업장 데이터 관리" 상단 표시로 통일한다
+  // (기존 브랜드/벨 헤더 + 정적 #btn-upload-close 대신).
+  const { header: subHeader, backBtn } = buildSettingsSubHeader('사업장 데이터 관리');
+  backBtn.addEventListener('click', () => {
+    const panel = document.getElementById('upload-panel');
+    if (panel) panel.style.display = 'none';
+  });
+  view.appendChild(subHeader);
 
   const desc = document.createElement('p');
-  desc.className = 'admin-mobile-desc';
+  desc.className = 'sv-mobile-subtitle';
+  desc.style.padding = '0 16px 12px';
   desc.textContent = '엑셀 파일로 사업장 정보를 업로드하고 이력을 확인합니다.';
   view.appendChild(desc);
 

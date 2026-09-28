@@ -139,7 +139,10 @@ export function getFilteredSortedSites() {
       : state.sites.filter(site => state.favoriteSiteIds.has(site.id));
   }
 
-  const query = (state.searchQuery || '').trim();
+  // STEP16.32: "주소/장소명" 모드에서는 검색어를 등록 사업장 필터링에 쓰지 않는다(그 검색어는
+  // js/ui.js renderAddressSearchResults()의 Kakao 주소/장소 검색 쪽으로만 간다) — 사업장 목록/
+  // 지도 마커는 검색 전과 동일하게(관할/금액 등 다른 필터만 적용된 채) 그대로 유지된다.
+  const query = state.siteSearchMode === 'address' ? '' : (state.searchQuery || '').trim();
 
   let result = state.sites
     .filter(site => matchesQuery(site, query))

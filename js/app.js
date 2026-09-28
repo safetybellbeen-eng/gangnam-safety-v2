@@ -562,15 +562,8 @@ function bindEvents() {
     }
   });
 
-  // STEP15-E.6: upload-panel은 admin-panel과 달리 전체가 매번 다시 그려지지 않으므로
-  // (upload-history/upload-preview만 부분 갱신) 정적 닫기 버튼을 1회만 바인딩한다.
-  // #btn-supervision-close와 동일하게 패널의 표시 여부만 되돌린다(새 상태/로직 없음).
-  const btnUploadClose = document.getElementById('btn-upload-close');
-  if (btnUploadClose) {
-    btnUploadClose.addEventListener('click', () => {
-      document.getElementById('upload-panel').style.display = 'none';
-    });
-  }
+  // STEP16.32: 정적 #btn-upload-close 버튼을 제거했다 — 닫기 동작은 이제 js/ui.js
+  // renderUploadMobileHost가 그리는 buildSettingsSubHeader의 뒤로가기 버튼이 담당한다.
 
   document.getElementById('btn-supervision-panel').addEventListener('click', () => {
     // approved 사용자 전체가 조회 가능(등록/수정/삭제 버튼만 renderSupervisionPanel 내부에서 admin으로 제한).
