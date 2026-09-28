@@ -344,10 +344,18 @@ function renderSiteNotesPanel(containerId) {
   header.className = 'sv-mobile-header';
   const titleWrap = document.createElement('div');
   titleWrap.className = 'sv-mobile-header-titlewrap';
+  const titleRow = document.createElement('div');
+  titleRow.className = 'sv-mobile-title-row';
   const titleEl = document.createElement('h2');
   titleEl.className = 'sv-mobile-title';
   titleEl.textContent = '현장 메모';
-  titleWrap.appendChild(titleEl);
+  titleRow.appendChild(titleEl);
+  const allNotes = getSiteNotesJoined();
+  const titleCountEl = document.createElement('span');
+  titleCountEl.className = 'sv-mobile-title-count';
+  titleCountEl.textContent = `전체 ${allNotes.length}건`;
+  titleRow.appendChild(titleCountEl);
+  titleWrap.appendChild(titleRow);
   const subtitleEl = document.createElement('p');
   subtitleEl.className = 'sv-mobile-subtitle';
   subtitleEl.textContent = '현장에서 작성한 메모를 한곳에서 관리합니다.';
@@ -361,23 +369,6 @@ function renderSiteNotesPanel(containerId) {
   addBtn.addEventListener('click', () => openSiteNotesWritePanel(null));
   header.appendChild(addBtn);
   container.appendChild(header);
-
-  const allNotes = getSiteNotesJoined();
-
-  const summary = document.createElement('div');
-  summary.className = 'site-notes-summary';
-  const summaryLabel = document.createElement('span');
-  summaryLabel.className = 'site-notes-summary-label';
-  summaryLabel.appendChild(svIcon(SV_ICON_DOC));
-  const summaryLabelText = document.createElement('span');
-  summaryLabelText.textContent = '전체 메모';
-  summaryLabel.appendChild(summaryLabelText);
-  summary.appendChild(summaryLabel);
-  const summaryCount = document.createElement('span');
-  summaryCount.className = 'site-notes-summary-count';
-  summaryCount.textContent = `${allNotes.length}건`;
-  summary.appendChild(summaryCount);
-  container.appendChild(summary);
 
   const searchWrap = document.createElement('div');
   searchWrap.className = 'site-notes-search-wrap';
