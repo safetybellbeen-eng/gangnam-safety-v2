@@ -161,9 +161,14 @@ function updateDongCounts(sites) {
     if (!site.dong) return;
     counts.set(site.dong, (counts.get(site.dong) || 0) + 1);
   });
+  // STEP16.34: 사용자 요청 — "현장/업체명" 검색모드에서 검색어를 입력했을 때는, 검색으로
+  // 찾은 현장이 있는 동 이름 옆에 "N개소"를 표시해 어느 동에 결과가 있는지 바로 알 수 있게
+  // 한다(줌 아웃 상태에서 핀이 숨겨져 있어도 라벨만으로 인지 가능). 검색어가 없거나
+  // "주소/장소명" 모드일 때는 기존과 동일하게 동이름만 표시한다.
+  const showSearchCounts = state.siteSearchMode !== 'address' && !!(state.searchQuery || '').trim();
   dongLabelContentByName.forEach((div, name) => {
-    // 사용자 요청: 동이름만 표시(개소수 숨김). counts 집계 자체는 향후 재사용을 위해 그대로 둔다.
-    div.textContent = name;
+    const count = counts.get(name) || 0;
+    div.textContent = (showSearchCounts && count > 0) ? `${name} ${count}개소` : name;
   });
 }
 

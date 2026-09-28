@@ -310,6 +310,9 @@ function routeByProfile() {
 }
 
 async function handleLogout() {
+  // 사용자 요청: 로그아웃 버튼을 눌렀을 때 실수로 로그아웃되지 않도록 한 번 더 확인한다.
+  // 기존 삭제 확인(js/ui.js window.confirm) 패턴과 동일하게 처리한다.
+  if (!window.confirm('정말 로그아웃하시겠습니까?')) return;
   await signOut();
   clearMarkers(); // 지도가 폐기되기 전에 마커를 먼저 정리
   clearCurrentLocationMarker();

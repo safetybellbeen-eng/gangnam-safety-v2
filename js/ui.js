@@ -2960,7 +2960,7 @@ export function renderMobileMoreMenu(containerId) {
   // activateMobileTab('alert'))과 동일한 진입점을 위임하고, 현장 메모는 gnmap_v2_site_notes/
   // notes.js CRUD를 그대로 쓰는 통합 화면을 연다(둘 다 기존 로직 그대로, 그룹 묶음만 변경).
   addMenuCard('점검 관리', [
-    { label: '감독일정관리', icon: 'calendar', onClick: () => document.getElementById('mobile-header-alert-btn').click() },
+    { label: '감독일정 관리', icon: 'calendar', onClick: () => document.getElementById('mobile-header-alert-btn').click() },
     { label: '현장 메모', icon: 'doc', onClick: () => openSiteNotesPanel() },
   ]);
 
@@ -4718,7 +4718,7 @@ function renderSupervisionMobileList(view, rows) {
   // 닫기라는 기존 설계), 여기서 style.display만 바꿔서는 실제로 닫히지 않는다. 기존 설계와
   // 동일하게 "더보기" 하단 탭 버튼 클릭을 위임해 실제로 탭을 벗어나야 한다 — app.js의
   // activateMobileTab()이 탭 이탈 시 이 패널을 포함해 함께 정리한다(app.js 로직 변경 없음).
-  const { header, backBtn } = buildSettingsSubHeader('감독일정관리');
+  const { header, backBtn } = buildSettingsSubHeader('감독일정 관리');
   backBtn.addEventListener('click', () => {
     const moreTabBtn = document.querySelector('.mobile-tab-btn[data-tab="more"]');
     if (moreTabBtn) moreTabBtn.click();
