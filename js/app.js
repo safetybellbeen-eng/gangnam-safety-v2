@@ -6,7 +6,7 @@ import { initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites } fro
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
-import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage } from './ui.js';
+import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView } from './ui.js';
 import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
 
 const VIEWS = [
@@ -83,6 +83,7 @@ function activateMobileTab(tab) {
     if (mobileFavoriteOnlyBackup === null) mobileFavoriteOnlyBackup = state.favoriteOnly;
     state.favoriteOnly = true;
     favoriteOnlyChanged = true;
+    setFavoriteTabView('favorites'); // 사용자 요청: 즐겨찾기 탭에 새로 들어올 때는 항상 "즐겨찾기 현장" 내부 탭부터 시작한다.
   } else if (previousTab === 'favorite' && tab !== 'favorite' && mobileFavoriteOnlyBackup !== null) {
     state.favoriteOnly = mobileFavoriteOnlyBackup;
     mobileFavoriteOnlyBackup = null;
@@ -128,7 +129,12 @@ function activateMobileTab(tab) {
   // 패널 자체의 데이터/렌더 로직(admin.js/import.js/supervision.js)은 전혀 건드리지 않으며,
   // 여기서는 기존 열기/닫기 버튼과 동일하게 표시 여부(inline style)만 되돌린다.
   if ((previousTab === 'alert' || previousTab === 'more') && tab !== previousTab) {
-    ['admin-panel', 'upload-panel', 'supervision-panel', 'account-info-panel', 'app-settings-panel', 'password-change-panel', 'notification-settings-panel'].forEach(id => {
+    // 사용자 요청(즐겨찾기 탭 작업 중 발견): site-notes-panel/site-notes-write-panel이 이
+    // 목록에 빠져 있어, 더보기 탭에서 현장 메모를 열어둔 채 다른 탭으로 이동하면 이 패널이
+    // display:block으로 남아 있었다(더보기 탭 전용 position:fixed 스타일은 data-mobile-tab
+    // 셀렉터라 탭을 벗어나면 더 이상 적용되지 않아, 일반 문서 흐름에 끼어들어 다른 화면
+    // 레이아웃을 방해할 수 있었다). 다른 더보기 패널과 동일하게 여기서 함께 닫는다.
+    ['admin-panel', 'upload-panel', 'supervision-panel', 'account-info-panel', 'app-settings-panel', 'password-change-panel', 'notification-settings-panel', 'site-notes-panel', 'site-notes-write-panel'].forEach(id => {
       const panelEl = document.getElementById(id);
       if (panelEl) panelEl.style.display = 'none';
     });

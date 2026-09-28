@@ -128,6 +128,17 @@ export function getDongOptions() {
 // state.sites를 원본 그대로 두고, 복사본에서 검색 → 관할(동) → 금액 → 점검 → 산재표 →
 // 즐겨찾기 → 정렬을 순서대로 적용해 반환한다. UI/marker는 이 파생 배열만 받아서 렌더한다.
 export function getFilteredSortedSites() {
+  // 사용자 요청: 모바일 "즐겨찾기" 탭은 검색/필터 UI를 전부 없애고, 내부 탭(즐겨찾기 현장/
+  // 메모 있는 현장)에 따른 단순 목록만 보여준다. "현장" 탭에 남아있을 수 있는 검색어나
+  // 필터가 이 탭의 목록에 영향을 주면 안 되므로, 이 탭일 때는 다른 필터를 전혀 적용하지
+  // 않고 favoriteSiteIds 또는 state.siteNotes 기준으로만 거른다(정렬도 적용하지 않음 —
+  // 필터 UI 자체가 없으므로 정렬 선택지도 없다).
+  if (state.mobileActiveTab === 'favorite') {
+    return state.favoriteTabView === 'notes'
+      ? state.sites.filter(site => state.siteNotes.has(site.id))
+      : state.sites.filter(site => state.favoriteSiteIds.has(site.id));
+  }
+
   const query = (state.searchQuery || '').trim();
 
   let result = state.sites

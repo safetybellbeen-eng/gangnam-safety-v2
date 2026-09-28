@@ -416,13 +416,10 @@ function renderSiteNotesPanel(containerId) {
 
   const filterRow = document.createElement('div');
   filterRow.className = 'site-notes-filter-row';
-  // 사용자 요청: 정렬 옵션에 "현장명순"을 추가한다("생성일순"은 기존 "최근 작성"이 이미
-  // created_at 내림차순 정렬을 제공하므로 중복 추가하지 않는다).
   const filters = [
     { value: 'all', label: '전체' },
     { value: 'recent-created', label: '최근 작성' },
     { value: 'recent-updated', label: '최근 수정' },
-    { value: 'name', label: '현장명순' },
   ];
   filters.forEach(f => {
     const chip = document.createElement('button');
@@ -457,13 +454,6 @@ function renderSiteNotesPanel(containerId) {
 
     if (state.siteNotesFilter === 'recent-created') {
       rows = rows.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    } else if (state.siteNotesFilter === 'name') {
-      // 현장명순(가나다순). site_name이 없는 경우 company_name으로 대체(카드 표시 기준과 동일).
-      rows = rows.slice().sort((a, b) => {
-        const nameA = a.site.site_name || a.site.company_name || '';
-        const nameB = b.site.site_name || b.site.company_name || '';
-        return nameA.localeCompare(nameB, 'ko');
-      });
     } else {
       // '전체'/'최근 수정' 모두 최신 수정순 — "전체"의 기본 정렬 기준으로도 자연스럽다.
       rows = rows.slice().sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
@@ -686,12 +676,25 @@ function renderSiteNotesWritePanel(containerId) {
   const counter = document.createElement('div');
   counter.className = 'site-notes-char-counter';
   counter.textContent = `${textarea.value.length} / 1000`;
+  // 사용자 요청: 메모 칸을 자유양식 노트처럼 크게 쓰고 싶다 — 자체 내부 스크롤(고정 높이
+  // textarea)이 아니라, 입력 내용에 맞춰 textarea 자체가 늘어나고 이 화면(#site-notes-write-panel,
+  // 이미 overflow-y:auto) 전체가 스크롤되게 한다. 새 라이브러리 없이 input마다 scrollHeight로
+  // 높이를 다시 맞추기만 한다.
+  function autoGrowNoteTextarea() {
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }
   textarea.addEventListener('input', () => {
     counter.textContent = `${textarea.value.length} / 1000`;
     updateSaveBtnState();
+    autoGrowNoteTextarea();
   });
   noteField.appendChild(counter);
   form.appendChild(noteField);
+  // 프리필된 기존 메모 내용 기준으로도 처음부터 높이를 맞춘다(DOM에 붙은 뒤 실제
+  // scrollHeight를 읽어야 하므로 이 화면을 표시(display:block)한 다음 실행되는
+  // renderSiteNotesWritePanel 호출 흐름상 다음 프레임에 맞춘다).
+  requestAnimationFrame(autoGrowNoteTextarea);
 
   container.appendChild(form);
 
@@ -883,7 +886,7 @@ export function selectSite(siteId) {
 // 동일한 라인형 별 SVG(index.html의 것과 동일 path)를 재사용해 디자인 언어를 통일한다.
 // "현장 둘러보기" 버튼은 새 탭 전환 로직을 만들지 않고, 기존 하단 네비게이션의 "현장" 버튼을
 // 그대로 클릭 위임해 app.js의 activateMobileTab 바인딩을 재사용한다.
-function buildFavoriteEmptyState(container) {
+function buildFavoriteEmptyState(container, mode) {
   const empty = document.createElement('div');
   empty.className = 'mobile-favorite-empty';
 
@@ -898,25 +901,39 @@ function buildFavoriteEmptyState(container) {
   svg.setAttribute('stroke-linejoin', 'round');
   svg.setAttribute('aria-hidden', 'true');
   const path = document.createElementNS(svgNS, 'path');
-  path.setAttribute('d', 'm12 3 2.5 5.6 6.1.6-4.6 4.1 1.3 6L12 16.3 6.7 19.3l1.3-6-4.6-4.1 6.1-.6L12 3Z');
+  // 사용자 요청: "메모 있는 현장" 내부 탭은 별 아이콘 대신 문서 아이콘으로 구분한다.
+  path.setAttribute('d', mode === 'notes'
+    ? 'M7 3.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19V5A1.5 1.5 0 0 1 7 3.5Z'
+    : 'm12 3 2.5 5.6 6.1.6-4.6 4.1 1.3 6L12 16.3 6.7 19.3l1.3-6-4.6-4.1 6.1-.6L12 3Z');
   svg.appendChild(path);
 
   const title = document.createElement('p');
   title.className = 'mobile-favorite-empty-title';
-  title.textContent = '즐겨찾기한 현장이 없습니다';
+  title.textContent = mode === 'notes' ? '메모가 있는 현장이 없습니다' : '즐겨찾기한 현장이 없습니다';
 
   const desc = document.createElement('p');
   desc.className = 'mobile-favorite-empty-desc';
-  desc.textContent = '자주 확인하는 현장을 즐겨찾기에 추가하면 여기에서 빠르게 확인할 수 있습니다.';
+  desc.textContent = mode === 'notes'
+    ? '현장에서 메모를 작성하면 여기에서 모아볼 수 있습니다.'
+    : '자주 확인하는 현장을 즐겨찾기에 추가하면 여기에서 빠르게 확인할 수 있습니다.';
 
   const goBtn = document.createElement('button');
   goBtn.type = 'button';
   goBtn.className = 'mobile-favorite-empty-btn';
-  goBtn.textContent = '현장 둘러보기';
-  goBtn.addEventListener('click', () => {
-    const siteTabBtn = document.querySelector('.mobile-tab-btn[data-tab="site"]');
-    if (siteTabBtn) siteTabBtn.click();
-  });
+  if (mode === 'notes') {
+    goBtn.textContent = '현장 메모 작성';
+    goBtn.addEventListener('click', () => {
+      const moreTabBtn = document.querySelector('.mobile-tab-btn[data-tab="more"]');
+      if (moreTabBtn) moreTabBtn.click();
+      openSiteNotesPanel();
+    });
+  } else {
+    goBtn.textContent = '현장 둘러보기';
+    goBtn.addEventListener('click', () => {
+      const siteTabBtn = document.querySelector('.mobile-tab-btn[data-tab="site"]');
+      if (siteTabBtn) siteTabBtn.click();
+    });
+  }
 
   empty.appendChild(svg);
   empty.appendChild(title);
@@ -941,7 +958,7 @@ export function renderSiteList(containerId) {
     // app.js의 activateMobileTab이 관리)에서 0건일 때만 전용 empty state를 보여준다.
     // PC의 "즐겨찾기만 보기" 필터나 현장 탭의 일반 검색 결과 0건은 기존 문구를 그대로 유지한다.
     if (state.favoriteOnly && state.mobileActiveTab === 'favorite') {
-      buildFavoriteEmptyState(container);
+      buildFavoriteEmptyState(container, state.favoriteTabView === 'notes' ? 'notes' : 'favorites');
     } else {
       const empty = document.createElement('p');
       empty.textContent = '표시할 사업장이 없습니다.';
@@ -3179,6 +3196,17 @@ export function renderDongOptions() {
   updateDongFilterLabel();
 }
 
+// 사용자 요청: 모바일 "즐겨찾기" 탭 내부 탭(즐겨찾기 현장/메모 있는 현장) 전환 — state 값과
+// 버튼 활성 표시(.active)를 함께 맞춘다. app.js의 activateMobileTab(탭 진입 시 'favorites'로
+// 초기화)과 아래 bindSearchAndSort(버튼 클릭 시 전환)가 공통으로 재사용한다.
+export function setFavoriteTabView(view) {
+  state.favoriteTabView = view;
+  const favBtn = document.getElementById('favorite-subtab-favorites');
+  const notesBtn = document.getElementById('favorite-subtab-notes');
+  if (favBtn) favBtn.classList.toggle('active', view !== 'notes');
+  if (notesBtn) notesBtn.classList.toggle('active', view === 'notes');
+}
+
 // 검색 input/관할(다중선택)/금액/정렬/점검/산재표/즐겨찾기 이벤트를 1회만 바인딩한다
 // (중복 등록 방지 플래그). 검색은 200ms debounce, 나머지는 즉시 반영. 모두 state 값만
 // 갱신하고 렌더는 renderSiteList가 담당한다.
@@ -3191,6 +3219,22 @@ export function bindSearchAndSort(containerId) {
   const dongFilterClearBtn = document.getElementById('site-dong-filter-clear');
   const searchClearBtn = document.getElementById('site-search-clear-btn');
   const favoriteFilterBtn = document.getElementById('site-favorite-filter-btn');
+  const favSubtabFavoritesBtn = document.getElementById('favorite-subtab-favorites');
+  const favSubtabNotesBtn = document.getElementById('favorite-subtab-notes');
+
+  setFavoriteTabView(state.favoriteTabView); // 최초 바인딩 시 버튼 활성 표시를 현재 state에 맞춘다.
+  if (favSubtabFavoritesBtn) {
+    favSubtabFavoritesBtn.addEventListener('click', () => {
+      setFavoriteTabView('favorites');
+      renderSiteList(containerId);
+    });
+  }
+  if (favSubtabNotesBtn) {
+    favSubtabNotesBtn.addEventListener('click', () => {
+      setFavoriteTabView('notes');
+      renderSiteList(containerId);
+    });
+  }
 
   searchInput.addEventListener('input', () => {
     if (searchClearBtn) searchClearBtn.style.display = searchInput.value ? 'inline-block' : 'none';

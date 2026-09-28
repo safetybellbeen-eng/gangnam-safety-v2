@@ -59,6 +59,7 @@ export const state = {
   supervisions: [],                   // STEP14. gnmap_v2_supervisions 목록 (사업장 연결 없음, 캠페인 단위 상황판)
   supervisionFilter: 'all',           // STEP14. 감독일정 패널 상태 필터: 'all' | 'scheduled' | 'ongoing' | 'done' (프론트 표시만, DB/RLS 무관)
   favoriteOnly: false,                // STEP14.5-B. "즐겨찾기만 보기" 토글 — true면 getFilteredSortedSites가 favoriteSiteIds에 있는 사업장만 반환
+  favoriteTabView: 'favorites',       // 사용자 요청: 모바일 "즐겨찾기" 탭 내부 탭 — 'favorites'(즐겨찾기 현장) | 'notes'(메모 있는 현장). 탭 진입 시 항상 'favorites'로 초기화.
   // 사용자 요청: 상단 필터에서 "확인필요" 토글/카운트를 제거하면서 reviewOnly도 함께 제거했다
   // (더 이상 화면 어디에서도 트리거되지 않음). location_quality 값 자체나 목록 카드의
   // "위치확인필요" 배지(site-list-review-badge)는 이 필터와 무관하게 그대로 유지된다.
