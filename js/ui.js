@@ -3298,6 +3298,32 @@ export function setFavoriteTabView(view) {
   if (notesBtn) notesBtn.classList.toggle('active', view === 'notes');
 }
 
+const SEARCH_MODE_PLACEHOLDER = {
+  site: '사업장명, 업체명, 주소, 동으로 검색',
+  address: '주소 또는 장소명으로 검색',
+};
+
+// STEP16.33: "현장/업체명" ↔ "주소/장소명" 검색 모드 전환을 한 곳에서 처리한다. 사용자가
+// #site-search-mode-filter 드롭다운에서 고를 때뿐 아니라, "현장" 탭에 들어올 때 강제로
+// "현장/업체명"으로 되돌리는 경우(js/app.js activateMobileTab)에도 이 함수만 호출하면 된다.
+// 겉표시 pill 라벨은 사용자 요청대로 선택값과 무관하게 항상 "검색모드"로 고정한다(다른
+// 필터처럼 선택값 텍스트로 바뀌지 않음) — dataset.active만 기본값(현장/업체명)이 아닐 때 켠다.
+export function setSiteSearchMode(mode, containerId = 'site-list') {
+  const normalized = mode === 'address' ? 'address' : 'site';
+  if (state.siteSearchMode === normalized) return;
+  state.siteSearchMode = normalized;
+
+  const detailsEl = document.getElementById('site-search-mode-filter');
+  if (detailsEl) {
+    detailsEl.dataset.active = String(normalized !== 'site');
+    detailsEl.querySelectorAll('input[type="radio"]').forEach(r => { r.checked = r.value === normalized; });
+  }
+  const searchInput = document.getElementById('site-search-input');
+  if (searchInput) searchInput.placeholder = SEARCH_MODE_PLACEHOLDER[normalized];
+  renderSiteList(containerId);
+  renderAddressSearchResults(searchInput ? searchInput.value : '');
+}
+
 // 검색 input/관할(다중선택)/금액/정렬/점검/산재표/즐겨찾기 이벤트를 1회만 바인딩한다
 // (중복 등록 방지 플래그). 검색은 200ms debounce, 나머지는 즉시 반영. 모두 state 값만
 // 갱신하고 렌더는 renderSiteList가 담당한다.
@@ -3307,25 +3333,42 @@ export function bindSearchAndSort(containerId) {
 
   const searchInput = document.getElementById('site-search-input');
   const dongFilterEl = document.getElementById('site-dong-filter');
-  const searchModeBtns = Array.from(document.querySelectorAll('.site-search-mode-btn'));
-  const SEARCH_MODE_PLACEHOLDER = {
-    site: '사업장명, 업체명, 주소, 동으로 검색',
-    address: '주소 또는 장소명으로 검색',
-  };
-  // STEP16.32: "현장/업체명" ↔ "주소/장소명" 검색 모드 전환. state.siteSearchMode만 바꾸고
-  // 현재 입력값 그대로 두 렌더 함수(getFilteredSortedSites를 쓰는 renderSiteList,
-  // renderAddressSearchResults)를 다시 호출해 즉시 반영한다(입력값/다른 필터는 유지).
-  searchModeBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const mode = btn.dataset.mode === 'address' ? 'address' : 'site';
-      if (state.siteSearchMode === mode) return;
-      state.siteSearchMode = mode;
-      searchModeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
-      if (searchInput) searchInput.placeholder = SEARCH_MODE_PLACEHOLDER[mode];
-      renderSiteList(containerId);
-      renderAddressSearchResults(searchInput ? searchInput.value : '');
+
+  // STEP16.33: 검색모드 드롭다운 — 관할/공사금액 등과 같은 <details> pill이지만, 라벨은
+  // 선택값과 무관하게 항상 "검색모드"로 고정되고(bindRadioFilterDetails 미사용 이유), 값이
+  // 바뀌면 검색창 placeholder/등록 사업장 목록/주소 검색 결과를 함께 갱신해야 해 setSiteSearchMode()를
+  // 직접 호출한다.
+  const searchModeDetailsEl = document.getElementById('site-search-mode-filter');
+  const searchModeLabelEl = document.getElementById('site-search-mode-filter-label');
+  if (searchModeDetailsEl && searchModeLabelEl) {
+    searchModeDetailsEl.dataset.active = String(state.siteSearchMode === 'address');
+    searchModeLabelEl.addEventListener('click', (e) => {
+      e.preventDefault();
+      searchModeDetailsEl.open = !searchModeDetailsEl.open;
     });
-  });
+    searchModeDetailsEl.querySelectorAll('input[type="radio"]').forEach(radio => {
+      radio.checked = radio.value === (state.siteSearchMode === 'address' ? 'address' : 'site');
+      radio.addEventListener('change', () => {
+        if (!radio.checked) return;
+        setSiteSearchMode(radio.value, containerId);
+        searchModeDetailsEl.open = false;
+      });
+    });
+    document.addEventListener('click', (e) => {
+      if (searchModeDetailsEl.open && !searchModeDetailsEl.contains(e.target)) {
+        searchModeDetailsEl.open = false;
+      }
+    });
+    const searchModePanel = document.getElementById('site-search-mode-filter-panel');
+    if (searchModePanel) {
+      searchModeDetailsEl.addEventListener('toggle', () => {
+        if (!searchModeDetailsEl.open) return;
+        const rect = searchModeDetailsEl.getBoundingClientRect();
+        searchModePanel.style.top = `${Math.round(rect.bottom + 6)}px`;
+        searchModePanel.style.left = `${Math.round(rect.left)}px`;
+      });
+    }
+  }
   const dongFilterClearBtn = document.getElementById('site-dong-filter-clear');
   const searchClearBtn = document.getElementById('site-search-clear-btn');
   const favoriteFilterBtn = document.getElementById('site-favorite-filter-btn');

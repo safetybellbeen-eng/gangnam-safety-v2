@@ -6,7 +6,7 @@ import { initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites, rend
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
-import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView, renderHeaderUploadDate } from './ui.js';
+import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView, renderHeaderUploadDate, setSiteSearchMode } from './ui.js';
 import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
 
 const VIEWS = [
@@ -93,6 +93,14 @@ function activateMobileTab(tab) {
     const favBtn = document.getElementById('site-favorite-filter-btn');
     if (favBtn) favBtn.classList.toggle('active', state.favoriteOnly);
     renderSiteList('site-list'); // 검색/동/금액 등 다른 필터 state는 그대로 유지한 채 재렌더만 한다.
+  }
+
+  // STEP16.33: 사용자 요청 — "현장" 탭은 검색모드 컨트롤 자체가 없고(css/mobile.css가 숨김)
+  // 항상 등록된 사업장(현장/업체명/주소)만 검색되어야 한다. 지도 탭에서 "주소/장소명" 모드로
+  // 전환해 두었더라도 현장 탭에 들어오면 항상 "현장/업체명"으로 되돌린다(이미 그 모드면
+  // setSiteSearchMode 내부에서 아무 것도 하지 않는다).
+  if (tab === 'site') {
+    setSiteSearchMode('site', 'site-list');
   }
 
   // 지도 탭으로 복귀(또는 최초 진입) 시, display:none 상태였던 동안 틀어진 지도 크기를 보정한다(재초기화 아님).
