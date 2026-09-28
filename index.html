@@ -329,7 +329,19 @@
         <li>입력하신 정보는 계정 관리 목적으로만 사용됩니다.</li>
       </ul>
     </div>
-    <button type="button" id="show-login">로그인으로 돌아가기</button>
+    <!-- Desktop Auth Stage 후속 수정: #show-login은 #mobile-signup-card 밖의 형제 요소라
+         #view-signup을 flex stage로 만들면서 의도치 않게 Hero보다 앞선 flex item(기본
+         order:0)이 되어 화면 좌측에 어중간하게 걸쳐 보이는 문제가 있었다. desktop.css에서
+         position:fixed로 완전히 분리해 상단바(.pc-auth-topbar, 좌상단)와 대칭되는
+         우상단에 항상 고정 노출되는 "로그인으로 돌아가기" 링크로 만든다(회원가입 화면에서
+         빠져나갈 방법이 없다는 문제 해결). 아이콘은 기존 #mobile-signup-back과 동일한
+         화살표를 재사용한다. -->
+    <button type="button" id="show-login">
+      <span class="mobile-icon-svg-wrap" aria-hidden="true">
+        <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </span>
+      로그인으로 돌아가기
+    </button>
   </section>
 
   <section id="view-signup-done" style="display:none">
