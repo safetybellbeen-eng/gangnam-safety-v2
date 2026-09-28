@@ -102,6 +102,7 @@
 .address-search-result-item {
   padding: 10px 12px;
   border-bottom: 1px solid #eee;
+  cursor: pointer;
 }
 .address-search-result-name {
   font-weight: bold;
