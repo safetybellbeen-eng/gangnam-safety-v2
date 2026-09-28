@@ -2,10 +2,10 @@
 // XSS 방지: DB 값(site_name/company_name/address 등)은 innerHTML 문자열 조립에 쓰지 않고
 // 전부 textContent 또는 createElement 기반 DOM 생성으로만 넣는다.
 import { state } from './state.js';
-import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight, refreshFavoriteMarker, initRouteMap, relayoutRouteMap, renderRouteMarkers, panToRouteSite, searchPlacesKeyword, showAddressSearchPin, clearAddressSearchPin } from './map.js';
+import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight, refreshFavoriteMarker, initRouteMap, relayoutRouteMap, renderRouteMarkers, panToRouteSite, searchPlacesKeyword, showAddressSearchPin, clearAddressSearchPin, assignDongToSites } from './map.js';
 import { getFilteredSortedSites, getDongOptions, loadActiveSites } from './sites.js';
-import { isFavorite, toggleFavorite } from './favorites.js';
-import { getNote, saveNote, deleteNote } from './notes.js';
+import { isFavorite, toggleFavorite, loadFavorites } from './favorites.js';
+import { getNote, saveNote, deleteNote, loadNotes } from './notes.js';
 import { loadUsers, setUserStatus, setUserRole, resetUserPassword, deleteRejectedProfile } from './admin.js';
 import { parseExcelFile } from './excel.js';
 import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, buildLotQueries, runJusoNormalize, buildJusoQuery, runKakaoJusoRecovery, runRoadApproximateRecovery, extractApproximateStructure, reverseGeocode, geocodeKeyword } from './geocoding.js';
@@ -115,7 +115,7 @@ async function handleFavoriteToggle(siteId, triggerBtn) {
   const success = await toggleFavorite(siteId);
 
   if (triggerBtn) triggerBtn.disabled = false;
-  if (!success) return; // 실패 시 기존 state/표시 그대로 유지
+  if (!success) { showToast('즐겨찾기 처리에 실패했습니다. 다시 시도해주세요.'); return; } // 실패 시 기존 state/표시 그대로 유지
 
   const nowFavorite = isFavorite(siteId);
   // STEP16.19: 지도 위 해당 사업장 마커도 즉시 별표 배지 상태로 갱신한다(전체 재렌더 없이).
@@ -187,6 +187,10 @@ function renderNoteSection(panel, siteId) {
         // 저장(또는 빈 값이라 삭제로 위임된 경우 모두) 성공 시 최신 state 기준으로 textarea만 갱신, 화면은 유지.
         const updated = getNote(siteId);
         textarea.value = updated ? updated.content : '';
+        showToast('메모가 저장되었습니다.', 'success');
+      } else {
+        // U1(STEP16.35): 이전에는 실패해도 아무 표시가 없어 사용자가 저장 여부를 알 수 없었다.
+        showToast('메모 저장에 실패했습니다. 다시 시도해주세요.');
       }
     } finally {
       state.noteInFlight.delete(siteId);
@@ -208,6 +212,9 @@ function renderNoteSection(panel, siteId) {
       const success = await deleteNote(siteId);
       if (success) {
         textarea.value = '';
+      } else {
+        // U1(STEP16.35): 이전에는 실패해도 아무 표시가 없었다.
+        showToast('메모 삭제에 실패했습니다. 다시 시도해주세요.');
       }
     } finally {
       state.noteInFlight.delete(siteId);
@@ -734,15 +741,17 @@ function renderSiteNotesWritePanel(containerId) {
     try {
       const success = await saveNote(siteId, textarea.value);
       if (success) {
-        window.alert('메모가 저장되었습니다.');
+        // U1(STEP16.35): 저장 확인을 막는 alert() 팝업 대신, 목록으로 돌아간 뒤에도 잠시
+        // 보이는 토스트로 바꾼다(닫기 버튼을 눌러야 하는 번거로움이 없어짐).
         closeSiteNotesWritePanel();
+        showToast('메모가 저장되었습니다.', 'success');
       } else {
-        window.alert('메모 저장에 실패했습니다. 다시 시도해주세요.');
+        showToast('메모 저장에 실패했습니다. 다시 시도해주세요.');
         saveBtn.disabled = false;
       }
     } catch (err) {
       console.error('현장 메모 저장 실패:', err);
-      window.alert('메모 저장에 실패했습니다. 다시 시도해주세요.');
+      showToast('메모 저장에 실패했습니다. 다시 시도해주세요.');
       saveBtn.disabled = false;
     }
   });
@@ -765,8 +774,14 @@ function renderSiteNotesWritePanel(containerId) {
       deleteBtn.disabled = true;
       try {
         const success = await deleteNote(siteId);
-        if (success) closeSiteNotesWritePanel();
-        else deleteBtn.disabled = false;
+        if (success) {
+          closeSiteNotesWritePanel();
+          showToast('메모가 삭제되었습니다.', 'success');
+        } else {
+          // U1(STEP16.35): 이전에는 실패해도 아무 표시가 없었다.
+          showToast('메모 삭제에 실패했습니다. 다시 시도해주세요.');
+          deleteBtn.disabled = false;
+        }
       } finally {
         state.noteInFlight.delete(siteId);
       }
@@ -930,6 +945,52 @@ function buildFavoriteEmptyState(container, mode) {
   container.appendChild(empty);
 }
 
+// U1(STEP16.35): 화면마다 제각각이던 저장/오류 안내(팝업 alert(), 조용한 실패로 아무 표시도
+// 없는 경우)를 하나의 토스트로 통일한다. index.html에 마크업을 추가하지 않고 필요할 때
+// document.body에 직접 붙였다가(최초 1회만 생성, 이후 재사용) 잠시 뒤 스스로 사라진다.
+// 폼 유효성 검사 메시지(빈 값 등, 필드 바로 옆 errorEl)처럼 이미 잘 동작하는 화면별 인라인
+// 안내는 그대로 두고, "성공/실패를 전혀 알려주지 않던 곳"과 "alert() 팝업을 쓰던 곳"만
+// 이 토스트로 옮긴다.
+let toastHideTimer = null;
+export function showToast(message, type = 'error') {
+  let toast = document.getElementById('gnmap-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'gnmap-toast';
+    document.body.appendChild(toast);
+  }
+  clearTimeout(toastHideTimer);
+  toast.textContent = message;
+  toast.className = `gnmap-toast-${type}`; // 아래 setTimeout에서 gnmap-toast-visible을 더한다.
+  // 브라우저가 클래스 제거→추가를 한 프레임에 합쳐버려 전환(transition)이 생략되지 않도록
+  // 강제로 한 프레임 띄운다(연속으로 토스트가 뜰 때도 항상 다시 나타나는 것처럼 보이게 함).
+  toast.classList.remove('gnmap-toast-visible');
+  requestAnimationFrame(() => { requestAnimationFrame(() => toast.classList.add('gnmap-toast-visible')); });
+  toastHideTimer = setTimeout(() => {
+    toast.classList.remove('gnmap-toast-visible');
+  }, 2600);
+}
+
+// F2(STEP16.35): "조회 실패"를 "0건"과 구분해서 보여주는 공용 컴포넌트. admin.js 회원목록에
+// 이미 있던 문구+"다시 시도" 버튼 패턴을 사업장/감독일정 목록에도 동일하게 재사용한다.
+// PC/모바일 공용 컨테이너(#site-list 등)에서도 그대로 동작하도록 특정 화면 전용 클래스는
+// 쓰지 않고 최소한의 마크업만 만든다.
+function buildLoadErrorState(container, message, onRetry) {
+  const wrap = document.createElement('div');
+  wrap.className = 'load-error-state';
+  const msg = document.createElement('p');
+  msg.className = 'load-error-state-msg';
+  msg.textContent = message;
+  wrap.appendChild(msg);
+  const retryBtn = document.createElement('button');
+  retryBtn.type = 'button';
+  retryBtn.className = 'load-error-state-retry-btn';
+  retryBtn.textContent = '다시 시도';
+  retryBtn.addEventListener('click', onRetry);
+  wrap.appendChild(retryBtn);
+  container.appendChild(wrap);
+}
+
 // 목록 전체를 다시 그린다. 매번 새 DOM을 생성하므로 이전 렌더의 이벤트가 남아 누적되지 않는다.
 // 검색/정렬이 적용된 파생 배열(getFilteredSortedSites)만 받아서 렌더한다 — state.sites 원본은 건드리지 않는다.
 export function renderSiteList(containerId) {
@@ -942,11 +1003,30 @@ export function renderSiteList(containerId) {
   // (해당 DOM 자체를 index.html에서 제거 — 여기서는 더 이상 채울 대상이 없다).
 
   if (!visibleSites || visibleSites.length === 0) {
-    // STEP15-E.4: 모바일 즐겨찾기 탭(state.favoriteOnly가 그 탭 진입 시에만 true가 되도록
-    // app.js의 activateMobileTab이 관리)에서 0건일 때만 전용 empty state를 보여준다.
-    // PC의 "즐겨찾기만 보기" 필터나 현장 탭의 일반 검색 결과 0건은 기존 문구를 그대로 유지한다.
-    if (state.favoriteOnly && state.mobileActiveTab === 'favorite') {
-      buildFavoriteEmptyState(container, state.favoriteTabView === 'notes' ? 'notes' : 'favorites');
+    // F2(STEP16.35): 조회 자체가 실패했을 때(state.sitesLoadError)는 "등록된 사업장이 없다"는
+    // 기존 문구 대신 오류 상태를 명확히 보여준다 — 그렇지 않으면 네트워크 오류로 목록이 비어도
+    // 사용자에게는 실제로 사업장이 하나도 없는 것처럼 보인다.
+    const favMode = state.favoriteTabView === 'notes' ? 'notes' : 'favorites';
+    const isFavoriteTab = state.favoriteOnly && state.mobileActiveTab === 'favorite';
+    const favModeLoadError = favMode === 'notes' ? state.notesLoadError : state.favoritesLoadError;
+
+    if (state.sitesLoadError) {
+      buildLoadErrorState(container, '사업장 정보를 불러오지 못했습니다.', async () => {
+        state.sites = await loadActiveSites();
+        await assignDongToSites(state.sites);
+        renderDongOptions();
+        renderSiteList(containerId);
+      });
+    } else if (isFavoriteTab && favModeLoadError) {
+      buildLoadErrorState(container, favMode === 'notes' ? '메모 정보를 불러오지 못했습니다.' : '즐겨찾기 정보를 불러오지 못했습니다.', async () => {
+        if (favMode === 'notes') { await loadNotes(); } else { await loadFavorites(); }
+        renderSiteList(containerId);
+      });
+    } else if (isFavoriteTab) {
+      // STEP15-E.4: 모바일 즐겨찾기 탭(state.favoriteOnly가 그 탭 진입 시에만 true가 되도록
+      // app.js의 activateMobileTab이 관리)에서 0건일 때만 전용 empty state를 보여준다.
+      // PC의 "즐겨찾기만 보기" 필터나 현장 탭의 일반 검색 결과 0건은 기존 문구를 그대로 유지한다.
+      buildFavoriteEmptyState(container, favMode);
     } else {
       const empty = document.createElement('p');
       empty.textContent = '표시할 사업장이 없습니다.';
@@ -2742,6 +2822,17 @@ export function renderNotificationSettingsPanel(containerId) {
   subtitle.textContent = '필요한 업무 알림을 설정합니다.';
   container.appendChild(subtitle);
 
+  // F1(STEP16.35): 위 주석대로 실제 푸시 발송 인프라가 없어 아래 토글은 설정값 저장까지만
+  // 한다. 이 사실을 화면에서 안내하지 않으면 사용자가 "설정했으니 알림이 올 것"으로 오해할
+  // 수 있어, 비밀번호 변경 화면과 동일한 안내 카드 컴포넌트로 명확히 표시한다.
+  const pushNoticeCard = document.createElement('div');
+  pushNoticeCard.className = 'settings-notice-card';
+  pushNoticeCard.appendChild(buildMobileMoreIcon('info'));
+  const pushNoticeText = document.createElement('span');
+  pushNoticeText.textContent = '아래 설정은 이 기기에만 저장되며, 실제 알림 발송 기능은 아직 준비 중입니다.';
+  pushNoticeCard.appendChild(pushNoticeText);
+  container.appendChild(pushNoticeCard);
+
   const settings = loadNotificationSettings();
   const admin = isAdmin();
 
@@ -4387,9 +4478,15 @@ export async function renderSupervisionPanel(containerId) {
   listWrap.appendChild(listEl);
 
   if (rows.length === 0) {
-    const empty = document.createElement('p');
-    empty.textContent = '등록된 감독일정이 없습니다.';
-    listEl.appendChild(empty);
+    // F2(STEP16.35): 조회 자체가 실패했을 때는 "등록된 감독일정이 없다"는 문구 대신
+    // 오류 상태 + 다시 시도 버튼을 보여준다.
+    if (state.supervisionsLoadError) {
+      buildLoadErrorState(listEl, '감독일정 정보를 불러오지 못했습니다.', () => renderSupervisionPanel(containerId));
+    } else {
+      const empty = document.createElement('p');
+      empty.textContent = '등록된 감독일정이 없습니다.';
+      listEl.appendChild(empty);
+    }
     return;
   }
 
@@ -4747,6 +4844,13 @@ function renderSupervisionMobileList(view, rows) {
   subtitleEl.style.padding = '0 16px 12px';
   subtitleEl.textContent = '예정된 감독 일정을 확인하고 관리합니다.';
   view.appendChild(subtitleEl);
+
+  // F2(STEP16.35): 조회 자체가 실패했을 때는 달력 자체를 그리지 않고(날짜별 "일정 없음"과
+  // 뒤섞이면 매일 오류 문구가 뜨는 것처럼 보일 수 있음) 상단에 오류 상태만 보여준다.
+  if (state.supervisionsLoadError) {
+    buildLoadErrorState(view, '감독일정 정보를 불러오지 못했습니다.', () => renderSupervisionMobileHost());
+    return;
+  }
 
   const monthBar = document.createElement('div');
   monthBar.className = 'sv-mobile-month-bar';

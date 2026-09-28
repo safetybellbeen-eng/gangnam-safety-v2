@@ -1,6 +1,7 @@
 // app.js — STEP 3B. 인증 흐름 최소 테스트 UI 연결.
 // 지도/사업장 등 실제 기능은 이후 STEP에서 추가한다 (CLAUDE.md 12절: 대규모 UI 금지).
 import { state } from './state.js';
+import { sb } from './api.js';
 import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, verifySignupCode, checkIdExists, checkLoginLock, translateAuthError } from './auth.js';
 import { initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites, renderHqMarker } from './map.js';
 import { loadActiveSites } from './sites.js';
@@ -22,6 +23,11 @@ const AUTO_LOGIN_KEY = 'gnmap_v2_auto_login';
 // STEP15-B. 모바일 "즐겨찾기" 탭에 들어가기 직전의 state.favoriteOnly 값을 임시 보관한다.
 // (탭을 벗어나면 사용자가 PC/모바일 공용 즐겨찾기 토글로 실제 선택해둔 값으로 복원 — 다른 필터는 건드리지 않는다.)
 let mobileFavoriteOnlyBackup = null;
+
+// S2(STEP16.35, 세션 만료 감지): handleLogout()이 직접 signOut()을 호출할 때는 아래 전역
+// onAuthStateChange 리스너가 "세션 만료"로 오인해 중복 처리(경고창 등)하지 않도록 표시해두는
+// 플래그. true로 표시한 뒤 곧바로 signOut()을 호출하고, 리스너 쪽에서 한 번 소비하고 원복한다.
+let manualSignOut = false;
 
 // STEP16.8(잠금 카운트다운). 로그인/회원가입 인증번호 잠금 메시지에 공통으로 쓰는 실시간
 // mm:ss 카운트다운. 같은 엘리먼트에 중복으로 걸리지 않도록 이전 타이머를 추적해 정리한다.
@@ -309,11 +315,10 @@ function routeByProfile() {
   }
 }
 
-async function handleLogout() {
-  // 사용자 요청: 로그아웃 버튼을 눌렀을 때 실수로 로그아웃되지 않도록 한 번 더 확인한다.
-  // 기존 삭제 확인(js/ui.js window.confirm) 패턴과 동일하게 처리한다.
-  if (!window.confirm('정말 로그아웃하시겠습니까?')) return;
-  await signOut();
+// S2(STEP16.35): handleLogout()(사용자가 직접 로그아웃 버튼 클릭)과, 아래 onAuthStateChange
+// 리스너가 감지하는 "세션 만료로 인한 자동 로그아웃" 양쪽에서 공통으로 필요한 화면/상태
+// 초기화. 기존 handleLogout() 본문을 그대로 옮긴 것으로, 동작 변경은 없다.
+function resetClientStateAfterSignOut() {
   clearMarkers(); // 지도가 폐기되기 전에 마커를 먼저 정리
   clearCurrentLocationMarker();
   closeDetail();
@@ -417,6 +422,35 @@ async function handleLogout() {
   });
   showView('view-login');
 }
+
+async function handleLogout() {
+  // 사용자 요청: 로그아웃 버튼을 눌렀을 때 실수로 로그아웃되지 않도록 한 번 더 확인한다.
+  // 기존 삭제 확인(js/ui.js window.confirm) 패턴과 동일하게 처리한다.
+  if (!window.confirm('정말 로그아웃하시겠습니까?')) return;
+  manualSignOut = true; // 아래 onAuthStateChange 리스너가 이 signOut()을 "세션 만료"로 오인하지 않게 함
+  await signOut();
+  resetClientStateAfterSignOut();
+}
+
+// S2(STEP16.35, 세션 만료 감지): 리프레시 토큰 만료 등으로 Supabase가 서버/SDK 차원에서
+// 세션을 강제로 끊으면, 기존에는 이후 API 호출이 전부 실패해도 화면에는 "표시할 사업장이
+// 없습니다" 같은 혼동되는 빈 상태로만 보였다(로그인 화면으로 안내하는 로직이 없었음).
+// onAuthStateChange로 SIGNED_OUT을 감지해, 사용자가 직접 로그아웃한 경우(manualSignOut)는
+// handleLogout()이 이미 처리했으므로 건너뛰고, 그 외의 경우만 "세션 만료" 안내 후 로그인
+// 화면으로 되돌린다. 로그인 전(아직 state.user가 없는 상태)의 SIGNED_OUT 이벤트(예: bootstrap()의
+// 자동로그인 미체크 시 기존 세션 정리)는 state.user 체크로 자연스럽게 무시된다.
+sb.auth.onAuthStateChange((event) => {
+  if (event !== 'SIGNED_OUT') return;
+  if (manualSignOut) {
+    manualSignOut = false;
+    return;
+  }
+  if (!state.user) return;
+  state.user = null;
+  state.profile = null;
+  window.alert('세션이 만료되어 로그아웃되었습니다. 다시 로그인해주세요.');
+  resetClientStateAfterSignOut();
+});
 
 // 사용자 요청(3): 사업장 상세정보 패널 상단 터치바를 아래로 스와이프하면 닫힌다.
 // Pointer Events로 마우스/터치를 통합 처리하고, 드래그 중에는 손가락을 따라 패널을

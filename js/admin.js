@@ -13,6 +13,13 @@ const ROLE_VALUES = ['user', 'admin', 'master'];
 // 관리자가 아니면 조회 시도 자체를 하지 않는다 (RLS도 어차피 막지만 불필요한 요청을 만들지 않음).
 // STEP16.5(모바일 회원관리 UI): 조회 실패를 화면(에러 상태)에서도 구분할 수 있도록
 // state.adminLoadError 플래그를 추가한다 — 기존 PC 동작(실패 시 빈 배열 + console.error)은 그대로 유지.
+// S3(STEP16.35): 모바일 회원관리 화면의 상태 탭(전체/승인대기/승인완료)과 이름/이메일 검색
+// (getFilteredAdminUsers, js/ui.js)이 전부 이 함수가 한 번에 채운 state.adminUsers 전체를
+// 대상으로 동작한다. 일부만 불러오는 "더보기" 방식 페이지네이션을 도입하면, 아직 불러오지
+// 않은(더 이전에 가입한) 회원은 검색·탭 필터에 전혀 걸리지 않는 문제가 생긴다. 이를 피하기
+// 위해 목록을 나눠서 보여주는 방식 대신, 예기치 않은 대량 데이터 증가에도 한 번의 조회가
+// 무한정 커지지 않도록 안전장치(.limit)만 추가한다. 현재 회원 규모에서는 이 값에 도달하지
+// 않으므로 기존 동작(전체 회원 표시)에는 변화가 없다.
 export async function loadUsers() {
   state.adminLoadError = false;
 
@@ -24,7 +31,8 @@ export async function loadUsers() {
   const { data, error } = await sb
     .from('gnmap_v2_profiles')
     .select('id, name, email, role, status, created_at, last_login_at')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(2000);
 
   if (error) {
     console.error('회원 목록 조회 실패:', error);

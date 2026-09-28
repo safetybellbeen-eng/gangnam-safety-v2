@@ -8,6 +8,9 @@ import { state } from './state.js';
 // 현재 로그인 사용자의 즐겨찾기만 조회해 state.favoriteSiteIds에 채운다.
 // 실패 시 예외를 던지지 않고 빈 Set으로 남겨 앱이 죽지 않도록 한다.
 export async function loadFavorites() {
+  // F2(STEP16.35): 조회 실패를 "즐겨찾기 0건"과 구분할 수 있도록 표시만 한다.
+  state.favoritesLoadError = false;
+
   if (!state.user) {
     state.favoriteSiteIds = new Set();
     return;
@@ -21,6 +24,7 @@ export async function loadFavorites() {
   if (error) {
     console.error('즐겨찾기 조회 실패:', error);
     state.favoriteSiteIds = new Set();
+    state.favoritesLoadError = true;
     return;
   }
 

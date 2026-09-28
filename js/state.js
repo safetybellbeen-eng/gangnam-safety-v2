@@ -18,6 +18,12 @@ export const state = {
   favoriteInFlight: new Set(), // 토글 요청이 진행 중인 site id (rapid click 중복 방지)
   siteNotes: new Map(),   // siteId -> gnmap_v2_site_notes 행 (id/site_id/content/created_at/updated_at). 없으면 키가 없음.
   noteInFlight: new Set(), // 저장/삭제 요청이 진행 중인 site id (동시 요청 중복 방지)
+  // F2(STEP16.35): 각 목록 조회가 "0건"인지 "조회 자체가 실패"했는지 화면에서 구분할 수 있도록
+  // admin.js의 adminLoadError와 동일한 패턴을 사업장/즐겨찾기/메모/감독일정에도 추가한다.
+  sitesLoadError: false,
+  favoritesLoadError: false,
+  notesLoadError: false,
+  supervisionsLoadError: false,
   // 모바일 "더보기 > 현장 메모" 화면 전용 상태(STEP16.23). 기존 site-detail 메모 CRUD/데이터는
   // 그대로 두고, 이 화면은 조회/검색/필터/작성 진입점만 새로 추가한다.
   siteNotesFilter: 'all',        // 'all' | 'recent-created' | 'recent-updated'

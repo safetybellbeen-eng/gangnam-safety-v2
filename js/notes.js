@@ -8,6 +8,9 @@ import { state } from './state.js';
 // 현재 로그인 사용자의 메모를 1회 조회해 state.siteNotes(Map)에 채운다.
 // 실패해도 예외를 던지지 않는다 — sites/map 등 다른 기능을 막지 않기 위함.
 export async function loadNotes() {
+  // F2(STEP16.35): 조회 실패를 "메모 0건"과 구분할 수 있도록 표시만 한다.
+  state.notesLoadError = false;
+
   if (!state.user) {
     state.siteNotes = new Map();
     return;
@@ -21,6 +24,7 @@ export async function loadNotes() {
   if (error) {
     console.error('메모 조회 실패:', error);
     state.siteNotes = new Map();
+    state.notesLoadError = true;
     return;
   }
 

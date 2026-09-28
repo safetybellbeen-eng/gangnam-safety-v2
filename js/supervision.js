@@ -2,6 +2,7 @@
 // site_id/사업장 연결은 이번 STEP 범위가 아니다(별도 테이블/FK 없음, 캠페인 단위 상황판만).
 // RLS: SELECT는 approved 전체, INSERT/UPDATE/DELETE는 admin만 — 이 파일은 그 위에서 얇게만 감싼다.
 import { sb } from './api.js';
+import { state } from './state.js';
 
 // supervision_type('inspection'|'supervision'|null) — STEP16.5: status(예정/진행중/완료, 날짜로 자동
 // 계산)와 완전히 별개인 "감독 유형(점검/감독)" 축. 기존 행은 NULL 허용, 신규 등록부터 프론트에서 필수값.
@@ -10,6 +11,9 @@ const SUPERVISION_COLUMNS = 'id, title, manager_name, start_date, end_date, stat
 // 전체 감독일정을 조회한다. 실패해도 예외를 던지지 않고 빈 배열을 반환한다 —
 // 다른 기능(지도/사업장 목록 등)을 막지 않기 위함(notes.js/favorites.js와 동일한 방어 패턴).
 export async function loadSupervisions() {
+  // F2(STEP16.35): 조회 실패를 "등록된 감독일정 0건"과 구분할 수 있도록 표시만 한다.
+  state.supervisionsLoadError = false;
+
   const { data, error } = await sb
     .from('gnmap_v2_supervisions')
     .select(SUPERVISION_COLUMNS)
@@ -17,6 +21,7 @@ export async function loadSupervisions() {
 
   if (error) {
     console.error('감독일정 조회 실패:', error);
+    state.supervisionsLoadError = true;
     return [];
   }
   return data || [];

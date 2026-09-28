@@ -6,14 +6,28 @@ const SITE_COLUMNS = 'id, company_name, site_name, address, lat, lng, dong, amou
 
 // is_active=true인 사업장을 전부 조회한다. 좌표 유무로 조회 자체를 제한하지 않는다 —
 // 좌표 없는 사업장도 목록에는 표시되어야 하며, 마커 생성 여부만 map.js의 좌표 검증이 담당한다.
+//
+// S3(STEP16.35): 지도 마커/검색/관할·금액 필터/동별 개수 표시가 전부 "전체 현장이 한 번에
+// state.sites에 올라와 있다"는 전제로 동작하므로(getFilteredSortedSites 등), 일부만 조회하는
+// 진짜 페이지네이션은 도입하지 않는다. 대신 예기치 않게 데이터가 비정상적으로 폭증하더라도
+// 한 번의 조회가 무한정 커지지 않도록 안전장치(.limit)만 추가한다. 실제 강남구 사업장 규모에서는
+// 이 값에 도달하지 않으므로 현재 동작(전체 표시)에는 변화가 없다. .order()를 명시해, 혹시
+// 이 상한에 걸리는 경우에도 매번 같은(가장 오래된 id부터) 부분집합이 잘리도록 보장한다.
 export async function loadActiveSites() {
+  // F2(STEP16.35): 조회 실패를 "등록된 사업장 0건"과 구분할 수 있도록 표시만 한다
+  // (admin.js의 adminLoadError와 동일한 패턴). 성공하면 매번 false로 리셋한다.
+  state.sitesLoadError = false;
+
   const { data, error } = await sb
     .from('gnmap_v2_sites')
     .select(SITE_COLUMNS)
-    .eq('is_active', true);
+    .eq('is_active', true)
+    .order('id', { ascending: true })
+    .limit(5000);
 
   if (error) {
     console.error('사업장 조회 실패:', error);
+    state.sitesLoadError = true;
     return [];
   }
   return data || [];
