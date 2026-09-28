@@ -484,7 +484,7 @@ export async function initMap(containerId, startCenter) {
 // - 사업장 데이터(gnmap_v2_sites)와는 무관한 순수 지도 표시 요소이며 DB에 저장하지 않는다.
 // ============================================================
 const HQ_ADDRESS = '서울 강남구 테헤란로 411';
-const HQ_LABEL = '강남지청 (커맨드센터)';
+const HQ_LABEL = '지청'; // 사용자 요청: "강남지청 (커맨드센터)"에서 "커맨드센터" 표현을 빼고 "지청"으로만 표시.
 let hqMarker = null;
 let hqLabelOverlay = null;
 let hqRenderRequested = false;
@@ -573,6 +573,34 @@ export function searchPlacesKeyword(query) {
       })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng)));
     });
   });
+}
+
+// ============================================================
+// STEP16.30-1: 주소/장소 검색 결과를 클릭하면 지도에 임시 핀으로 표시한다(사용자 요청).
+// 등록된 사업장 마커(state.markers/클러스터러)와는 완전히 별개이며, 클러스터러에도 넣지 않고
+// 지도에 직접 붙인다(HQ 마커와 같은 방식) — 검색 결과는 항상 1개만 유지하고, 새로 클릭하면
+// 이전 핀을 지우고 새 위치로 교체한다. 사업장 데이터(gnmap_v2_sites)에는 전혀 저장하지 않는다.
+// ============================================================
+let addressSearchPinMarker = null;
+
+export function showAddressSearchPin(lat, lng) {
+  if (!state.map) return;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+  clearAddressSearchPin();
+  const position = new kakao.maps.LatLng(lat, lng);
+  addressSearchPinMarker = new kakao.maps.Marker({
+    position,
+    map: state.map, // 클러스터러가 아닌 지도에 직접 부착 — 항상 표시.
+    zIndex: 800
+  });
+  state.map.panTo(position);
+}
+
+export function clearAddressSearchPin() {
+  if (addressSearchPinMarker) {
+    addressSearchPinMarker.setMap(null);
+    addressSearchPinMarker = null;
+  }
 }
 
 // 사업장 배열로 마커를 그린다. 기존 마커는 전부 정리한 뒤 새로 생성한다 (중복 방지, 재호출 가능).
