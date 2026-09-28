@@ -505,7 +505,13 @@
            handleExcelFileSelect가 upload-history/upload-preview만 부분적으로 다시 그리고
            패널 전체를 지우지 않으므로, 닫기 버튼을 정적으로 둔다. PC에서는 css/mobile.css의
            기본값(.mobile-panel-close-btn)이 항상 숨기므로 PC 화면은 그대로다. -->
-      <button type="button" id="btn-upload-close" class="mobile-panel-close-btn" aria-label="닫기">×</button>
+      <!-- 사용자 요청: "×" 닫기를 다른 더보기 하위 화면(앱설정 등)과 동일한 "‹ 뒤로가기"
+           표시로 통일한다. 위치/크기/동작(js/app.js의 기존 클릭 핸들러, 패널 display만 되돌림)은 그대로다. -->
+      <button type="button" id="btn-upload-close" class="mobile-panel-close-btn" aria-label="뒤로가기">
+        <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 5.5 9 12l6 6.5"/>
+        </svg>
+      </button>
       <input type="file" id="upload-file-input" accept=".xlsx,.xls">
       <div id="upload-history"></div>
       <div id="upload-preview"></div>
@@ -520,6 +526,13 @@
           <h2>감독일정 상황판</h2>
           <p id="supervision-panel-subtitle">예정 · 진행중 · 완료 일정 관리</p>
         </div>
+        <!-- STEP16.29 확인 결과: 모바일에서는 #btn-supervision-panel이 항상 숨김(css/mobile.css
+             !important)이라 이 패널은 오직 더보기>감독일정관리(헤더 벨 클릭 위임,
+             activateMobileTab('alert'))로만 열리고, 그 경로에서는 data-mobile-tab="alert"이 되어
+             #btn-supervision-close 자체가 항상 display:none이다(css/mobile.css 기존 규칙,
+             하단 탭으로 나가는 것을 전제로 한 설계). 즉 모바일에서 실제로 보이는 "×"가 없어
+             바꿀 대상이 없고, 이 버튼은 PC 전용(components.css, 항상 보임)이라 표시는 그대로
+             "×" 닫기로 유지한다(PC 화면 변경 금지 원칙). -->
         <button type="button" id="btn-supervision-close" aria-label="닫기">×</button>
       </div>
       <div id="supervision-filter-bar">
