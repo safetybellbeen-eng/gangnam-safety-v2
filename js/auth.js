@@ -197,8 +197,15 @@ export function isApproved() {
   return state.profile && state.profile.status === 'approved';
 }
 
+// STEP16.31: 3단계 권한(마스터관리자/관리자/사용자). "admin 전용" 기존 기능(회원관리/
+// 감독일정등록/현장엑셀업로드 등)은 마스터관리자도 그대로 써야 하므로 isAdmin()은 두 역할
+// 모두 true를 반환한다. "회원 권한 부여"(역할 변경)만 마스터관리자 전용이라 별도로 isMaster()를 둔다.
 export function isAdmin() {
-  return state.profile && state.profile.role === 'admin';
+  return !!(state.profile && (state.profile.role === 'admin' || state.profile.role === 'master'));
+}
+
+export function isMaster() {
+  return !!(state.profile && state.profile.role === 'master');
 }
 
 // STEP16.5(오류 메시지 한글화). Supabase Auth/PostgREST가 내려주는 오류 메시지는 영어 원문이라

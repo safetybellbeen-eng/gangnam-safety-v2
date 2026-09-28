@@ -7,7 +7,8 @@ import { state } from './state.js';
 import { isAdmin } from './auth.js';
 
 const STATUS_VALUES = ['pending', 'approved', 'rejected', 'disabled'];
-const ROLE_VALUES = ['user', 'admin'];
+// STEP16.31: 마스터관리자 등급 추가(회원권한 부여는 마스터관리자만 — DB RPC가 최종 검증).
+const ROLE_VALUES = ['user', 'admin', 'master'];
 
 // 관리자가 아니면 조회 시도 자체를 하지 않는다 (RLS도 어차피 막지만 불필요한 요청을 만들지 않음).
 // STEP16.5(모바일 회원관리 UI): 조회 실패를 화면(에러 상태)에서도 구분할 수 있도록

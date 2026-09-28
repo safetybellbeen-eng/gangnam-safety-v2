@@ -2,7 +2,7 @@
 // XSS 방지: DB 값(site_name/company_name/address 등)은 innerHTML 문자열 조립에 쓰지 않고
 // 전부 textContent 또는 createElement 기반 DOM 생성으로만 넣는다.
 import { state } from './state.js';
-import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight, refreshFavoriteMarker, initRouteMap, relayoutRouteMap, renderRouteMarkers, panToRouteSite, searchPlacesKeyword } from './map.js';
+import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight, refreshFavoriteMarker, initRouteMap, relayoutRouteMap, renderRouteMarkers, panToRouteSite, searchPlacesKeyword, showAddressSearchPin, clearAddressSearchPin } from './map.js';
 import { getFilteredSortedSites, getDongOptions, loadActiveSites } from './sites.js';
 import { isFavorite, toggleFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote } from './notes.js';
@@ -11,7 +11,7 @@ import { parseExcelFile } from './excel.js';
 import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, buildLotQueries, runJusoNormalize, buildJusoQuery, runKakaoJusoRecovery, runRoadApproximateRecovery, extractApproximateStructure, reverseGeocode, geocodeKeyword } from './geocoding.js';
 import { importSitesToDatabase, previewImportImpact, loadUploadHistory, loadLastUploadAt } from './import.js';
 import { loadSupervisions, createSupervision, updateSupervision, deleteSupervision } from './supervision.js';
-import { isAdmin, changePassword } from './auth.js';
+import { isAdmin, isMaster, changePassword } from './auth.js';
 import { requestCurrentLocation } from './location.js';
 import { CONFIG } from './config.js';
 
@@ -3036,7 +3036,6 @@ export function renderAccountInfoPanel(containerId) {
   container.appendChild(subtitle);
 
   const profile = state.profile;
-  const admin = isAdmin();
   const { org: profileOrg, name: profileName } = splitOrgName(profile ? profile.name : '');
 
   const rows = [
@@ -3044,7 +3043,8 @@ export function renderAccountInfoPanel(containerId) {
   ];
   if (profileOrg) rows.push({ icon: 'briefcase', title: '소속', desc: profileOrg });
   rows.push({ icon: 'info', title: '아이디', desc: profile ? displayValue(profile.email) : '-' });
-  rows.push({ icon: 'users', title: '권한', desc: admin ? '관리자' : '일반 사용자' });
+  // STEP16.31: 마스터관리자/관리자/사용자 3단계로 표시.
+  rows.push({ icon: 'users', title: '권한', desc: profile ? adminRoleLabel(profile.role) : '-' });
 
   container.appendChild(buildSettingsCard('user', '계정 정보', rows));
 }
@@ -3068,6 +3068,7 @@ function renderAddressSearchResults(query) {
   const trimmed = (query || '').trim();
   if (trimmed.length < 2) {
     container.innerHTML = '';
+    clearAddressSearchPin(); // 검색어를 지우면 지도 위 임시 핀도 함께 치운다.
     return;
   }
   const myToken = ++addressSearchToken;
@@ -3092,6 +3093,12 @@ function renderAddressSearchResults(query) {
     results.slice(0, 8).forEach(r => {
       const item = document.createElement('div');
       item.className = 'address-search-result-item';
+      // 사용자 요청: 검색 결과를 누르면 지도에 핀으로 위치를 표시한다. 등록 사업장이 아니라
+      // 순수 조회용 임시 핀이며(map.js showAddressSearchPin, 클러스터러 밖에 직접 부착),
+      // DB에는 저장하지 않는다.
+      item.addEventListener('click', () => {
+        showAddressSearchPin(r.lat, r.lng);
+      });
 
       const nameEl = document.createElement('div');
       nameEl.className = 'address-search-result-name';
@@ -3106,6 +3113,7 @@ function renderAddressSearchResults(query) {
 
       const actions = document.createElement('div');
       actions.className = 'address-search-result-actions';
+      actions.addEventListener('click', (e) => e.stopPropagation()); // 버튼 클릭이 item의 핀 표시 클릭과 중복 실행되지 않게 한다(둘 다 실행돼도 무해하지만 불필요).
 
       const copyBtn = document.createElement('button');
       copyBtn.type = 'button';
@@ -3498,7 +3506,7 @@ function renderAdminDesktopRows(container, users, containerId) {
     info.className = 'admin-user-info';
     [
       ['이름', u.name],
-      ['역할', u.role],
+      ['역할', adminRoleLabel(u.role)],
       ['상태', u.status],
       ['가입일', u.created_at]
     ].forEach(([label, value]) => {
@@ -3529,21 +3537,26 @@ function renderAdminDesktopRows(container, users, containerId) {
       handleAdminChange(u.id, () => setUserStatus(u.id, statusSelect.value), containerId, [statusSaveBtn, roleSaveBtn])
     );
 
-    // 역할 select + 저장 버튼
+    // 역할 select + 저장 버튼. STEP16.31: 3단계 권한 + "회원 권한 부여"는 마스터관리자 전용
+    // (DB RPC gnmap_v2_set_user_role이 최종 검증 — 여기서는 UX 보조로 비활성화만 한다).
+    const viewerIsMaster = isMaster();
     const roleSelect = document.createElement('select');
-    ['user', 'admin'].forEach(r => {
+    ['user', 'admin', 'master'].forEach(r => {
       const opt = document.createElement('option');
       opt.value = r;
-      opt.textContent = r;
+      opt.textContent = adminRoleLabel(r);
       if (r === u.role) opt.selected = true;
-      // 자기 자신 보호: 본인 행에서는 user로 강등 불가
-      if (isSelf && r === 'user') opt.disabled = true;
+      // 자기 자신 보호: 본인 행에서는 역할 변경 불가(서버도 차단)
+      if (isSelf) opt.disabled = true;
       roleSelect.appendChild(opt);
     });
+    roleSelect.disabled = !viewerIsMaster || isSelf;
 
     const roleSaveBtn = document.createElement('button');
     roleSaveBtn.type = 'button';
     roleSaveBtn.textContent = '역할 저장';
+    roleSaveBtn.disabled = !viewerIsMaster || isSelf;
+    if (!viewerIsMaster) roleSaveBtn.title = '마스터관리자만 회원 역할을 변경할 수 있습니다.';
     roleSaveBtn.addEventListener('click', () =>
       handleAdminChange(u.id, () => setUserRole(u.id, roleSelect.value), containerId, [statusSaveBtn, roleSaveBtn])
     );
@@ -3571,6 +3584,16 @@ const ADMIN_STATUS_META = {
   rejected: { label: '승인거절', cls: 'rejected' },
   disabled: { label: '휴면', cls: 'disabled' },
 };
+
+// STEP16.31: 3단계 권한 표시 라벨. PC/모바일 회원관리 화면 전체에서 공통으로 사용한다.
+const ADMIN_ROLE_META = {
+  master: { label: '마스터관리자' },
+  admin: { label: '관리자' },
+  user: { label: '사용자' },
+};
+function adminRoleLabel(role) {
+  return (ADMIN_ROLE_META[role] || {}).label || displayValue(role);
+}
 
 // name 컬럼은 회원가입 화면(#signup-org)에서 고른 소속을 그대로 합쳐 "{지청} {실명}" 형태로
 // 저장된다(예: "강남지청 임종빈") — 별도 지청 컬럼은 없다(실 데이터로 확인 완료). 지청 컬럼을
@@ -3833,10 +3856,10 @@ function buildAdminMemberCard(u, currentUserId, listEl, containerId) {
   const nameWrap = document.createElement('span');
   nameWrap.className = 'admin-mobile-card-name';
   nameWrap.textContent = displayValue(name);
-  if (u.role === 'admin') {
+  if (u.role === 'admin' || u.role === 'master') {
     const roleBadge = document.createElement('span');
-    roleBadge.className = 'admin-mobile-role-badge';
-    roleBadge.textContent = '관리자';
+    roleBadge.className = 'admin-mobile-role-badge' + (u.role === 'master' ? ' admin-mobile-role-badge-master' : '');
+    roleBadge.textContent = adminRoleLabel(u.role);
     nameWrap.appendChild(roleBadge);
   }
   row1.appendChild(nameWrap);
@@ -3990,7 +4013,7 @@ function openAdminActionSheet(u, currentUserId, listEl, containerId) {
     [
       ['계정', maskEmailDomain(u.email)],
       ['지청', infoOrg || '-'],
-      ['역할', u.role === 'admin' ? '관리자' : '일반 사용자'],
+      ['역할', adminRoleLabel(u.role)],
       ['상태', (ADMIN_STATUS_META[u.status] || {}).label || displayValue(u.status)],
       ['가입일', formatAdminDate(u.created_at)],
     ].forEach(([label, value]) => {
