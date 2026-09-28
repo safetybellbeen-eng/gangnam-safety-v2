@@ -662,17 +662,39 @@
     font-size: 12.5px;
   }
 
+  /* #show-login은 #mobile-signup-card 밖의 #view-signup 직계 형제라, stage를 flex로
+     만들면서 의도치 않게 Hero보다 앞선 flex item(기본 order:0)이 되어 화면 좌측에
+     어중간하게 걸쳐 보이고 회원가입 화면을 빠져나갈 방법이 실질적으로 없는 것처럼
+     보이는 문제가 있었다. position:fixed로 flex 흐름에서 완전히 빼내 좌상단
+     .pc-auth-topbar와 대칭되는 우상단에 항상 고정 노출한다 — 스크롤/줌과 무관하게
+     항상 클릭 가능한 로그인 복귀 경로가 된다. */
   #view-signup #show-login {
-    display: block !important;
-    margin: 16px auto 0;
+    display: flex !important;
+    align-items: center;
+    gap: 6px;
+    position: fixed;
+    z-index: 3;
+    top: clamp(20px, 3vh, 36px);
+    right: clamp(24px, 4vw, 64px);
+    margin: 0;
     border: none;
     background: none;
-    padding: 0;
-    font-size: 12.5px;
+    padding: 8px 4px;
+    font-size: 13px;
     font-weight: 700;
-    color: var(--pc-blue);
+    color: var(--pc-navy);
     cursor: pointer;
     text-align: center;
+  }
+  #view-signup #show-login:hover {
+    color: var(--pc-blue);
+  }
+  #view-signup #show-login .mobile-icon-svg-wrap {
+    display: flex !important;
+  }
+  #view-signup #show-login .mobile-icon-svg {
+    width: 18px;
+    height: 18px;
   }
 
 
