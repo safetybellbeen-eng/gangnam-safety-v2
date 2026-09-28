@@ -1313,6 +1313,36 @@
     display: none;
   }
 
+  /* 사용자 요청: 즐겨찾기 탭은 검색/필터를 전부 없앤다 — #site-search-bar(검색창 + 관할/
+     공사금액/점검/산재표/기본순서 필터 + ★즐겨찾기 토글)를 숨기고, 대신 내부 탭
+     (#favorite-subtabs: 즐겨찾기 현장/메모 있는 현장)만 보여준다. */
+  #app[data-mobile-tab="favorite"] #site-search-bar {
+    display: none;
+  }
+  #app[data-mobile-tab="favorite"] #favorite-subtabs {
+    display: flex;
+  }
+  #favorite-subtabs {
+    display: none;
+    gap: 8px;
+    padding: 12px 16px 10px;
+    flex-shrink: 0;
+  }
+  .favorite-subtab-btn {
+    flex: 1;
+    min-height: 38px;
+    border: none;
+    border-radius: var(--gnmap-radius-pill);
+    background: var(--gnmap-bg-soft);
+    color: var(--gnmap-text-sub);
+    font-size: 13px;
+    font-weight: var(--gnmap-fw-semibold);
+  }
+  .favorite-subtab-btn.active {
+    background: var(--gnmap-blue);
+    color: #fff;
+  }
+
   /* STEP15-E.4: 즐겨찾기 탭에 즐겨찾기한 현장이 0건일 때 renderSiteList()가 대신 그리는
      empty state. 현장/즐겨찾기 카드(.site-list-item)와 같은 화이트/네이비/블루 톤을 쓴다. */
   .mobile-favorite-empty {
@@ -5030,9 +5060,14 @@
   }
   .settings-success-text { color: var(--gnmap-green) !important; }
 
-  /* STEP16.23: 더보기 > 현장 메모(목록/작성) 전용. 나머지 컴포넌트(카드/안내카드/저장버튼/
-     bottom sheet/빈 상태 등)는 기존 .sv-mobile-*/.settings-notice-card/.upload-mobile-primary-btn/
-     .admin-sheet* 클래스를 그대로 재사용하고, 여기서는 이 화면에만 필요한 것만 추가한다. */
+  /* STEP16.23: 더보기 > 현장 메모(목록/작성) 전용. 나머지 컴포넌트(카드, 안내카드, 저장버튼,
+     bottom sheet, 빈 상태 등)는 기존 sv-mobile 접두사 클래스, settings-notice-card,
+     upload-mobile-primary-btn, admin-sheet 계열 클래스를 그대로 재사용하고, 여기서는 이
+     화면에만 필요한 것만 추가한다.
+     (수정: 이전 버전의 이 주석 문구 안에 별표와 슬래시가 연달아 나오는 부분이 있어 주석이
+     그 지점에서 조기 종료되고, 뒤 텍스트가 잘못된 선택자로 파싱되는 바람에 다음
+     site-notes-summary 규칙 전체가 무효화되어 있었다. "전체 메모"와 건수 배지가 파란 상자
+     없이 세로로 어긋나 보인 원인이 바로 이것이었다.) */
   .site-notes-summary {
     display: flex;
     align-items: center;
@@ -5182,11 +5217,21 @@
   .site-notes-select-field.is-locked .site-notes-select-field-text { color: var(--gnmap-text-sub); }
   .site-notes-existing-hint { font-size: 12px; color: var(--gnmap-blue); margin: 6px 2px 0; }
   .site-notes-delete-actions { padding: 4px 16px 0; }
-  .site-notes-textarea {
-    min-height: 200px;
-    padding: 12px;
-    resize: vertical;
-    line-height: 1.5;
+  /* 사용자 요청: 작은 상자 안에 갇힌 느낌(자체 내부 스크롤) 대신, 자유 노트처럼 크게 쓰고
+     화면 자체를 내리면서 보게 한다 — js/ui.js의 autoGrowNoteTextarea()가 입력할 때마다
+     scrollHeight로 실제 높이를 늘려주므로, 여기서는 처음부터 큼직한 최소 높이만 잡고
+     overflow-y는 hidden으로 둬 textarea 자체는 스크롤바를 갖지 않게 한다(대신 이미
+     overflow-y:auto인 #site-notes-write-panel 전체가 스크롤된다).
+     (주의: ".sv-mobile-field textarea"(감독일정 등 다른 폼과 공용, min-height:44px)가
+     상세도(0,1,1)가 더 높아 ".site-notes-textarea" 단독 클래스(0,1,0)로는 이기지 못했다 —
+     같은 상세도로 만들기 위해 태그+클래스로 선택자를 바꾼다.) */
+  textarea.site-notes-textarea {
+    min-height: 55vh;
+    padding: 14px;
+    resize: none;
+    overflow-y: hidden;
+    line-height: 1.6;
+    font-size: 15px;
     white-space: pre-wrap;
   }
   .site-notes-char-counter {
