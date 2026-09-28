@@ -2284,12 +2284,14 @@ function buildMobileMoreIcon(name) {
 // 덮일 때, 다시 "더보기" 목록으로 돌아갈 수 있는 닫기(×) 버튼이 없던 패널(admin-panel)에
 // 최소한으로 하나 추가한다. 클릭 시 해당 패널의 표시 여부(style.display)만 되돌릴 뿐,
 // 새 router/history나 별도 상태를 만들지 않는다 — 기존 #btn-supervision-close와 동일한 방식.
+// 사용자 요청: "×" 닫기 대신 앱설정/비밀번호 변경/알림 설정과 같은 "‹ 뒤로가기" 표시로
+// 통일한다. 위치/크기/동작(패널 display만 되돌림)은 그대로 두고 아이콘과 라벨만 바꾼다.
 function buildMobilePanelCloseBtn(panelId) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'mobile-panel-close-btn';
-  btn.setAttribute('aria-label', '닫기');
-  btn.textContent = '×';
+  btn.setAttribute('aria-label', '뒤로가기');
+  btn.appendChild(svIcon(SV_ICON_CHEVRON_LEFT));
   btn.addEventListener('click', () => {
     const panel = document.getElementById(panelId);
     if (panel) panel.style.display = 'none';
