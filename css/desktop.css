@@ -19,6 +19,7 @@
 .pc-auth-hero,
 #pc-feature-cards,
 #pc-login-card-title,
+#pc-signup-card-title,
 #pc-signup-subtitle,
 #pc-splash-content {
   display: none;
@@ -36,34 +37,56 @@
     --pc-radius: 14px;
   }
 
+  /* Section 2 재구축: base.css는 리셋이 없는 골격 파일이고, css/mobile.css의 html,body
+     margin:0 리셋은 그 파일 자신의 @media(max-width:768px) 안에만 있어 데스크톱 폭에는
+     적용되지 않았다 — 이 때문에 브라우저 기본 body margin(~8px)이 화면 4면에 흰 라인으로
+     노출되었다. 데스크톱 폭 전용으로 동일한 리셋을 둔다(모바일 쿼리와 겹치지 않음).
+     100vw는 스크롤바 폭을 포함해 오히려 가로 스크롤을 유발할 수 있어 width는 100%만 쓴다. */
   html, body {
-    height: 100%;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100%;
   }
 
   /* base.css가 전역 reset을 두지 않아(주석만 있는 골격 파일) 컴포넌트마다 box-sizing이
      제각각이었다. width+padding을 함께 쓰는 아래 카드/입력 규칙들이 의도한 폭대로
      렌더링되도록 로그인/회원가입 화면 내부에서만 border-box로 통일한다(다른 화면 무영향). */
+  #view-login,
   #view-login *,
   #view-login *::before,
   #view-login *::after,
+  #view-signup,
   #view-signup *,
   #view-signup *::before,
   #view-signup *::after {
     box-sizing: border-box;
   }
 
-  /* ================= 공용 배경/상단바/Hero (로그인·회원가입 공유) ================= */
+  /* ================= Desktop Auth Stage (로그인·회원가입 공유) =================
+     Section 4/11/14 재구축: 이전 구현은 .pc-auth-hero/#mobile-login-card/#pc-feature-cards를
+     각각 독립적으로 position:absolute + %(컨테이너 기준)/vw(뷰포트 기준) 혼합 단위로
+     배치해, 배경·UI가 서로 다른 좌표계를 쓰는 것처럼 어긋나고(Section 13/14), 우측
+     Feature Card가 뷰포트 밖으로 잘리며(Section 6), 리사이즈·줌에도 취약했다(Section 11).
+     대신 #view-login/#view-signup 자체를 하나의 flex "stage"로 만들어 Hero/로그인
+     카드/Feature 컬럼(또는 Hero/가입 카드)을 같은 컨테이너 안에 나란히 배치한다.
+     배경(.pc-auth-bg)과 상단 CI(.pc-auth-topbar)는 position:fixed로 완전히 분리해
+     stage의 폭 제약과 무관하게 항상 뷰포트 전체/모서리에 고정한다(Section 13). */
   /* components.css의 `#app section{max-width:360px;margin:40px auto;...}`보다 반드시
      이겨야 하므로 `#app`을 함께 붙여 specificity를 (2,0,0)으로 올린다
      (`#app section`은 (1,0,1)이라 `#view-login` 단독(1,0,0)으로는 지는 문제가 있었다). */
   #app #view-login,
   #app #view-signup {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(28px, 3.2vw, 56px);
     position: relative;
+    width: 100%;
     min-height: 100vh;
-    overflow: hidden;
     max-width: none;
     margin: 0;
-    padding: 0;
+    padding: 48px clamp(24px, 4vw, 64px);
     background: #eaf1fb;
     font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
   }
@@ -76,7 +99,7 @@
 
   .pc-auth-bg {
     display: block;
-    position: absolute;
+    position: fixed;
     inset: 0;
     z-index: 0;
     background-image: url('../assets/images/desktop-auth-bg.jpg');
@@ -84,8 +107,9 @@
     background-size: cover;
     background-position: center 62%;
   }
-  /* Section 5: 1366~1920 사이에서 롯데타워/스카이라인이 Hero 텍스트·로그인 카드와 겹치지
-     않도록 폭에 따라 배경 위치를 미세 조정한다(단순 cover+center로 방치하지 않음). */
+  /* Section 5/13: 1366~1920 사이에서 롯데타워/스카이라인이 Hero 텍스트·로그인 카드와
+     겹치지 않도록 폭에 따라 배경 위치를 미세 조정한다(단순 cover+center로 방치하지 않음).
+     position:fixed라 로그인/회원가입 두 화면에서 완전히 동일하게 렌더링된다. */
   @media (min-width: 1600px) {
     .pc-auth-bg { background-position: center 58%; }
   }
@@ -97,7 +121,7 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    position: absolute;
+    position: fixed;
     z-index: 2;
     top: clamp(20px, 3vh, 36px);
     left: clamp(24px, 4vw, 64px);
@@ -129,12 +153,16 @@
     color: var(--pc-navy);
   }
 
+  /* Section 4/7: Hero는 더 이상 뷰포트에 독립적으로 절대배치되지 않고, stage의 첫 번째
+     flex item(order:1)이 되어 로그인/Feature 카드와 같은 좌표계에서 함께 정렬된다.
+     35~38% 비중 목표(Section 4)를 flex-basis로 근사하고, 텍스트가 과도하게 넓어지지
+     않도록 max-width는 유지한다. */
   .pc-auth-hero {
     display: block;
-    position: absolute;
+    position: relative;
     z-index: 2;
-    left: clamp(24px, 4vw, 64px);
-    top: 34%;
+    order: 1;
+    flex: 1 1 36%;
     max-width: 480px;
   }
   .pc-auth-hero-title {
@@ -167,7 +195,10 @@
     color: var(--pc-text-sub);
   }
 
-  /* ================= 로그인 카드 (#mobile-login-card 재사용) ================= */
+  /* ================= 로그인 카드 (#mobile-login-card 재사용) =================
+     Section 4/5/11: stage의 두 번째 flex item(order:2). %+vw 혼합 절대좌표 대신 고정
+     폭 범위(clamp)로 스스로의 크기를 가지며, flex-shrink가 허용되어 있어 좁은 화면에서도
+     Feature 컬럼처럼 화면 밖으로 밀려나지 않고 자연스럽게 줄어든다. */
   #view-login #mobile-login-card {
     display: grid;
     grid-template-areas:
@@ -177,14 +208,13 @@
       "remember"
       "bottom";
     row-gap: 4px;
-    position: absolute;
+    position: relative;
     z-index: 2;
-    top: 50%;
-    left: 57%;
-    transform: translateY(-50%);
-    width: min(400px, 34vw);
-    min-width: 340px;
-    max-width: none;
+    order: 2;
+    flex: 0 1 400px;
+    width: clamp(340px, 30vw, 400px);
+    max-width: 400px;
+    min-width: 0;
     margin: 0;
     padding: 40px 36px 32px;
     background: rgba(255, 255, 255, 0.97);
@@ -367,16 +397,20 @@
     display: none !important;
   }
 
-  /* ================= 우측 기능 카드 3개 ================= */
+  /* ================= 우측 기능 카드 3개 =================
+     Section 4/6: stage의 세 번째 flex item(order:3). 이전 calc(%+min(vw))는 로그인
+     카드가 실제로 차지하는 폭과 어긋나 우측 카드가 뷰포트 밖으로 잘리는 원인이었다.
+     이제 같은 flex 컨테이너 안에서 Hero/로그인 카드와 나란히 배치되므로 구조적으로
+     화면 밖으로 나갈 수 없다(overflow:hidden으로 숨기는 방식이 아니라 flex가 애초에
+     3개를 모두 담을 수 있는 폭에서만 보이도록 1440px 미만에서 아예 숨긴다). */
   #pc-feature-cards {
     display: flex;
     flex-direction: column;
     gap: 16px;
-    position: absolute;
+    position: relative;
     z-index: 2;
-    top: 50%;
-    left: calc(57% + min(400px, 34vw) + 40px);
-    transform: translateY(-50%);
+    order: 3;
+    flex: 0 0 230px;
     width: 230px;
   }
   .pc-feature-card {
@@ -416,82 +450,81 @@
     color: var(--pc-text-sub);
   }
 
-  /* 1440px 미만에서는 우측 카드가 로그인 폼을 침범할 수 있어 숨긴다(Section 11 — 로그인
-     폼이 항상 최우선). 1366px 폭 테스트도 이 규칙으로 커버된다. */
+  /* 1440px 미만에서는 우측 카드가 로그인 폼을 침범할 수 있어 숨긴다(Section 11/12 — 로그인
+     폼이 항상 최우선). 1366px 폭 테스트도 이 규칙으로 커버된다. 로그인 카드는 stage의
+     flex 배치를 그대로 유지하며 justify-content:center로 재중앙정렬될 뿐, 별도의 절대
+     좌표 재계산이 필요 없다(Section 20 — 충돌하는 override 정리). */
   @media (max-width: 1440px) {
     #pc-feature-cards {
       display: none;
     }
-    #view-login #mobile-login-card {
-      left: 62%;
-    }
   }
   @media (max-width: 1180px) {
-    #view-login #mobile-login-card {
-      left: auto;
-      right: 6%;
-    }
     .pc-auth-hero {
       max-width: 420px;
     }
   }
-  /* 1366×768처럼 세로 공간이 좁으면 카드가 화면 밖으로 넘치지 않게 상단 고정 + 자연스러운
-     스크롤을 허용한다(Section 11 — 폼을 억지로 축소하지 않는다). */
+  /* Section 10: 1366×768처럼 세로 공간이 좁은 경우, 카드를 억지로 화면 안에 우겨넣거나
+     내부 스크롤을 쓰지 않고 stage 자체가 자라나 페이지 전체가 자연스럽게 세로 스크롤되게
+     한다(align-items:flex-start로 전환해 카드가 뷰포트 상단에 붙어 시작하도록만 한다). */
   @media (max-height: 800px) {
-    #view-login #mobile-login-card,
-    #view-signup #mobile-signup-card {
-      position: absolute;
-      top: 24px;
-      transform: none;
-    }
-    #view-login,
-    #view-signup {
-      padding-bottom: 60px;
+    #app #view-login,
+    #app #view-signup {
+      align-items: flex-start;
     }
   }
 
-  /* ================= 회원가입 화면 ================= */
-  #view-signup > h1 {
-    position: absolute;
-    z-index: 2;
-    top: clamp(60px, 10vh, 110px);
-    right: clamp(24px, 6vw, 96px);
-    margin: 0;
-    font-size: 26px;
+  /* ================= 회원가입 화면 =================
+     Section 8/9/15 재구축: TARGET은 "회원가입" 제목+설명이 흰 Card *내부* 최상단에 있다.
+     기존 <h1>/#pc-signup-subtitle는 Card 밖에 별도로 절대배치되어 있던 것이 가장 큰
+     구조적 차이였다 — 삭제하지 않고 데스크톱에서는 숨기기만 하며, 대신 index.html에 새로
+     추가한 #pc-signup-card-title(카드의 첫 자식)이 동일한 문구를 Card 안에서 보여준다. */
+  #view-signup > h1,
+  #pc-signup-subtitle {
+    display: none;
+  }
+
+  #pc-signup-card-title {
+    display: block;
+    margin: 0 0 22px;
+  }
+  #pc-signup-card-title h3 {
+    margin: 0 0 6px;
+    font-size: 22px;
     font-weight: 800;
     color: var(--pc-navy);
   }
-  #pc-signup-subtitle {
-    display: block;
-    position: absolute;
-    z-index: 2;
-    top: calc(clamp(60px, 10vh, 110px) + 42px);
-    right: clamp(24px, 6vw, 96px);
+  #pc-signup-card-title p {
     margin: 0;
     font-size: 13.5px;
     color: var(--pc-text-sub);
   }
 
+  /* Section 4/9: stage의 두 번째 flex item(order:2, Hero가 order:1). Section 9는 Card가
+     "우측이지만 사방 여백이 충분해야 한다"고 명시하므로, 화면에 딱 붙이는 절대좌표 대신
+     stage의 justify-content:center 안에서 Hero와 나란한 flex item으로 둔다.
+     Section 10: 예전의 max-height+overflow-y:auto(카드 내부 스크롤바)를 완전히 제거한다.
+     1920×1080에서는 카드가 뷰포트 안에 다 들어오고, 1366×768처럼 좁은 경우에는 stage
+     자체가 늘어나 페이지 전체가 자연스럽게 스크롤된다(카드 내부 스크롤 아님). */
   #view-signup #mobile-signup-card {
-    position: absolute;
+    position: relative;
     z-index: 2;
-    top: clamp(60px, 10vh, 110px);
-    right: clamp(24px, 6vw, 96px);
-    margin: 84px 0 0;
-    width: min(460px, 38vw);
-    min-width: 360px;
-    max-height: calc(100vh - clamp(60px, 10vh, 110px) - 40px);
-    overflow-y: auto;
+    order: 2;
+    flex: 0 1 460px;
+    width: clamp(380px, 34vw, 460px);
+    max-width: 460px;
+    min-width: 0;
+    margin: 0;
     background: rgba(255, 255, 255, 0.97);
     border: 1px solid #e7ecf3;
     border-radius: var(--pc-radius);
-    padding: 28px 32px 30px;
+    padding: 30px 32px 30px;
     box-shadow: 0 18px 48px rgba(15, 35, 75, 0.16);
   }
   #app #mobile-signup-card #signup-form {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 14px;
   }
 
   #view-signup .mobile-signup-field {
@@ -513,7 +546,7 @@
     display: flex !important;
     position: relative;
     align-items: center;
-    margin-top: 8px;
+    margin-top: 6px;
   }
   #view-signup .mobile-signup-field-input-wrap > .mobile-icon-svg-wrap {
     display: flex !important;
@@ -530,7 +563,7 @@
   #view-signup .mobile-signup-field-input-wrap input,
   #view-signup .mobile-signup-field-input-wrap select {
     width: 100%;
-    height: 46px;
+    height: 42px;
     box-sizing: border-box;
     padding: 0 44px 0 40px;
     border: 1px solid var(--pc-border);
@@ -579,8 +612,8 @@
   #view-signup .mobile-signup-rules {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px 12px;
-    margin: 8px 0 0;
+    gap: 4px 12px;
+    margin: 6px 0 0;
     padding: 0;
     list-style: none;
     font-size: 11.5px;
@@ -588,9 +621,9 @@
   }
   #view-signup .mobile-signup-hint {
     display: block;
-    margin-top: 6px;
+    margin-top: 4px;
     font-size: 11.5px;
-    line-height: 1.5;
+    line-height: 1.45;
     color: #98a3b0;
   }
 
@@ -642,13 +675,6 @@
     text-align: center;
   }
 
-  @media (max-width: 1180px) {
-    #view-signup > h1,
-    #pc-signup-subtitle,
-    #view-signup #mobile-signup-card {
-      right: 5%;
-    }
-  }
 
   /* ================= PC 스플래시 ================= */
   #mobile-splash {
@@ -693,6 +719,7 @@
     display: block;
     width: 88px;
     height: 88px;
+    object-fit: contain;
     margin-bottom: 18px;
   }
   #pc-splash-agency {
