@@ -3671,6 +3671,10 @@
     border-top: 1px solid var(--gnmap-border);
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+  /* U1(STEP16.35): 모바일에서는 토스트가 하단 탭 바에 가리지 않도록 그 위로 올린다. */
+  #gnmap-toast {
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  }
   .mobile-tab-btn {
     flex: 1;
     display: flex;

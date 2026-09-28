@@ -105,3 +105,61 @@
 #supervision-form label {
   margin-bottom: 6px;
 }
+
+/* F2(STEP16.35): 조회 실패(state.*LoadError)를 "0건"과 구분해서 보여주는 공용 상태.
+   PC/모바일 공용 컨테이너(#site-list, 감독일정 목록 등)에서 함께 쓰이므로 media query 밖(공용
+   컴포넌트 파일)에 둔다 — 특정 화면 전용 스타일이 아니다. */
+.load-error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px;
+  text-align: center;
+}
+.load-error-state-msg {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+}
+.load-error-state-retry-btn {
+  margin-top: 12px;
+  padding: 8px 20px;
+  border: 1px solid #1a73e8;
+  border-radius: 6px;
+  background: #fff;
+  color: #1a73e8;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* U1(STEP16.35): 화면마다 제각각이던 저장/오류 안내(팝업 alert(), 조용한 실패)를 하나의
+   토스트로 통일한다. index.html에 마크업을 추가하지 않고 js/ui.js의 showToast()가 필요할 때
+   document.body에 붙였다 스스로 사라진다. PC/모바일 공용(components.css)이며, 모바일 하단
+   탭 바에 가리지 않도록 하는 위치 보정은 css/mobile.css에 별도로 둔다. */
+#gnmap-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%) translateY(12px);
+  max-width: calc(100% - 32px);
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #fff;
+  background: #333;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 999;
+  text-align: center;
+}
+#gnmap-toast.gnmap-toast-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+#gnmap-toast.gnmap-toast-error { background: #c62828; }
+#gnmap-toast.gnmap-toast-success { background: #2e7d32; }
