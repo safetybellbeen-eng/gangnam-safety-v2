@@ -5,6 +5,10 @@ import { state } from './state.js';
 
 const CONCURRENCY = 4; // 브라우저에서 대량 동시 호출을 피하기 위한 제한 (양식2 1,244건 대응)
 
+// 인증/권한 오류가 확인된 뒤 수천 건을 계속 Edge Function에 재요청하지 않도록 하는 fail-fast 상태.
+// 새 좌표확인 작업 시작 시 runGeocodingForParsedRows()에서 반드시 초기화한다.
+let geocodeFatalAuthReason = null;
+
 // 단일 주소 1건을 Edge Function에 넘겨 좌표를 조회한다.
 // 반환값은 Edge Function 응답 계약을 그대로 전달한다: { success, lat, lng, matchedAddress } | { success:false, reason }
 //
@@ -14,6 +18,11 @@ const CONCURRENCY = 4; // 브라우저에서 대량 동시 호출을 피하기 �
 // context를 읽지 못하는 순수 네트워크/예외 상황에서만 INTERNAL_ERROR로 처리한다.
 // JWT/API key/원본 민감 오류 body는 UI/console에 내보내지 않는다.
 async function geocodeAddress(address) {
+  // 한 번이라도 인증/권한 실패가 확인되면 같은 작업의 나머지 수천 건은 네트워크 호출 자체를 중단한다.
+  if (geocodeFatalAuthReason) {
+    return { success: false, reason: geocodeFatalAuthReason };
+  }
+
   try {
     const { data, error } = await sb.functions.invoke('gnmap-v2-geocode', {
       body: { address },
@@ -23,6 +32,9 @@ async function geocodeAddress(address) {
         try {
           const body = await error.context.json();
           if (body && typeof body.reason === 'string') {
+            if (body.reason === 'UNAUTHORIZED' || body.reason === 'FORBIDDEN') {
+              geocodeFatalAuthReason = body.reason;
+            }
             return { success: false, reason: body.reason };
           }
         } catch (_parseErr) {
@@ -224,6 +236,9 @@ export function extractCoreRoadAddress(address) {
 // LEVEL 1(원본 주소) 실패 시에만, 정제주소가 원본과 실질적으로 다른 경우 LEVEL 2(정제주소)를 재시도한다.
 // onProgress(progress)는 매 행 완료마다 호출되어 UI가 진행상황을 갱신할 수 있게 한다.
 export async function runGeocodingForParsedRows(onProgress) {
+  // 이전 좌표확인 시도의 권한 오류 상태가 다음 시도까지 남지 않도록 매 실행마다 초기화한다.
+  geocodeFatalAuthReason = null;
+
   const targets = state.uploadParsedRows.filter(
     row => row._validation !== 'ERROR' && row.address
   );
