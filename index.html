@@ -144,8 +144,9 @@
               <svg class="mobile-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
             </span>
           </button>
+          <span id="login-caps-warning" class="auth-caps-warning" role="status" aria-live="polite" hidden>Caps Lock이 켜져 있습니다.</span>
         </label>
-        <button type="submit">로그인</button>
+        <button type="submit"><span class="auth-button-spinner" aria-hidden="true"></span><span class="auth-button-label">로그인</span></button>
       </form>
       <p id="login-error" class="form-error"></p>
 
@@ -275,6 +276,7 @@
               </span>
             </button>
           </span>
+          <span id="signup-password-caps-warning" class="auth-caps-warning" role="status" aria-live="polite" hidden>Caps Lock이 켜져 있습니다.</span>
           <!-- STEP16.8(비밀번호 규칙 실시간 체크리스트). 제출 시점 에러 대신, 타이핑하는 동안
                각 규칙 충족 여부를 실시간으로 보여준다. -->
           <ul id="signup-password-rules" class="mobile-signup-rules">
@@ -296,6 +298,7 @@
               </span>
             </button>
           </span>
+          <span id="signup-confirm-caps-warning" class="auth-caps-warning" role="status" aria-live="polite" hidden>Caps Lock이 켜져 있습니다.</span>
           <span id="signup-password-match-msg" class="mobile-signup-match-msg" aria-live="polite"></span>
         </label>
         <label class="mobile-signup-field">인증번호<span class="mobile-required-star" aria-hidden="true"> *</span>
@@ -307,15 +310,16 @@
           </span>
           <span class="mobile-signup-hint">관리자로부터 안내받은 인증번호를 입력해주세요. 5회 이상 틀리면 일정 시간 동안 잠깁니다.</span>
         </label>
-        <label class="mobile-signup-field mobile-signup-privacy-field">
+        <div class="mobile-signup-field mobile-signup-privacy-field">
           <span class="mobile-signup-privacy-check-wrap">
             <input type="checkbox" id="signup-privacy-agree" required>
             <span class="mobile-signup-privacy-text">
               <span class="mobile-required-star" aria-hidden="true">* </span>개인정보 수집·이용에 동의합니다.
             </span>
+            <button type="button" id="privacy-details-btn" class="privacy-details-btn" aria-haspopup="dialog" aria-controls="privacy-details-modal">자세히 보기</button>
           </span>
           <span class="mobile-signup-hint">수집 항목: 소속, 이름, 아이디 / 수집 목적: 회원가입 및 계정 승인·관리 / 보유 기간: 회원 탈퇴 시까지</span>
-        </label>
+        </div>
         <button type="submit"><span class="signup-label-pc-only">가입하기</span><span class="mobile-signup-submit-label">가입 신청</span></button>
       </form>
       <p id="signup-error" class="form-error"></p>
@@ -324,6 +328,28 @@
         <button type="button" id="pc-signup-login-link">로그인</button>
       </div>
     </div>
+    <div id="privacy-details-modal" class="privacy-details-modal" role="dialog" aria-modal="true" aria-labelledby="privacy-details-title" hidden>
+      <div class="privacy-details-backdrop" data-privacy-close="true"></div>
+      <div class="privacy-details-dialog" role="document">
+        <div class="privacy-details-header">
+          <div>
+            <span class="privacy-details-kicker">개인정보 수집·이용 안내</span>
+            <h3 id="privacy-details-title">개인정보 수집·이용 동의</h3>
+          </div>
+          <button type="button" id="privacy-details-x" class="privacy-details-x" aria-label="개인정보 안내 닫기">×</button>
+        </div>
+        <div class="privacy-details-body">
+          <dl>
+            <div><dt>수집 항목</dt><dd>소속, 이름, 아이디</dd></div>
+            <div><dt>수집 목적</dt><dd>회원가입, 계정 승인 및 서비스 계정 관리</dd></div>
+            <div><dt>보유·이용 기간</dt><dd>회원 탈퇴 시까지</dd></div>
+          </dl>
+          <p>개인정보 수집·이용 동의를 거부할 수 있으나, 필수 항목에 대한 동의를 거부하는 경우 회원가입 및 서비스 이용이 제한될 수 있습니다.</p>
+        </div>
+        <button type="button" id="privacy-details-close" class="privacy-details-close">확인</button>
+      </div>
+    </div>
+
     <div id="mobile-signup-info">
       <div id="mobile-signup-info-title">
         <span class="mobile-icon-svg-wrap" aria-hidden="true">
