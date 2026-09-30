@@ -1058,3 +1058,219 @@
     }
   }
 }
+
+
+/* =========================================================
+   AUTH POLISH — 기능 6종 + UI 정밀조정 7종
+   기존 인증/Supabase 로직은 변경하지 않고 데스크톱 표현·접근성만 보강한다.
+   ========================================================= */
+.auth-caps-warning[hidden],
+.privacy-details-modal[hidden] { display: none !important; }
+
+.auth-caps-warning {
+  display: block;
+  margin-top: 6px;
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+body.auth-modal-open { overflow: hidden; }
+
+.privacy-details-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.privacy-details-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, .52);
+  backdrop-filter: blur(3px);
+}
+.privacy-details-dialog {
+  position: relative;
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(680px, calc(100vh - 48px));
+  overflow: auto;
+  padding: 28px;
+  border: 1px solid rgba(203, 213, 225, .9);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, .24);
+  color: #17233d;
+}
+.privacy-details-header { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; }
+.privacy-details-kicker { color:#0b63f6; font-size:12px; font-weight:800; }
+.privacy-details-header h3 { margin:5px 0 0; font-size:22px; letter-spacing:-.03em; }
+.privacy-details-x { width:36px; height:36px; border:0; border-radius:9px; background:#f3f6fb; color:#475569; font-size:25px; line-height:1; cursor:pointer; }
+.privacy-details-body { margin-top:22px; }
+.privacy-details-body dl { margin:0; }
+.privacy-details-body dl > div { display:grid; grid-template-columns:120px 1fr; gap:16px; padding:15px 0; border-top:1px solid #e8edf5; }
+.privacy-details-body dt { color:#52617e; font-size:13px; font-weight:800; }
+.privacy-details-body dd { margin:0; color:#17233d; font-size:14px; line-height:1.55; }
+.privacy-details-body p { margin:18px 0 0; padding:14px 16px; border-radius:10px; background:#f6f9fe; color:#65728c; font-size:12.5px; line-height:1.6; }
+.privacy-details-close { width:100%; height:48px; margin-top:22px; border:0; border-radius:10px; background:#0b63f6; color:#fff; font-size:15px; font-weight:800; cursor:pointer; }
+
+@media (min-width: 769px) {
+  /* 1) 카드 밀도와 시선축 정리 */
+  #view-login #mobile-login-card {
+    padding-top: 46px;
+    padding-bottom: 42px;
+  }
+  #view-login .pc-auth-hero { transform: translateY(-34px); }
+  #view-login #mobile-login-card { transform: translateY(-22px); }
+
+  /* 2) 배경 전체를 어둡게 만들지 않고 Hero 주변만 아주 약하게 가독성 보강 */
+  #view-login .pc-auth-hero::before,
+  #view-signup .pc-auth-hero::before {
+    content:"";
+    position:absolute;
+    z-index:-1;
+    inset:-46px -60px;
+    border-radius:40px;
+    background: radial-gradient(ellipse at 35% 45%, rgba(10,31,70,.20) 0%, rgba(10,31,70,.08) 45%, rgba(10,31,70,0) 74%);
+    pointer-events:none;
+  }
+
+  /* 3) 기능카드 위계 + hover. 클릭요소처럼 과하게 움직이지 않는다. */
+  .pc-feature-card {
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+  }
+  .pc-feature-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(255,255,255,.82);
+    background: rgba(255,255,255,.96);
+    box-shadow: 0 16px 38px rgba(24,52,94,.16);
+  }
+  .pc-feature-card:hover .pc-feature-icon { transform: scale(1.04); }
+  .pc-feature-icon { transition: transform .18s ease; }
+  .pc-feature-card strong { font-weight: 800; letter-spacing:-.025em; }
+  .pc-feature-card p { color:#6c7891; line-height:1.5; }
+
+  /* 4) 입력 상태를 한 규칙으로 통일 */
+  #view-login input.caps-lock-on,
+  #view-signup input.caps-lock-on { border-color:#d97706 !important; box-shadow:0 0 0 3px rgba(217,119,6,.10) !important; }
+  #view-signup .mobile-signup-match-msg.is-match { color:#16803c; font-weight:700; }
+  #view-signup .mobile-signup-match-msg.is-mismatch { color:#c0392b; font-weight:700; }
+  #view-signup .mobile-signup-rules li.is-met { color:#16803c; font-weight:700; }
+
+  /* 5) 회원가입 정보 그룹은 선을 추가하지 않고 간격만으로 구분 */
+  #view-signup #signup-form > .mobile-signup-field:nth-of-type(3) { margin-top:7px; }
+  #view-signup #signup-form > .mobile-signup-field:nth-of-type(6) { margin-top:7px; }
+  #view-signup .mobile-signup-privacy-check-wrap { display:flex; align-items:center; gap:10px; }
+  #view-signup .privacy-details-btn {
+    margin-left:auto;
+    padding:2px 0;
+    border:0;
+    border-bottom:1px solid currentColor;
+    background:transparent;
+    color:#0b63f6;
+    font-size:12px;
+    font-weight:800;
+    cursor:pointer;
+  }
+
+  /* 로그인 로딩 spinner */
+  #view-login #login-form > button[type="submit"] { display:flex; align-items:center; justify-content:center; gap:10px; }
+  #view-login .auth-button-spinner { display:none; width:18px; height:18px; border:2px solid rgba(255,255,255,.45); border-top-color:#fff; border-radius:50%; }
+  #view-login button.is-loading .auth-button-spinner { display:inline-block; animation:auth-button-spin .7s linear infinite; }
+  @keyframes auth-button-spin { to { transform:rotate(360deg); } }
+
+  /* 6) 키보드 사용: DOM 순서를 그대로 사용하고 명확한 focus-visible만 제공 */
+  #view-login button:focus-visible,
+  #view-login input:focus-visible,
+  #view-signup button:focus-visible,
+  #view-signup input:focus-visible,
+  #view-signup select:focus-visible,
+  .privacy-details-modal button:focus-visible {
+    outline:3px solid rgba(11,99,246,.38);
+    outline-offset:3px;
+  }
+
+  /* 7) 가입완료/승인대기/거절/중지 화면을 인증화면과 같은 PC 언어로 통일 */
+  #view-signup-done,
+  #view-pending,
+  #view-rejected,
+  #view-disabled {
+    min-height:100vh;
+    box-sizing:border-box;
+    padding:64px 24px;
+    background:linear-gradient(145deg,#edf4ff 0%,#f7faff 52%,#eef5ff 100%);
+    color:#17233d;
+    text-align:center;
+  }
+  #view-signup-done > h1,
+  #view-pending > h1,
+  #view-rejected > h1,
+  #view-disabled > h1 { margin-top:9vh; font-size:34px; letter-spacing:-.04em; }
+  #view-signup-done > p,
+  #view-pending > p,
+  #view-rejected > p,
+  #view-disabled > p { color:#66748f; font-size:16px; }
+  #view-signup-done #signup-done-to-login,
+  #view-pending #logout-pending,
+  #view-rejected #logout-rejected,
+  #view-disabled #logout-disabled {
+    min-width:220px;
+    min-height:50px;
+    border:0;
+    border-radius:10px;
+    background:#0b63f6;
+    color:#fff;
+    font-weight:800;
+    cursor:pointer;
+  }
+
+  /* 정확히 1366×768 계열까지 별도 안전장치 */
+  @media (max-width: 1366px), (max-height: 768px) {
+    #app #view-login {
+      grid-template-columns:minmax(330px,1fr) minmax(380px,440px);
+      column-gap:30px;
+      padding:58px 44px 34px;
+      min-height:768px;
+    }
+    #view-login .pc-auth-hero {
+      max-width:500px;
+      transform:translateY(-44px) scale(.94);
+      transform-origin:left center;
+    }
+    #view-login #mobile-login-card {
+      width:min(440px,100%);
+      padding:34px 34px 30px;
+      transform:translateY(-20px);
+    }
+    #pc-login-card-title { margin-bottom:20px; }
+    #view-login .mobile-login-field input { height:52px; font-size:15px; }
+    #view-login #login-form > button[type="submit"] { height:58px; font-size:18px; }
+    #view-login #mobile-login-meta-row { margin-bottom:14px; }
+    #view-login #mobile-login-password-help,
+    #view-login #mobile-login-quick-row { margin-top:12px; padding-top:12px; }
+    #pc-feature-cards { display:none !important; }
+
+    #app #view-signup {
+      min-height:768px;
+      overflow-y:auto;
+      align-items:flex-start;
+    }
+    #view-signup .pc-auth-hero { top:50%; transform:translateY(-50%) scale(.90); transform-origin:left center; }
+    #view-signup #mobile-signup-card {
+      width:500px;
+      min-width:0;
+      margin:18px 30px 18px auto;
+      padding:22px 34px 24px;
+    }
+    #view-signup #signup-form { gap:7px; }
+    #view-signup .mobile-signup-field-input-wrap input,
+    #view-signup .mobile-signup-field-input-wrap select { height:42px; }
+    #view-signup #signup-form button[type="submit"] { height:48px; }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pc-feature-card, .pc-feature-icon, #view-login .auth-button-spinner { transition:none !important; }
+}
