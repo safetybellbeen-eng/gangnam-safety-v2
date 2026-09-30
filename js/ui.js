@@ -5660,20 +5660,24 @@ function openUploadDetailSheet() {
 async function handleGeocodeStartMobile() {
   if (state.geocodeInProgress) return;
   state.geocodeInProgress = true;
-  renderUploadMobileHost();
+  renderUploadMobileHost(); // 버튼 disabled/진행 UI를 시작 시 1회만 반영
 
-  let isFirstProgressTick = true;
   try {
     await runGeocodingForParsedRows((progress) => {
       state.geocodeProgress = progress;
-      if (isFirstProgressTick) {
-        isFirstProgressTick = false;
+
+      // 수천 건 처리 중 매 행마다 renderUploadMobileHost()로 화면 전체를 다시 만들면 DOM 재생성이
+      // 수천 번 발생해 심하게 버벅일 수 있다. 진행 중에는 숫자/텍스트만 갱신한다.
+      const progressEl = document.getElementById('upload-mobile-geocode-progress');
+      if (progressEl) {
+        progressEl.style.display = '';
+        progressEl.textContent =
+          `확인 중 ${progress.done}/${progress.total}건 · 성공 ${progress.success} · 결과없음 ${progress.notFound} · 오류 ${progress.error}`;
       }
-      renderUploadMobileHost();
     });
   } finally {
     state.geocodeInProgress = false;
-    renderUploadMobileHost();
+    renderUploadMobileHost(); // 완료 결과는 마지막에 1회 전체 재렌더
   }
 }
 
@@ -5711,6 +5715,10 @@ async function handleImportToDatabaseMobile() {
     if (result.success) {
       const sites = await loadActiveSites();
       state.sites = sites;
+      // 대량 업로드 직후에도 새 사업장 전체가 지도/관할 필터에 즉시 반영되도록 초기 로딩과 같은
+      // 좌표→동 배정 절차를 거친 뒤 목록/마커를 다시 그린다(DB의 dong 값을 수정하는 작업은 아님).
+      await assignDongToSites(state.sites);
+      renderDongOptions();
       renderSiteList('site-list');
       await renderUploadHistoryPanel('upload-history');
     }
@@ -5842,13 +5850,18 @@ function renderUploadMobileAnalyzed(body, fileInput) {
     geoBtn.addEventListener('click', () => handleGeocodeStartMobile());
     geoCard.appendChild(geoBtn);
 
+    // 진행 중에는 이 DOM 한 개의 textContent만 갱신한다. 수천 건에서도 전체 화면 재렌더를 피한다.
+    const progressP = document.createElement('p');
+    progressP.id = 'upload-mobile-geocode-progress';
+    progressP.className = 'upload-mobile-card-desc';
     if (state.geocodeProgress) {
       const p = state.geocodeProgress;
-      const progressP = document.createElement('p');
-      progressP.className = 'upload-mobile-card-desc';
-      progressP.textContent = `확인 중 ${p.done}/${p.total}건...`;
-      geoCard.appendChild(progressP);
+      progressP.textContent =
+        `확인 중 ${p.done}/${p.total}건 · 성공 ${p.success} · 결과없음 ${p.notFound} · 오류 ${p.error}`;
+    } else {
+      progressP.style.display = 'none';
     }
+    geoCard.appendChild(progressP);
   } else {
     const { resolved, needsReview } = getUploadLocationBuckets(state.uploadParsedRows);
     const geoGrid = document.createElement('div');
@@ -6788,9 +6801,12 @@ async function handleImportToDatabase(containerId) {
     state.uploadImportResult = result;
 
     if (result.success) {
-      // DB 반영 성공 시에만 지도/목록을 다시 불러온다. 로그인/지도 재초기화는 하지 않는다.
+      // DB 반영 성공 시에만 지도/목록을 다시 불러온다. loadActiveSites()는 내부 배치 조회로
+      // 수천 건 전체를 합쳐 반환하므로, 업로드 직후에도 전체 사업장을 한 번에 지도에 반영한다.
       const sites = await loadActiveSites();
       state.sites = sites;
+      await assignDongToSites(state.sites);
+      renderDongOptions();
       renderSiteList('site-list');
 
       // STEP13-6: 저장 성공 직후 업로드 이력을 다시 불러와 최신 상태로 갱신한다.

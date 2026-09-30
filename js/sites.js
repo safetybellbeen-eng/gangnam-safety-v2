@@ -7,30 +7,53 @@ const SITE_COLUMNS = 'id, company_name, site_name, address, lat, lng, dong, amou
 // is_active=true인 사업장을 전부 조회한다. 좌표 유무로 조회 자체를 제한하지 않는다 —
 // 좌표 없는 사업장도 목록에는 표시되어야 하며, 마커 생성 여부만 map.js의 좌표 검증이 담당한다.
 //
-// S3(STEP16.35): 지도 마커/검색/관할·금액 필터/동별 개수 표시가 전부 "전체 현장이 한 번에
-// state.sites에 올라와 있다"는 전제로 동작하므로(getFilteredSortedSites 등), 일부만 조회하는
-// 진짜 페이지네이션은 도입하지 않는다. 대신 예기치 않게 데이터가 비정상적으로 폭증하더라도
-// 한 번의 조회가 무한정 커지지 않도록 안전장치(.limit)만 추가한다. 실제 강남구 사업장 규모에서는
-// 이 값에 도달하지 않으므로 현재 동작(전체 표시)에는 변화가 없다. .order()를 명시해, 혹시
-// 이 상한에 걸리는 경우에도 매번 같은(가장 오래된 id부터) 부분집합이 잘리도록 보장한다.
+// 지도/검색/필터는 state.sites에 전체 사업장이 올라와 있다는 전제로 동작한다. 다만 Supabase/PostgREST의
+// 단일 응답 행 제한에 걸리지 않도록 500건씩 여러 번 조회한 뒤 브라우저에서 하나의 배열로 합친다.
+// 이것은 UI 페이지네이션이 아니라 "전체 데이터 로딩을 위한 내부 배치 조회"다.
+const SITE_FETCH_PAGE_SIZE = 500;
+const SITE_FETCH_SAFETY_MAX = 20000;
+
 export async function loadActiveSites() {
-  // F2(STEP16.35): 조회 실패를 "등록된 사업장 0건"과 구분할 수 있도록 표시만 한다
-  // (admin.js의 adminLoadError와 동일한 패턴). 성공하면 매번 false로 리셋한다.
+  // 조회 실패를 "등록된 사업장 0건"과 구분한다. 어느 한 페이지라도 실패하면 partial data를
+  // 정상 결과처럼 사용하지 않고 전체 조회를 실패 처리한다.
   state.sitesLoadError = false;
 
-  const { data, error } = await sb
-    .from('gnmap_v2_sites')
-    .select(SITE_COLUMNS)
-    .eq('is_active', true)
-    .order('id', { ascending: true })
-    .limit(5000);
+  const allSites = [];
 
-  if (error) {
-    console.error('사업장 조회 실패:', error);
+  try {
+    for (let from = 0; from < SITE_FETCH_SAFETY_MAX; from += SITE_FETCH_PAGE_SIZE) {
+      const to = Math.min(from + SITE_FETCH_PAGE_SIZE - 1, SITE_FETCH_SAFETY_MAX - 1);
+      const { data, error } = await sb
+        .from('gnmap_v2_sites')
+        .select(SITE_COLUMNS)
+        .eq('is_active', true)
+        .order('id', { ascending: true })
+        .range(from, to);
+
+      if (error) {
+        console.error(`사업장 조회 실패 (${from}~${to}):`, error);
+        state.sitesLoadError = true;
+        return [];
+      }
+
+      const page = data || [];
+      allSites.push(...page);
+
+      // 마지막 페이지: 요청 크기보다 적게 왔으면 더 이상 조회할 행이 없다.
+      if (page.length < SITE_FETCH_PAGE_SIZE) {
+        return allSites;
+      }
+    }
+
+    // 안전 상한에 정확히 도달한 경우 조용히 일부 데이터만 표시하지 않는다.
+    console.error(`사업장 수가 안전 조회 상한(${SITE_FETCH_SAFETY_MAX}건)에 도달했습니다.`);
+    state.sitesLoadError = true;
+    return [];
+  } catch (e) {
+    console.error('사업장 조회 예외:', e);
     state.sitesLoadError = true;
     return [];
   }
-  return data || [];
 }
 
 function matchesQuery(site, query) {

@@ -70,6 +70,8 @@ export async function importSitesToDatabase(fileName, sourceForm) {
 // 대조해 신규 예정/갱신 예정 건수를 계산한다. DB에 아무것도 쓰지 않는 순수 조회(SELECT)이며,
 // RPC 호출 없이 이 함수만으로는 저장이 발생하지 않는다.
 // 반환: { success:true, total, updateCount, insertCount } | { success:false, message }
+const IMPORT_PREVIEW_CHUNK_SIZE = 200;
+
 export async function previewImportImpact(fileName, sourceForm) {
   const payload = buildImportPayload(fileName, sourceForm);
   const businessStartNos = payload.rows.map(r => r.business_start_no);
@@ -78,18 +80,30 @@ export async function previewImportImpact(fileName, sourceForm) {
     return { success: false, message: '대상 행이 없습니다.' };
   }
 
-  try {
-    const { data, error } = await sb
-      .from('gnmap_v2_sites')
-      .select('business_start_no')
-      .in('business_start_no', businessStartNos);
+  // 수천 건의 사업개시번호를 한 번의 .in() URL에 넣으면 요청 URL이 지나치게 커질 수 있다.
+  // 조회에 필요한 번호만 중복 제거한 뒤 작은 묶음으로 순차 조회하고, 결과는 하나의 Set으로 합친다.
+  // 신규/갱신 건수 계산은 원래 businessStartNos 배열 기준으로 하므로 기존 의미는 유지된다.
+  const uniqueBusinessStartNos = [...new Set(businessStartNos.filter(Boolean))];
+  const existingSet = new Set();
 
-    if (error) {
-      console.error('사전 검증 조회 실패:', error);
-      return { success: false, message: error.message || '사전 검증 조회에 실패했습니다.' };
+  try {
+    for (let i = 0; i < uniqueBusinessStartNos.length; i += IMPORT_PREVIEW_CHUNK_SIZE) {
+      const chunk = uniqueBusinessStartNos.slice(i, i + IMPORT_PREVIEW_CHUNK_SIZE);
+      const { data, error } = await sb
+        .from('gnmap_v2_sites')
+        .select('business_start_no')
+        .in('business_start_no', chunk);
+
+      if (error) {
+        console.error(`사전 검증 조회 실패 (${i + 1}~${Math.min(i + chunk.length, uniqueBusinessStartNos.length)}):`, error);
+        return { success: false, message: error.message || '사전 검증 조회에 실패했습니다.' };
+      }
+
+      (data || []).forEach(row => {
+        if (row.business_start_no) existingSet.add(row.business_start_no);
+      });
     }
 
-    const existingSet = new Set((data || []).map(r => r.business_start_no));
     const updateCount = businessStartNos.filter(no => existingSet.has(no)).length;
     const insertCount = businessStartNos.length - updateCount;
 
