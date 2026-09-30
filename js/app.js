@@ -496,17 +496,52 @@ function bindDetailPanelSwipeToClose() {
   panel.addEventListener('pointercancel', endDrag);
 }
 
+function bindCapsLockWarning(inputId, warningId) {
+  const input = document.getElementById(inputId);
+  const warning = document.getElementById(warningId);
+  if (!input || !warning) return;
+  const update = (event) => {
+    const on = !!(event.getModifierState && event.getModifierState('CapsLock'));
+    warning.hidden = !on;
+    input.classList.toggle('caps-lock-on', on);
+  };
+  input.addEventListener('keydown', update);
+  input.addEventListener('keyup', update);
+  input.addEventListener('blur', () => { warning.hidden = true; input.classList.remove('caps-lock-on'); });
+}
+
+function bindPrivacyDetailsModal() {
+  const modal = document.getElementById('privacy-details-modal');
+  const openBtn = document.getElementById('privacy-details-btn');
+  const closeBtn = document.getElementById('privacy-details-close');
+  const closeX = document.getElementById('privacy-details-x');
+  if (!modal || !openBtn || !closeBtn || !closeX) return;
+  let lastFocused = null;
+  const open = () => { lastFocused = document.activeElement; modal.hidden = false; document.body.classList.add('auth-modal-open'); closeX.focus(); };
+  const close = () => { modal.hidden = true; document.body.classList.remove('auth-modal-open'); if (lastFocused && typeof lastFocused.focus === 'function') lastFocused.focus(); };
+  openBtn.addEventListener('click', open);
+  closeBtn.addEventListener('click', close);
+  closeX.addEventListener('click', close);
+  modal.addEventListener('click', (event) => { if (event.target.dataset.privacyClose === 'true') close(); });
+  modal.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') { event.preventDefault(); close(); return; }
+    if (event.key !== 'Tab') return;
+    const focusables = [...modal.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')];
+    if (!focusables.length) return;
+    const first = focusables[0], last = focusables[focusables.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  });
+}
+
 function bindEvents() {
   document.getElementById('show-signup').addEventListener('click', () => showView('view-signup'));
   document.getElementById('show-login').addEventListener('click', () => showView('view-login'));
-  
-    // PC 회원가입 화면: 뒤로가기 / 하단 로그인
+  // PC 회원가입 카드의 뒤로가기/하단 로그인 링크도 기존 show-login과 같은 화면 전환만 재사용한다.
   const pcSignupBack = document.getElementById('pc-signup-back');
   if (pcSignupBack) pcSignupBack.addEventListener('click', () => document.getElementById('show-login').click());
-
   const pcSignupLoginLink = document.getElementById('pc-signup-login-link');
   if (pcSignupLoginLink) pcSignupLoginLink.addEventListener('click', () => document.getElementById('show-login').click());
-  
   // 로그인 화면 우상단 "회원가입 >" 링크. 기존 show-signup과 동일한 화면 전환만 재사용한다(신규 로직 없음).
   const signupTop = document.getElementById('mobile-login-signup-top');
   if (signupTop) signupTop.addEventListener('click', () => showView('view-signup'));
@@ -564,6 +599,11 @@ function bindEvents() {
     document.getElementById('mobile-login-remember').checked = true;
   }
   document.getElementById('mobile-login-autologin').checked = localStorage.getItem(AUTO_LOGIN_KEY) === '1';
+
+  bindCapsLockWarning('login-password', 'login-caps-warning');
+  bindCapsLockWarning('signup-password', 'signup-password-caps-warning');
+  bindCapsLockWarning('signup-password-confirm', 'signup-confirm-caps-warning');
+  bindPrivacyDetailsModal();
 
   // 사용자 요청(3): 상세정보 패널 상단의 터치바(드래그 핸들)를 아래로 스와이프하면 닫힌다.
   // 패널 자체는 renderDetail()이 매번 innerHTML만 바꾸고 엘리먼트는 재사용하므로, 리스너는
@@ -669,9 +709,11 @@ function bindEvents() {
     const submitBtn = e.target.querySelector('button[type="submit"]');
     if (submitBtn) {
       if (submitBtn.disabled) return;
-      submitBtn.dataset.originalText = submitBtn.textContent;
+      submitBtn.dataset.originalHtml = submitBtn.innerHTML;
       submitBtn.disabled = true;
-      submitBtn.textContent = '로그인 중...';
+      submitBtn.classList.add('is-loading');
+      submitBtn.setAttribute('aria-busy', 'true');
+      submitBtn.innerHTML = '<span class="auth-button-spinner" aria-hidden="true"></span><span class="auth-button-label">로그인 중...</span>';
     }
 
     try {
@@ -701,7 +743,9 @@ function bindEvents() {
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
-        if (submitBtn.dataset.originalText != null) submitBtn.textContent = submitBtn.dataset.originalText;
+        submitBtn.classList.remove('is-loading');
+        submitBtn.removeAttribute('aria-busy');
+        if (submitBtn.dataset.originalHtml != null) submitBtn.innerHTML = submitBtn.dataset.originalHtml;
       }
     }
   });
