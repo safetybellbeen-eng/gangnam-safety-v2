@@ -499,6 +499,12 @@ function bindDetailPanelSwipeToClose() {
 function bindEvents() {
   document.getElementById('show-signup').addEventListener('click', () => showView('view-signup'));
   document.getElementById('show-login').addEventListener('click', () => showView('view-login'));
+    // PC 회원가입 화면: 뒤로가기 / 하단 로그인
+  const pcSignupBack = document.getElementById('pc-signup-back');
+  if (pcSignupBack) pcSignupBack.addEventListener('click', () => document.getElementById('show-login').click());
+
+  const pcSignupLoginLink = document.getElementById('pc-signup-login-link');
+  if (pcSignupLoginLink) pcSignupLoginLink.addEventListener('click', () => document.getElementById('show-login').click());
   // 로그인 화면 우상단 "회원가입 >" 링크. 기존 show-signup과 동일한 화면 전환만 재사용한다(신규 로직 없음).
   const signupTop = document.getElementById('mobile-login-signup-top');
   if (signupTop) signupTop.addEventListener('click', () => showView('view-signup'));
