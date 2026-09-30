@@ -439,11 +439,10 @@
     display: block !important;
     justify-self: stretch;
     margin-bottom: 0;
-    padding-right: 96px;
+    padding-right: 110px;
     color: #65718c;
-    font-size: 13px;
+    font-size: 14px;
     line-height: 1.4;
-    white-space: nowrap;
   }
 
   #view-login #mobile-login-quick-row {
@@ -796,6 +795,89 @@
     margin: 8px 0 0;
     color: #c0392b;
     font-size: 12px;
+  }
+
+
+  /* 개인정보 동의 UI: 인증 화면의 파란색 계열과 동일한 버튼/모달 스타일 */
+  #view-signup .privacy-details-btn {
+    margin-left: auto;
+    padding: 5px 10px;
+    border: 1px solid #b9cff7;
+    border-radius: 6px;
+    background: #fff;
+    color: #0b63f6;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease, box-shadow .15s ease;
+  }
+
+  #view-signup .privacy-details-btn:hover {
+    background: #f5f9ff;
+    border-color: #78a6f8;
+    box-shadow: 0 2px 7px rgba(11, 99, 246, .10);
+  }
+
+  #view-signup .privacy-details-modal[hidden] { display: none !important; }
+  #view-signup .privacy-details-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  #view-signup .privacy-details-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(7, 28, 97, .42);
+    backdrop-filter: blur(2px);
+  }
+  #view-signup .privacy-details-dialog {
+    position: relative;
+    z-index: 1;
+    width: min(480px, calc(100vw - 48px));
+    padding: 26px;
+    border: 1px solid #d9e5f6;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 24px 70px rgba(6, 30, 82, .24);
+    color: #132b5e;
+  }
+  #view-signup .privacy-details-header { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; }
+  #view-signup .privacy-details-kicker { display:block; margin-bottom:5px; color:#0b63f6; font-size:12px; font-weight:800; }
+  #view-signup .privacy-details-header h3 { margin:0; color:#071c61; font-size:22px; line-height:1.25; }
+  #view-signup .privacy-details-x { width:34px; height:34px; padding:0; border:0; border-radius:8px; background:#f3f7fd; color:#536889; font-size:23px; line-height:1; cursor:pointer; }
+  #view-signup .privacy-details-body { margin-top:20px; }
+  #view-signup .privacy-details-body dl { margin:0; border:1px solid #e1e9f5; border-radius:10px; overflow:hidden; }
+  #view-signup .privacy-details-body dl > div { display:grid; grid-template-columns:110px 1fr; border-bottom:1px solid #e8eef7; }
+  #view-signup .privacy-details-body dl > div:last-child { border-bottom:0; }
+  #view-signup .privacy-details-body dt,
+  #view-signup .privacy-details-body dd { margin:0; padding:12px 14px; font-size:13px; line-height:1.45; }
+  #view-signup .privacy-details-body dt { background:#f6f9fe; color:#304b7c; font-weight:800; }
+  #view-signup .privacy-details-body dd { color:#52617e; }
+  #view-signup .privacy-details-body p { margin:14px 0 0; color:#6a7894; font-size:12px; line-height:1.6; }
+  #view-signup .privacy-details-close { width:100%; height:46px; margin-top:20px; border:0; border-radius:8px; background:#0b63f6; color:#fff; font-size:14px; font-weight:800; cursor:pointer; }
+
+  /* 가입 신청 버튼의 PC 라벨을 명시적으로 표시한다. */
+  #view-signup #signup-form button[type="submit"] .mobile-signup-submit-label { display: inline !important; }
+  #view-signup #signup-form button[type="submit"] .signup-label-pc-only { display: none !important; }
+
+  /* 가입 오류는 항상 회원가입 카드 안, 제출 버튼 바로 아래에 표시한다. */
+  #view-signup #signup-error {
+    position: static !important;
+    display: block !important;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 16px;
+    margin: 8px 0 0 !important;
+    padding: 0 !important;
+    color: #d63636;
+    font-size: 12px;
+    line-height: 1.35;
   }
 
   #pc-signup-login-row {
