@@ -439,10 +439,11 @@
     display: block !important;
     justify-self: stretch;
     margin-bottom: 0;
-    padding-right: 110px;
+    padding-right: 96px;
     color: #65718c;
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1.4;
+    white-space: nowrap;
   }
 
   #view-login #mobile-login-quick-row {
