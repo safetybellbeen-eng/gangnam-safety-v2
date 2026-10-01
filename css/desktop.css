@@ -1191,10 +1191,10 @@
   #app[data-pc-tab="map"] #site-search-input-wrap{height:42px!important;border:1px solid #cddbf0!important;border-radius:7px!important;background:#fff!important}
   #app[data-pc-tab="map"] #site-search-input{font-size:13px!important;color:#173467!important}
   #app[data-pc-tab="map"] #site-filter-row{display:flex!important;flex-wrap:wrap!important;gap:6px!important;align-items:center!important}
-  #app[data-pc-tab="map"] #site-search-mode-filter,#app[data-pc-tab="map"] #site-accident-report-filter,#app[data-pc-tab="map"] #site-sort-filter{display:none!important}
+  #app[data-pc-tab="map"] #site-search-mode-filter,#app[data-pc-tab="map"] #site-sort-filter{display:none!important}
   #app[data-pc-tab="map"] .site-select-filter-label{min-height:34px!important;padding:0 10px!important;border:1px solid #cddbf0!important;border-radius:6px!important;color:#183a70!important;background:#fff!important;font-size:12px!important;font-weight:650!important;display:flex!important;align-items:center!important}
   #app[data-pc-tab="map"] #site-dong-filter-label::before{content:'동 '}
-  #app[data-pc-tab="map"] #site-inspection-filter-label::before{content:'점검여부 '}
+  
   #app[data-pc-tab="map"] #site-toggle-filter-row{display:none!important}
 
   #app[data-pc-tab="map"] #site-list{height:calc(100% - 132px)!important;margin:0 -4px!important;padding:0 4px!important;overflow:auto!important;scrollbar-width:thin;scrollbar-color:#b9c8dd transparent}
@@ -1501,4 +1501,36 @@
   #app[data-pc-tab="map"] #site-detail-panel .site-detail-note-actions button{min-height:34px!important;padding:0 12px!important;border:1px solid #c7d8ef!important;border-radius:6px!important;background:#fff!important;color:#0b56c7!important;font-size:12px!important;font-weight:700!important}
   #app[data-pc-tab="map"] #site-detail-panel .site-detail-note-textarea{display:block!important;width:100%!important;min-height:86px!important;box-sizing:border-box!important;margin-top:8px!important;padding:10px!important;border:1px solid #d3e0f1!important;border-radius:7px!important;background:#fff!important;color:#173467!important;resize:vertical!important}
   #app[data-pc-tab="map"] #site-detail-panel .site-detail-copy-btn{flex:0 0 auto!important;min-height:26px!important;padding:0 8px!important;border:1px solid #d3e0f1!important;border-radius:5px!important;background:#fff!important;color:#5473a4!important;font-size:10px!important}
+}
+
+
+/* PC STEP3.4 polish — desktop only. Mobile/TWA untouched. */
+@media (min-width:769px){
+  /* Top search: keep placeholder/text vertically centered and visible. */
+  .pc-global-search{box-sizing:border-box;overflow:hidden}
+  .pc-global-search>span{display:flex;align-items:center;justify-content:center;flex:0 0 22px;line-height:1}
+  .pc-global-search input{display:block;height:100%!important;min-height:0!important;margin:0!important;padding:0!important;line-height:1.4!important;box-sizing:border-box;background:transparent!important;transform:none!important}
+  .pc-global-search input::placeholder{color:#7a8ca9;opacity:1}
+
+  /* Page title + description: explicit flex sizing prevents text from slipping under title. */
+  #pc-page-heading{box-sizing:border-box;overflow:hidden}
+  #pc-page-heading h1{flex:0 0 auto;white-space:nowrap}
+  #pc-page-heading p{display:block;flex:0 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5;margin:0!important}
+
+  /* Sidebar official mark: transparent symbol, no white tile/ring. */
+  .pc-brand{gap:10px;min-height:42px}
+  .pc-brand img{display:block;width:40px!important;height:40px!important;object-fit:contain!important;background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important}
+  .pc-brand div{min-width:0}.pc-brand strong,.pc-brand span{color:#fff}
+
+  /* Consistent line icons instead of text glyphs. */
+  .pc-nav-btn{gap:13px}
+  .pc-nav-icon{width:21px;height:21px;flex:0 0 21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .pc-nav-btn.active .pc-nav-icon{stroke-width:2}
+
+  /* Map filters requested for PC. */
+  #app[data-pc-tab="map"] #site-inspection-filter-label::before{content:none!important}
+  #app[data-pc-tab="map"] #site-accident-report-filter{display:block!important}
+  #app[data-pc-tab="map"] #site-accident-report-filter-label{white-space:nowrap}
+  #app[data-pc-tab="map"] #favorite-subtabs{display:none!important}
+  #app[data-pc-tab="map"] #site-list-panel>.favorite-subtabs{display:none!important}
 }
