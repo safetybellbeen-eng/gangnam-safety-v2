@@ -7,7 +7,7 @@ import { initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites, rend
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
-import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView, renderHeaderUploadDate, setSiteSearchMode } from './ui.js';
+import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView, renderHeaderUploadDate, setSiteSearchMode, renderSiteNotesPanel, renderAppSettingsPanel } from './ui.js';
 import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
 
 const VIEWS = [
@@ -496,7 +496,81 @@ function bindDetailPanelSwipeToClose() {
   panel.addEventListener('pointercancel', endDrag);
 }
 
+function activatePcTab(tab) {
+  if (window.matchMedia('(max-width: 768px)').matches) return;
+  const appEl = document.getElementById('app');
+  if (appEl) appEl.dataset.pcTab = tab;
+
+  document.querySelectorAll('.pc-nav-btn[data-pc-tab]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.pcTab === tab);
+  });
+
+  const meta = {
+    map: ['지도', '강남구 사업장을 지도에서 확인하고 현장 정보를 조회할 수 있습니다.'],
+    site: ['현장', '강남구 사업장 목록을 조회하고, 상세 정보를 확인할 수 있습니다.'],
+    route: ['경로', '선택한 현장의 방문 순서를 확인하고 경로를 관리할 수 있습니다.'],
+    favorite: ['즐겨찾기', '자주 방문하는 현장을 즐겨찾기로 등록하여 빠르게 확인할 수 있습니다.']
+  };
+  const [title, desc] = meta[tab] || meta.map;
+  const titleEl = document.getElementById('pc-page-title');
+  const descEl = document.getElementById('pc-page-desc');
+  if (titleEl) titleEl.textContent = title;
+  if (descEl) descEl.textContent = desc;
+
+  // 기존 모바일 탭 전환 함수가 가진 필터/즐겨찾기/경로 렌더 로직을 그대로 재사용한다.
+  activateMobileTab(tab);
+  if (tab === 'map' && state.map && typeof state.map.relayout === 'function') {
+    requestAnimationFrame(() => state.map.relayout());
+  }
+}
+
+function bindPcWorkspace() {
+  const appEl = document.getElementById('app');
+  if (appEl && !appEl.dataset.pcTab) appEl.dataset.pcTab = 'map';
+
+  document.querySelectorAll('.pc-nav-btn[data-pc-tab]').forEach(btn => {
+    btn.addEventListener('click', () => activatePcTab(btn.dataset.pcTab));
+  });
+
+  const actionMap = {
+    supervision: 'btn-supervision-panel',
+    admin: 'btn-admin-panel',
+    upload: 'btn-upload-panel',
+    logout: 'logout-approved'
+  };
+  document.querySelectorAll('.pc-nav-btn[data-pc-action]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const action = btn.dataset.pcAction;
+      if (action === 'notes') {
+        renderSiteNotesPanel?.('site-notes-panel');
+        const panel = document.getElementById('site-notes-panel');
+        if (panel) panel.style.display = 'block';
+        return;
+      }
+      if (action === 'settings') {
+        renderAppSettingsPanel?.('app-settings-panel');
+        const panel = document.getElementById('app-settings-panel');
+        if (panel) panel.style.display = 'block';
+        return;
+      }
+      const target = document.getElementById(actionMap[action]);
+      if (target) target.click();
+    });
+  });
+
+  const globalSearch = document.getElementById('pc-global-search-input');
+  const siteSearch = document.getElementById('site-search-input');
+  if (globalSearch && siteSearch) {
+    globalSearch.addEventListener('input', () => {
+      siteSearch.value = globalSearch.value;
+      siteSearch.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    siteSearch.addEventListener('input', () => { globalSearch.value = siteSearch.value; });
+  }
+}
+
 function bindEvents() {
+  bindPcWorkspace();
   document.getElementById('show-signup').addEventListener('click', () => showView('view-signup'));
   document.getElementById('show-login').addEventListener('click', () => showView('view-login'));
   // PC 회원가입 카드의 뒤로가기/하단 로그인 링크도 기존 show-login과 같은 화면 전환만 재사용한다.

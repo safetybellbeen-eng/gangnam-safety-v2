@@ -341,7 +341,7 @@ function openSiteNotesPanel() {
   renderSiteNotesPanel('site-notes-panel');
 }
 
-function renderSiteNotesPanel(containerId) {
+export function renderSiteNotesPanel(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
   container.innerHTML = '';
