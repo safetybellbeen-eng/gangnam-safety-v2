@@ -890,6 +890,21 @@
         <span class="mobile-map-legend-item"><span class="mobile-map-legend-dot mobile-map-legend-dot-review"></span>확인필요</span>
       </div>
     </div>
+    <!-- PC STEP3: 현장 탭 전용 테이블. 모바일에서는 desktop.css 기본값으로 숨김. -->
+    <section id="pc-site-table-panel" aria-label="현장 목록">
+      <div class="pc-site-table-toolbar">
+        <label class="pc-site-table-search"><span aria-hidden="true">⌕</span><input id="pc-site-table-search-input" type="search" placeholder="사업장명, 주소 검색"></label>
+        <button type="button" id="pc-site-filter-reset">☷ <span>필터 초기화</span></button>
+      </div>
+      <div id="pc-site-table-filters"></div>
+      <div class="pc-site-table-wrap">
+        <table id="pc-site-table">
+          <thead><tr><th class="pc-col-check"></th><th class="pc-col-fav">☆</th><th>사업장명</th><th>주소</th><th>공사금액</th><th>공사기간</th><th>위치 정확도</th><th>메모</th></tr></thead>
+          <tbody id="pc-site-table-body"></tbody>
+        </table>
+      </div>
+      <div id="pc-site-table-footer"><span id="pc-site-table-summary"></span><div id="pc-site-table-pagination"></div></div>
+    </section>
     <div id="site-detail-panel" style="display:none"></div>
     <button type="button" id="logout-approved">로그아웃</button>
 
