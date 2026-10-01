@@ -612,8 +612,16 @@
       </div>
     </aside>
     <header id="pc-app-header">
-      <label class="pc-global-search"><span>⌕</span><input id="pc-global-search-input" type="search" placeholder="사업장명 또는 주소를 검색하세요."></label>
-      <div class="pc-user-area"><button type="button" class="pc-bell" aria-label="알림">♧</button><span class="pc-user-avatar">●</span><strong id="pc-user-name">감독관</strong><span>⌄</span></div>
+      <label class="pc-global-search">
+        <svg class="pc-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+        <input id="pc-global-search-input" type="search" placeholder="사업장명 또는 주소를 검색하세요.">
+      </label>
+      <div class="pc-user-area">
+        <button type="button" class="pc-bell" aria-label="알림"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 16v-5a6 6 0 1 0-12 0v5l-2 2h16l-2-2Z"/><path d="M10 21h4"/></svg></button>
+        <span class="pc-user-avatar"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg></span>
+        <strong id="pc-user-name">감독관</strong>
+        <svg class="pc-user-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg>
+      </div>
     </header>
     <div id="pc-page-heading"><h1 id="pc-page-title">지도</h1><p id="pc-page-desc">강남구 사업장을 지도에서 확인하고 현장 정보를 조회할 수 있습니다.</p></div>
     <!-- STEP15-C/E.1/E.1-2: 모바일 전용 공통 헤더. PC에서는 css/mobile.css가 항상 숨김 처리한다.
