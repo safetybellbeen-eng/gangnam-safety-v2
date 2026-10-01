@@ -591,6 +591,31 @@
   </section>
 
   <section id="view-approved" style="display:none">
+    <!-- PC 업무화면 Shell: 모바일 DOM/기능은 그대로 두고 769px 이상에서만 표시 -->
+    <aside id="pc-sidebar" aria-label="PC 주 메뉴">
+      <div class="pc-brand"><img src="assets/icons/moel-ci-cutout.png" alt=""><div><strong>고용노동부</strong><span>산업안전 순찰지도</span></div></div>
+      <nav class="pc-nav">
+        <button class="pc-nav-btn active" data-pc-tab="map">⌖<span>지도</span></button>
+        <button class="pc-nav-btn" data-pc-tab="site">▣<span>현장</span></button>
+        <button class="pc-nav-btn" data-pc-tab="route">⌁<span>경로</span></button>
+        <button class="pc-nav-btn" data-pc-tab="favorite">☆<span>즐겨찾기</span></button>
+        <div class="pc-nav-sep"></div>
+        <button class="pc-nav-btn" data-pc-action="supervision">□<span>감독일정관리</span></button>
+        <button class="pc-nav-btn" data-pc-action="notes">▤<span>현장 메모</span></button>
+        <div class="pc-nav-sep pc-admin-sep"></div>
+        <button class="pc-nav-btn pc-admin-only" data-pc-action="admin">♙<span>회원관리</span></button>
+        <button class="pc-nav-btn pc-admin-only" data-pc-action="upload">◉<span>사업장 데이터 관리</span></button>
+      </nav>
+      <div class="pc-nav-bottom">
+        <button class="pc-nav-btn" data-pc-action="settings">⚙<span>설정</span></button>
+        <button class="pc-nav-btn" data-pc-action="logout">⇥<span>로그아웃</span></button>
+      </div>
+    </aside>
+    <header id="pc-app-header">
+      <label class="pc-global-search"><span>⌕</span><input id="pc-global-search-input" type="search" placeholder="사업장명 또는 주소를 검색하세요."></label>
+      <div class="pc-user-area"><button type="button" class="pc-bell" aria-label="알림">♧</button><span class="pc-user-avatar">●</span><strong id="pc-user-name">감독관</strong><span>⌄</span></div>
+    </header>
+    <div id="pc-page-heading"><h1 id="pc-page-title">지도</h1><p id="pc-page-desc">강남구 사업장을 지도에서 확인하고 현장 정보를 조회할 수 있습니다.</p></div>
     <!-- STEP15-C/E.1/E.1-2: 모바일 전용 공통 헤더. PC에서는 css/mobile.css가 항상 숨김 처리한다.
          고용노동부 공식 CI는 태극 문양+"고용노동부" 글자가 한 덩어리인 원본 가로 조합형 이미지를
          그대로(비율/색상/글자 변경 없이) 사용하고, 외곽 흰 여백만 crop해 assets/icons/moel-ci-full.png로
