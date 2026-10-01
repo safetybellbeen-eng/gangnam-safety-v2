@@ -1558,7 +1558,7 @@ export function renderDetail(site) {
   // 알 수 있는 지금 시점에, 핀이 "가려지지 않고 보이는" 지도 영역 한가운데에 오도록
   // centerSiteInVisibleArea()로 정밀 재중심화한다(지도 탭일 때만 — 다른 탭은 시트가 지도를
   // 가리지 않으므로 기존 selectSite()의 panToSite()로 충분).
-  if (state.mobileActiveTab === 'map' && state.map) {
+  if (isMobileViewport() && state.mobileActiveTab === 'map' && state.map) {
     const hiddenBottomPx = panel.getBoundingClientRect().height;
     centerSiteInVisibleArea(site, hiddenBottomPx);
   }
