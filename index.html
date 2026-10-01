@@ -736,6 +736,10 @@
     <div id="route-order-panel" style="display:none"></div>
     <div id="route-detail-panel" style="display:none"></div>
     <div id="site-list-panel">
+      <div id="pc-site-list-head">
+        <div><strong>현장</strong><span id="pc-site-count">전체 0개</span></div>
+        <button type="button" id="pc-favorite-filter-btn" aria-label="즐겨찾기 현장만 보기">☆</button>
+      </div>
       <div id="site-search-bar">
         <div id="site-search-input-wrap">
           <!-- STEP15-E.1: 검색 아이콘. 기존 #site-search-input/state/이벤트는 전혀 건드리지 않고
@@ -872,6 +876,10 @@
       <div id="site-address-search-results"></div>
     </div>
     <div id="map-container">
+      <div id="pc-map-toolbar" aria-label="지도 도구">
+        <button type="button" id="pc-map-current-location">⌖ <span>현재 위치</span></button>
+        <button type="button" id="pc-map-reset">↻ <span>지도 초기화</span></button>
+      </div>
       <!-- STEP15-E.1-2: 정확도 범례. #map-container 내부에 넣지만 Kakao Map은 이 컨테이너에
            자신의 지도/컨트롤 div를 추가만 할 뿐 기존 자식을 지우지 않으므로 안전하다(Kakao 자체
            줌/지도타입 컨트롤도 같은 방식으로 컨테이너 안에 얹힌다). 지도 재초기화/마커 로직과는
