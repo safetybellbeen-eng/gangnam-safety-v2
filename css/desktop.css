@@ -1168,3 +1168,89 @@
   @media(max-width:1450px){#view-approved{--side:190px}.pc-nav-btn{padding:0 12px}.pc-brand{padding-left:8px}.pc-brand span{font-size:13px}#site-list-panel{width:300px!important}#map-container{left:calc(var(--side) + 324px)!important;right:320px!important}#site-detail-panel{width:300px!important}.pc-global-search{width:520px}}
   @media(max-width:1200px){#view-approved{--side:176px}.pc-nav-btn{font-size:13px;gap:9px}#site-list-panel{width:280px!important}#map-container{left:calc(var(--side) + 304px)!important;right:292px!important}#site-detail-panel{width:272px!important}}
 }
+
+
+/* ===== PC 업무화면 STEP2: 지도 탭 정밀화 ===== */
+@media (min-width:769px){
+  #view-approved{--side:224px;--head:70px;--pc-gap:8px;--pc-panel:#fff;--pc-border:#d6e2f3;--pc-muted:#667da5;--pc-blue:#0b67f5}
+  #pc-sidebar{width:var(--side);padding:18px 10px;background:#07376b}
+  .pc-brand{padding:0 12px 24px}.pc-brand img{width:42px;height:42px}.pc-brand strong{font-size:12px}.pc-brand span{font-size:14px}
+  .pc-nav-btn{height:47px;border-radius:7px;font-size:15px}.pc-nav-btn.active{background:#1b63c6}
+  #pc-app-header{height:var(--head);padding:0 22px}.pc-global-search{width:615px;height:44px;border-radius:7px}.pc-global-search input{font-size:14px}
+  #pc-page-heading{left:calc(var(--side) + 22px);top:var(--head);height:66px;right:16px;background:#fff}
+  #pc-page-heading h1{font-size:27px;letter-spacing:-.04em}#pc-page-heading p{font-size:14px;color:#6078a3}
+
+  #app[data-pc-tab="map"] #site-list-panel{left:calc(var(--side) + 12px)!important;top:136px!important;bottom:20px!important;width:350px!important;padding:12px!important;border-color:var(--pc-border)!important;border-radius:10px!important;box-shadow:none!important}
+  #pc-site-list-head{display:none}
+  #app[data-pc-tab="map"] #pc-site-list-head{display:flex;align-items:center;justify-content:space-between;height:38px;padding:0 2px 8px}
+  #pc-site-list-head>div{display:flex;align-items:center;gap:12px}#pc-site-list-head strong{font-size:20px;color:#08265f}#pc-site-count{font-size:12px;color:#61779c}
+  #pc-favorite-filter-btn{width:34px;height:34px;border:0;background:transparent;color:#7190bd;font-size:25px;line-height:1;cursor:pointer}
+  #pc-favorite-filter-btn:hover{color:#f59e0b;transform:translateY(-1px)}
+
+  #app[data-pc-tab="map"] #site-search-bar{gap:8px!important;margin:0 0 8px!important}
+  #app[data-pc-tab="map"] #site-search-input-wrap{height:42px!important;border:1px solid #cddbf0!important;border-radius:7px!important;background:#fff!important}
+  #app[data-pc-tab="map"] #site-search-input{font-size:13px!important;color:#173467!important}
+  #app[data-pc-tab="map"] #site-filter-row{display:flex!important;flex-wrap:wrap!important;gap:6px!important;align-items:center!important}
+  #app[data-pc-tab="map"] #site-search-mode-filter,#app[data-pc-tab="map"] #site-accident-report-filter,#app[data-pc-tab="map"] #site-sort-filter{display:none!important}
+  #app[data-pc-tab="map"] .site-select-filter-label{min-height:34px!important;padding:0 10px!important;border:1px solid #cddbf0!important;border-radius:6px!important;color:#183a70!important;background:#fff!important;font-size:12px!important;font-weight:650!important;display:flex!important;align-items:center!important}
+  #app[data-pc-tab="map"] #site-dong-filter-label::before{content:'동 '}
+  #app[data-pc-tab="map"] #site-inspection-filter-label::before{content:'점검여부 '}
+  #app[data-pc-tab="map"] #site-toggle-filter-row{display:none!important}
+
+  #app[data-pc-tab="map"] #site-list{height:calc(100% - 132px)!important;margin:0 -4px!important;padding:0 4px!important;overflow:auto!important;scrollbar-width:thin;scrollbar-color:#b9c8dd transparent}
+  #app[data-pc-tab="map"] .site-list-item{position:relative!important;min-height:82px!important;padding:10px 34px 9px 10px!important;margin:0!important;border:0!important;border-bottom:1px solid #e4ecf7!important;border-radius:0!important;background:#fff!important;box-shadow:none!important;cursor:pointer!important;box-sizing:border-box!important}
+  #app[data-pc-tab="map"] .site-list-item:hover{background:#f7faff!important}
+  #app[data-pc-tab="map"] .site-list-item.active{background:#f3f8ff!important;box-shadow:inset 0 0 0 1.5px var(--pc-blue)!important;border-radius:6px!important}
+  #app[data-pc-tab="map"] .site-list-title-row{display:block!important;margin:0 0 3px!important}
+  #app[data-pc-tab="map"] .favorite-toggle-btn{position:absolute!important;right:9px!important;top:12px!important;width:24px!important;height:24px!important;padding:0!important;border:0!important;background:transparent!important;color:#7d99bf!important;font-size:20px!important;line-height:24px!important}
+  #app[data-pc-tab="map"] .favorite-toggle-btn.is-favorite{color:#f59e0b!important}
+  #app[data-pc-tab="map"] .site-list-title{font-size:14px!important;line-height:1.25!important;font-weight:800!important;color:#092b66!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;padding-right:2px!important}
+  #app[data-pc-tab="map"] .site-list-company{display:none!important}
+  #app[data-pc-tab="map"] .site-list-address{font-size:11.5px!important;line-height:1.3!important;color:#7284a4!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;margin:0 0 7px!important}
+  #app[data-pc-tab="map"] .site-list-meta,#app[data-pc-tab="map"] .site-list-summary{display:none!important}
+  .pc-site-row-meta{display:none}
+  #app[data-pc-tab="map"] .pc-site-row-meta{display:flex;align-items:center;gap:8px;font-size:11px;color:#62779b}
+  .pc-site-amount-tag{padding:3px 7px;border-radius:4px;background:#edf4ff;color:#4f6f9e;font-weight:650}
+  .pc-site-quality{display:inline-flex;align-items:center;gap:5px}.pc-site-quality i{width:8px;height:8px;border-radius:50%;display:inline-block}.pc-site-quality-exact i{background:#ef3340}.pc-site-quality-estimated i{background:#f59e0b}.pc-site-quality-review i{background:#2f9d61}
+
+  #app[data-pc-tab="map"] #map-container{left:calc(var(--side) + 370px)!important;right:370px!important;top:136px!important;bottom:20px!important;border-radius:10px!important;border:1px solid var(--pc-border)!important;background:#eef5fb!important}
+  #pc-map-toolbar{display:none}
+  #app[data-pc-tab="map"] #pc-map-toolbar{display:flex;position:absolute;left:12px;top:12px;z-index:25;gap:7px;pointer-events:auto}
+  #pc-map-toolbar button{height:38px;padding:0 13px;border:1px solid #d1deef;border-radius:7px;background:#fff;color:#173c76;font-size:12px;font-weight:750;box-shadow:0 2px 8px rgba(18,58,111,.08);cursor:pointer}
+  #pc-map-toolbar button:hover{border-color:#83adf1;background:#f7faff}
+  #app[data-pc-tab="map"] #mobile-map-legend{left:12px!important;bottom:12px!important;padding:8px 12px!important;border-radius:7px!important;font-size:11px!important;box-shadow:0 2px 8px rgba(18,58,111,.08)!important}
+
+  #app[data-pc-tab="map"] #site-detail-panel{right:12px!important;top:136px!important;bottom:20px!important;width:350px!important;padding:18px!important;border:1px solid var(--pc-border)!important;border-radius:10px!important;box-shadow:none!important;background:#fff!important}
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-close-x{display:block!important;position:absolute!important;right:12px!important;top:8px!important;border:0!important;background:transparent!important;color:#173467!important;font-size:24px!important;cursor:pointer!important}
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-quality-badge{display:inline-flex!important;margin:0 0 12px!important;padding:4px 8px!important;border-radius:5px!important;font-size:11px!important;font-weight:700!important;background:#f3f7fd!important;color:#315b92!important}
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-hero{padding:10px 0 14px!important;border-bottom:1px solid #e4ecf7!important}
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-row{display:flex!important;gap:10px!important;align-items:flex-start!important;margin:0!important;padding:7px 0!important;border-bottom:1px solid #edf2f8!important}
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-row-name{border-bottom:0!important;padding-top:0!important}
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-label{flex:0 0 74px!important;color:#7284a4!important;font-size:12px!important}
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-value{color:#173467!important;font-size:12px!important;font-weight:650!important;line-height:1.45!important}
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-label-name{display:none!important}
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-value-name{font-size:22px!important;font-weight:900!important;letter-spacing:-.04em!important;color:#08265f!important;line-height:1.2!important}
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-meta{display:block!important;margin-top:12px!important;padding:8px 12px!important;background:#f7faff!important;border-radius:7px!important}
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-actions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;margin-top:16px!important}
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-action-btn{height:42px!important;border-radius:6px!important;font-size:13px!important;font-weight:750!important}
+  #app[data-pc-tab="map"] #site-detail-panel #site-detail-favorite-btn{display:block!important}
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-section-title{margin-top:16px!important;padding:9px 10px!important;border-left:3px solid var(--pc-blue)!important;background:#f7faff!important;color:#173467!important;font-size:13px!important}
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-note-textarea{width:100%!important;min-height:92px!important;box-sizing:border-box!important;border:1px solid #d6e2f3!important;border-radius:7px!important;padding:10px!important;font-size:12px!important}
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-close-text{display:none!important}
+
+  @media(max-width:1450px){
+    #view-approved{--side:190px}
+    #app[data-pc-tab="map"] #site-list-panel{width:300px!important}
+    #app[data-pc-tab="map"] #map-container{left:calc(var(--side) + 320px)!important;right:310px!important}
+    #app[data-pc-tab="map"] #site-detail-panel{width:290px!important;padding:14px!important}
+    #app[data-pc-tab="map"] .site-list-item{min-height:78px!important;padding-left:8px!important}
+    #pc-page-heading{left:calc(var(--side) + 20px)}
+  }
+  @media(max-width:1200px){
+    #view-approved{--side:176px}
+    #app[data-pc-tab="map"] #site-list-panel{width:272px!important}
+    #app[data-pc-tab="map"] #map-container{left:calc(var(--side) + 292px)!important;right:282px!important}
+    #app[data-pc-tab="map"] #site-detail-panel{width:264px!important}
+    #pc-map-toolbar button{padding:0 9px}#pc-map-toolbar button span{display:none}
+  }
+}
