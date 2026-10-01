@@ -558,6 +558,25 @@ function bindPcWorkspace() {
     });
   });
 
+  const pcCurrentLocation = document.getElementById('pc-map-current-location');
+  if (pcCurrentLocation) {
+    pcCurrentLocation.addEventListener('click', () => document.getElementById('btn-current-location')?.click());
+  }
+
+  const pcMapReset = document.getElementById('pc-map-reset');
+  if (pcMapReset) {
+    pcMapReset.addEventListener('click', () => {
+      if (!state.map || typeof kakao === 'undefined' || !kakao.maps) return;
+      state.map.setLevel(6);
+      state.map.setCenter(new kakao.maps.LatLng(37.4979, 127.0276));
+    });
+  }
+
+  const pcFavoriteFilter = document.getElementById('pc-favorite-filter-btn');
+  if (pcFavoriteFilter) {
+    pcFavoriteFilter.addEventListener('click', () => activatePcTab('favorite'));
+  }
+
   const globalSearch = document.getElementById('pc-global-search-input');
   const siteSearch = document.getElementById('site-search-input');
   if (globalSearch && siteSearch) {

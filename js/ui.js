@@ -999,6 +999,10 @@ export function renderSiteList(containerId) {
 
   const visibleSites = getFilteredSortedSites();
 
+  // PC 업무화면 상단 결과 건수. 모바일 DOM/표시는 건드리지 않는다.
+  const pcCount = document.getElementById('pc-site-count');
+  if (pcCount) pcCount.textContent = `전체 ${visibleSites.length.toLocaleString('ko-KR')}개`;
+
   // 사용자 요청: 필터 옆 결과 건수("N건")와 확인필요 카운트 배지를 화면에서 없앴다
   // (해당 DOM 자체를 index.html에서 제거 — 여기서는 더 이상 채울 대상이 없다).
 
@@ -1124,6 +1128,28 @@ export function renderSiteList(containerId) {
         summary.appendChild(cell);
       });
       item.appendChild(summary);
+
+      // PC 지도 목록용 한 줄 보조정보. 기존 site 데이터만 표시하고 모바일에서는 CSS로 숨긴다.
+      const pcMeta = document.createElement('div');
+      pcMeta.className = 'pc-site-row-meta';
+      const amountTag = document.createElement('span');
+      amountTag.className = 'pc-site-amount-tag';
+      const amountNum = Number(site.amount);
+      if (Number.isFinite(amountNum)) {
+        amountTag.textContent = amountNum < 5000000000 ? '50억미만' : (amountNum < 12000000000 ? '50~120억' : '120억이상');
+      } else {
+        amountTag.textContent = '금액미상';
+      }
+      const qualityTag = document.createElement('span');
+      const q = site.location_quality;
+      const qInfo = (q === 'EXACT' || q === 'MANUAL')
+        ? ['정확', 'exact']
+        : (q === 'ESTIMATED' ? ['중간', 'estimated'] : ['낮음', 'review']);
+      qualityTag.className = `pc-site-quality pc-site-quality-${qInfo[1]}`;
+      qualityTag.innerHTML = `<i aria-hidden="true"></i>${qInfo[0]}`;
+      pcMeta.appendChild(amountTag);
+      pcMeta.appendChild(qualityTag);
+      item.appendChild(pcMeta);
 
       item.addEventListener('click', () => selectSite(site.id));
 
