@@ -7,7 +7,7 @@ import { initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites, rend
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
-import { renderSiteList, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView, renderHeaderUploadDate, setSiteSearchMode, renderSiteNotesPanel, renderAppSettingsPanel } from './ui.js';
+import { renderSiteList, renderPcSiteTable, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView, renderHeaderUploadDate, setSiteSearchMode, renderSiteNotesPanel, renderAppSettingsPanel } from './ui.js';
 import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
 
 const VIEWS = [
@@ -519,6 +519,7 @@ function activatePcTab(tab) {
 
   // 기존 모바일 탭 전환 함수가 가진 필터/즐겨찾기/경로 렌더 로직을 그대로 재사용한다.
   activateMobileTab(tab);
+  if (tab === 'site') renderPcSiteTable();
   if (tab === 'map' && state.map && typeof state.map.relayout === 'function') {
     requestAnimationFrame(() => state.map.relayout());
   }
@@ -577,6 +578,28 @@ function bindPcWorkspace() {
     pcFavoriteFilter.addEventListener('click', () => activatePcTab('favorite'));
   }
 
+  const pcSiteSearch = document.getElementById('pc-site-table-search-input');
+  const pcSiteReset = document.getElementById('pc-site-filter-reset');
+  if (pcSiteSearch) {
+    pcSiteSearch.addEventListener('input', () => {
+      const target = document.getElementById('site-search-input');
+      if (!target) return;
+      target.value = pcSiteSearch.value;
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
+  if (pcSiteReset) {
+    pcSiteReset.addEventListener('click', () => {
+      state.searchQuery = ''; state.selectedDongs = []; state.amountFilter = 'all';
+      state.siteInspectionFilter = 'all'; state.siteAccidentReportFilter = 'all'; state.sortMode = 'default';
+      const target = document.getElementById('site-search-input');
+      if (target) { target.value = ''; target.dispatchEvent(new Event('input', { bubbles: true })); }
+      if (pcSiteSearch) pcSiteSearch.value = '';
+      document.querySelectorAll('#site-filter-row input[type="radio"][value="all"]').forEach(el => { el.checked = true; });
+      renderSiteList('site-list');
+    });
+  }
+
   const globalSearch = document.getElementById('pc-global-search-input');
   const siteSearch = document.getElementById('site-search-input');
   if (globalSearch && siteSearch) {
@@ -584,7 +607,7 @@ function bindPcWorkspace() {
       siteSearch.value = globalSearch.value;
       siteSearch.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    siteSearch.addEventListener('input', () => { globalSearch.value = siteSearch.value; });
+    siteSearch.addEventListener('input', () => { globalSearch.value = siteSearch.value; if (pcSiteSearch) pcSiteSearch.value = siteSearch.value; });
   }
 }
 

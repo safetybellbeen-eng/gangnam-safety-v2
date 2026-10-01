@@ -882,6 +882,7 @@ export function selectSite(siteId) {
   updateListActiveState();
   scrollListItemIntoView(siteId);
   renderDetail(site);
+  renderPcSiteTable();
 }
 
 // STEP15-E.4: 모바일 즐겨찾기 탭 전용 empty state. 새 DB 조회/즐겨찾기 상태를 만들지 않고
@@ -993,6 +994,83 @@ function buildLoadErrorState(container, message, onRetry) {
 
 // 목록 전체를 다시 그린다. 매번 새 DOM을 생성하므로 이전 렌더의 이벤트가 남아 누적되지 않는다.
 // 검색/정렬이 적용된 파생 배열(getFilteredSortedSites)만 받아서 렌더한다 — state.sites 원본은 건드리지 않는다.
+
+let pcSiteTablePage = 1;
+const PC_SITE_PAGE_SIZE = 10;
+
+function pcLocationQuality(site) {
+  const q = site?.location_quality;
+  if (q === 'EXACT' || q === 'MANUAL') return ['정확', 'exact'];
+  if (q === 'ESTIMATED') return ['중간', 'estimated'];
+  return ['낮음', 'review'];
+}
+
+export function renderPcSiteTable() {
+  const body = document.getElementById('pc-site-table-body');
+  const panel = document.getElementById('pc-site-table-panel');
+  if (!body || !panel || isMobileViewport()) return;
+
+  const rows = getFilteredSortedSites();
+  const pageCount = Math.max(1, Math.ceil(rows.length / PC_SITE_PAGE_SIZE));
+  pcSiteTablePage = Math.min(Math.max(1, pcSiteTablePage), pageCount);
+  const start = (pcSiteTablePage - 1) * PC_SITE_PAGE_SIZE;
+  const pageRows = rows.slice(start, start + PC_SITE_PAGE_SIZE);
+  body.innerHTML = '';
+
+  if (!pageRows.length) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 8;
+    td.textContent = state.sitesLoadError ? '사업장 정보를 불러오지 못했습니다.' : '표시할 사업장이 없습니다.';
+    td.style.textAlign = 'center'; td.style.color = '#7184a3'; td.style.height = '120px';
+    tr.appendChild(td); body.appendChild(tr);
+  }
+
+  pageRows.forEach(site => {
+    const tr = document.createElement('tr');
+    tr.dataset.siteId = site.id;
+    if (site.id === state.selectedSiteId) tr.classList.add('selected');
+
+    const checkTd = document.createElement('td');
+    const check = document.createElement('input'); check.type = 'checkbox'; check.setAttribute('aria-label', `${site.site_name || '사업장'} 선택`);
+    check.addEventListener('click', e => e.stopPropagation()); checkTd.appendChild(check); tr.appendChild(checkTd);
+
+    const favTd = document.createElement('td');
+    const fav = document.createElement('button'); fav.type='button'; fav.className=`pc-table-fav${isFavorite(site.id)?' on':''}`; fav.textContent=isFavorite(site.id)?'★':'☆';
+    fav.addEventListener('click', e => { e.stopPropagation(); handleFavoriteToggle(site.id, fav); }); favTd.appendChild(fav); tr.appendChild(favTd);
+
+    const nameTd = document.createElement('td'); const nameWrap=document.createElement('div'); nameWrap.className='pc-table-site-name';
+    const strong=document.createElement('strong'); strong.textContent=site.site_name || site.company_name || '-'; nameWrap.appendChild(strong);
+    if (site.company_name && site.company_name !== site.site_name) { const small=document.createElement('small'); small.textContent=site.company_name; nameWrap.appendChild(small); }
+    nameTd.appendChild(nameWrap); tr.appendChild(nameTd);
+
+    const addressTd=document.createElement('td'); addressTd.textContent=displayValue(site.address); addressTd.title=displayValue(site.address); tr.appendChild(addressTd);
+    const amountTd=document.createElement('td'); amountTd.textContent=formatAmountKRW(site.amount); tr.appendChild(amountTd);
+    const periodTd=document.createElement('td'); periodTd.textContent=formatPeriodKR(site.period_start, site.period_end); tr.appendChild(periodTd);
+    const qualityTd=document.createElement('td'); const [ql, qc]=pcLocationQuality(site); const qspan=document.createElement('span'); qspan.className=`pc-table-quality ${qc}`; const dot=document.createElement('i'); qspan.appendChild(dot); qspan.append(document.createTextNode(ql)); qualityTd.appendChild(qspan); tr.appendChild(qualityTd);
+    const noteTd=document.createElement('td'); noteTd.style.textAlign='center'; const noteBtn=document.createElement('button'); noteBtn.type='button'; noteBtn.className='pc-table-note'; noteBtn.textContent=getNote(site.id)?'▣':'▤'; noteBtn.title=getNote(site.id)?'메모 있음':'메모 작성'; noteBtn.addEventListener('click', e=>{e.stopPropagation(); selectSite(site.id);}); noteTd.appendChild(noteBtn); tr.appendChild(noteTd);
+    tr.addEventListener('click', ()=>selectSite(site.id)); body.appendChild(tr);
+  });
+
+  const summary=document.getElementById('pc-site-table-summary');
+  if(summary) summary.textContent=`전체 ${rows.length.toLocaleString('ko-KR')}개 · ${pcSiteTablePage} / ${pageCount} 페이지`;
+  const pagination=document.getElementById('pc-site-table-pagination');
+  if(pagination){
+    pagination.innerHTML='';
+    const addBtn=(label,page,disabled=false,active=false)=>{const b=document.createElement('button');b.type='button';b.className=`pc-page-btn${active?' active':''}`;b.textContent=label;b.disabled=disabled;b.addEventListener('click',()=>{pcSiteTablePage=page;renderPcSiteTable();});pagination.appendChild(b);};
+    addBtn('‹', Math.max(1,pcSiteTablePage-1), pcSiteTablePage===1);
+    const from=Math.max(1,Math.min(pcSiteTablePage-2,pageCount-4)); const to=Math.min(pageCount,from+4);
+    for(let i=from;i<=to;i++) addBtn(String(i),i,false,i===pcSiteTablePage);
+    addBtn('›', Math.min(pageCount,pcSiteTablePage+1), pcSiteTablePage===pageCount);
+  }
+
+  const filters=document.getElementById('pc-site-table-filters');
+  if(filters && !filters.dataset.ready){
+    filters.dataset.ready='1';
+    [['동 전체','site-dong-filter-label'],['공사금액 전체','site-amount-filter-label'],['점검여부 전체','site-inspection-filter-label']].forEach(([label,targetId])=>{const b=document.createElement('button');b.type='button';b.className='pc-filter-chip';b.textContent=label;if(targetId)b.addEventListener('click',()=>document.getElementById(targetId)?.click());filters.appendChild(b);});
+  }
+}
+
 export function renderSiteList(containerId) {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
@@ -1161,6 +1239,7 @@ export function renderSiteList(containerId) {
 
   // 검색/정렬 결과에 맞춰 marker도 다시 그린다.
   renderMarkers(visibleSites, selectSite);
+  renderPcSiteTable();
 
   // 선택된 사업장이 현재 결과에서 사라졌으면 상세를 닫는다. 단, 사용자 피드백(4): 지도 탭에서
   // 연 상세는 다른 탭(예: 즐겨찾기 탭 진입 시 favoriteOnly 임시 적용)에서 목록이 일시적으로
