@@ -1317,3 +1317,103 @@
     #app[data-pc-tab="site"] #pc-site-table-panel{right:282px!important}
   }
 }
+
+/* ===== PC STEP3.2: 현장 탭 시안 정밀 보정 ===== */
+@media (min-width:769px){
+  /* 콘텐츠 여백과 2-column 비율 */
+  #app[data-pc-tab="site"] #pc-site-table-panel{
+    left:calc(var(--side) + 12px)!important;
+    right:382px!important;
+    top:136px!important;
+    bottom:20px!important;
+    border:1px solid #d6e2f3!important;
+    border-radius:10px!important;
+    background:#fff!important;
+    box-shadow:none!important;
+  }
+  #app[data-pc-tab="site"] #site-detail-panel{
+    display:block!important;
+    position:absolute!important;
+    right:12px!important;
+    top:136px!important;
+    bottom:20px!important;
+    width:358px!important;
+    max-width:none!important;
+    height:auto!important;
+    margin:0!important;
+    padding:16px!important;
+    box-sizing:border-box!important;
+    overflow:auto!important;
+    border:1px solid #d6e2f3!important;
+    border-radius:10px!important;
+    background:#fff!important;
+    box-shadow:none!important;
+  }
+
+  /* 검색/필터 영역 */
+  .pc-site-table-toolbar{padding:12px 12px 8px!important;gap:10px!important}
+  .pc-site-table-search{height:42px!important;border-color:#cbdaf0!important;border-radius:7px!important}
+  #pc-site-filter-reset{height:42px!important;border-color:#bcd0ed!important;border-radius:7px!important;background:#fff!important;color:#0b63f6!important;font-size:12px!important}
+  #pc-site-table-filters{padding:0 12px 10px!important;gap:8px!important;background:#fff!important}
+  .pc-filter-chip{height:34px!important;padding:0 13px!important;border-color:#cbdaf0!important;color:#173467!important;background:#fff!important}
+
+  /* 테이블 가독성 */
+  #pc-site-table{table-layout:fixed!important;font-size:12px!important}
+  #pc-site-table thead{background:#f4f7fc!important}
+  #pc-site-table th{height:40px!important;padding:0 9px!important;color:#35527d!important;font-size:11px!important;border-bottom:1px solid #dce6f3!important}
+  #pc-site-table td{height:51px!important;padding:0 9px!important;color:#23436f!important;border-bottom:1px solid #e5edf7!important}
+  #pc-site-table tbody tr:hover{background:#f6faff!important}
+  #pc-site-table tbody tr.selected{background:#eaf3ff!important;box-shadow:inset 3px 0 0 #0b67f5!important}
+  #pc-site-table th:nth-child(1),#pc-site-table td:nth-child(1){width:28px!important}
+  #pc-site-table th:nth-child(2),#pc-site-table td:nth-child(2){width:32px!important}
+  #pc-site-table th:nth-child(3){width:22%!important}
+  #pc-site-table th:nth-child(4){width:26%!important}
+  #pc-site-table th:nth-child(5){width:14%!important}
+  #pc-site-table th:nth-child(6){width:18%!important}
+  #pc-site-table th:nth-child(7){width:12%!important}
+  #pc-site-table th:nth-child(8),#pc-site-table td:nth-child(8){width:42px!important;text-align:center!important}
+  .pc-table-site-name strong{font-size:12px!important;font-weight:800!important;color:#092b66!important}
+  .pc-table-site-name small{max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;background:#edf4ff!important;color:#6880a5!important}
+  #pc-site-table-footer{height:50px!important;padding:0 12px!important}
+
+  /* 현장 탭 상세패널 — 지도 탭의 디자인 언어를 그대로 재사용 */
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-close-x{
+    display:block!important;position:absolute!important;right:12px!important;top:8px!important;
+    border:0!important;background:transparent!important;color:#173467!important;font-size:24px!important;cursor:pointer!important
+  }
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-close-text{display:none!important}
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-quality-badge{
+    display:inline-flex!important;margin:0 0 12px!important;padding:4px 8px!important;border-radius:5px!important;
+    font-size:11px!important;font-weight:700!important;background:#f3f7fd!important;color:#315b92!important
+  }
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-hero{padding:8px 0 14px!important;border-bottom:1px solid #e4ecf7!important}
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-row{
+    display:flex!important;gap:10px!important;align-items:flex-start!important;justify-content:flex-start!important;
+    margin:0!important;padding:8px 0!important;border-bottom:1px solid #edf2f8!important
+  }
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-row-name{padding-top:0!important;border-bottom:0!important}
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-label{flex:0 0 76px!important;color:#7284a4!important;font-size:12px!important;line-height:1.5!important}
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-value{flex:1!important;min-width:0!important;color:#173467!important;font-size:12px!important;font-weight:650!important;line-height:1.5!important;overflow-wrap:anywhere!important}
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-label-name{display:none!important}
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-value-name{font-size:20px!important;font-weight:900!important;letter-spacing:-.035em!important;color:#08265f!important;line-height:1.25!important}
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-meta{display:block!important;margin-top:12px!important;padding:4px 12px!important;background:#f8fbff!important;border-radius:7px!important}
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-section-title{margin:16px 0 8px!important;padding:9px 10px!important;border-left:3px solid #0b67f5!important;background:#f7faff!important;color:#173467!important;font-size:13px!important;font-weight:800!important}
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-note-textarea{width:100%!important;min-height:92px!important;box-sizing:border-box!important;border:1px solid #d6e2f3!important;border-radius:7px!important;padding:10px!important;font-size:12px!important;resize:vertical!important}
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-actions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;margin-top:14px!important}
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-action-btn,
+  #app[data-pc-tab="site"] #site-detail-panel button:not(.site-detail-close-x){min-height:36px;border:1px solid #cbdaf0;border-radius:6px;background:#fff;color:#0b56c7;font-size:12px;font-weight:750;cursor:pointer}
+  #app[data-pc-tab="site"] #site-detail-panel button:not(.site-detail-close-x):hover{background:#f3f8ff;border-color:#8bb1e9}
+  #app[data-pc-tab="site"] #site-detail-panel #site-detail-favorite-btn{display:block!important}
+
+  @media(max-width:1450px){
+    #app[data-pc-tab="site"] #pc-site-table-panel{right:322px!important}
+    #app[data-pc-tab="site"] #site-detail-panel{width:302px!important;padding:13px!important}
+    #pc-site-table th:nth-child(4){width:23%!important}
+    #pc-site-table th:nth-child(6){width:16%!important}
+  }
+  @media(max-width:1200px){
+    #app[data-pc-tab="site"] #pc-site-table-panel{right:294px!important}
+    #app[data-pc-tab="site"] #site-detail-panel{width:274px!important;padding:12px!important}
+    #pc-site-table th:nth-child(5),#pc-site-table td:nth-child(5){display:none!important}
+  }
+}
