@@ -1287,3 +1287,33 @@
   @media(max-width:1450px){#app[data-pc-tab="site"] #pc-site-table-panel{right:310px}#app[data-pc-tab="site"] #site-detail-panel{width:290px!important;padding:14px!important}#pc-site-table th:nth-child(4),#pc-site-table td:nth-child(4){max-width:180px}}
   @media(max-width:1200px){#app[data-pc-tab="site"] #pc-site-table-panel{right:282px}#app[data-pc-tab="site"] #site-detail-panel{width:264px!important}#pc-site-table th:nth-child(5),#pc-site-table td:nth-child(5){display:none}}
 }
+
+/* ===== PC STEP3.1: 현장 탭 레이아웃 보정 =====
+   components.css의 공통 `#app section { max-width:360px; margin:40px auto; padding:20px; }`
+   이 PC 전용 현장 테이블 section에도 적용되어 폭이 360px로 압축되던 문제를 PC 범위에서만 해제한다. */
+@media (min-width:769px){
+  #app[data-pc-tab="site"] #pc-site-table-panel{
+    display:flex!important;
+    position:absolute!important;
+    left:calc(var(--side) + 12px)!important;
+    right:370px!important;
+    top:136px!important;
+    bottom:20px!important;
+    width:auto!important;
+    max-width:none!important;
+    height:auto!important;
+    margin:0!important;
+    padding:0!important;
+    flex-direction:column!important;
+    box-sizing:border-box!important;
+  }
+  #app[data-pc-tab="site"] #site-detail-panel:empty{
+    display:none!important;
+  }
+  @media (max-width:1450px){
+    #app[data-pc-tab="site"] #pc-site-table-panel{right:310px!important}
+  }
+  @media (max-width:1200px){
+    #app[data-pc-tab="site"] #pc-site-table-panel{right:282px!important}
+  }
+}
