@@ -1535,6 +1535,30 @@ export function renderDetail(site) {
     }
   }
 
+  // PC 최종 시안: 모바일에서 이미 사용 중인 "경로에 추가" 기능을
+  // 데스크톱 상세 패널에서도 동일한 state.routePlanSiteIds 로직으로 노출한다.
+  // 모바일 분기는 위에서 그대로 유지되며, 이 블록은 PC에서만 실행된다.
+  if (!isMobileViewport()) {
+    const pcRouteAddBtn = document.createElement('button');
+    pcRouteAddBtn.type = 'button';
+    pcRouteAddBtn.className = 'site-detail-action-btn site-detail-btn-primary pc-route-add-btn';
+    function refreshPcRouteAddBtn() {
+      const added = state.routePlanSiteIds.includes(site.id);
+      pcRouteAddBtn.textContent = added ? '✓ 경로에 추가됨' : '⌖ 경로에 추가';
+      pcRouteAddBtn.classList.toggle('is-added', added);
+    }
+    refreshPcRouteAddBtn();
+    pcRouteAddBtn.addEventListener('click', () => {
+      if (state.routePlanSiteIds.includes(site.id)) {
+        state.routePlanSiteIds = state.routePlanSiteIds.filter(id => id !== site.id);
+      } else {
+        state.routePlanSiteIds = [...state.routePlanSiteIds, site.id];
+      }
+      refreshPcRouteAddBtn();
+    });
+    actions.appendChild(pcRouteAddBtn);
+  }
+
   panel.appendChild(actions);
 
   // 사용자 요청(STEP16.22): 모바일에서는 어느 탭(지도/경로/현장/즐겨찾기)에서 열든 상세 패널에
