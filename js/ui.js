@@ -4,7 +4,7 @@
 import { state } from './state.js';
 import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight, refreshFavoriteMarker, initRouteMap, relayoutRouteMap, renderRouteMarkers, panToRouteSite, searchPlacesKeyword, showAddressSearchPin, clearAddressSearchPin, assignDongToSites } from './map.js';
 import { getFilteredSortedSites, getDongOptions, loadActiveSites } from './sites.js';
-import { isFavorite, toggleFavorite, loadFavorites } from './favorites.js';
+import { isFavorite, toggleFavorite, loadFavorites, addFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote, loadNotes } from './notes.js';
 import { loadUsers, setUserStatus, setUserRole, resetUserPassword, deleteRejectedProfile } from './admin.js';
 import { parseExcelFile } from './excel.js';
@@ -1055,6 +1055,142 @@ export function restorePcSiteFiltersToRow() {
   });
 }
 
+// 사용자 요청(2026-10): 표 헤더(사업장명/주소/공사금액/공사기간) 클릭 시 오름차순/내림차순
+// 정렬. 기존 "기본순서" 드롭다운(모바일과 공유하는 라디오 목록)에는 없는 새 정렬값만 써서
+// state.sortMode를 바꾸므로, js/sites.js의 compareBySort/getFilteredSortedSites 파이프라인을
+// 그대로 재사용하면서도 모바일 쪽 정렬 옵션 목록/동작에는 전혀 영향이 없다.
+const PC_SITE_SORT_ASC = { name: 'name-asc', address: 'address-asc', amount: 'amount-asc', period: 'period-asc' };
+const PC_SITE_SORT_DESC = { name: 'name-desc', address: 'address-desc', amount: 'amount-desc', period: 'period-desc' };
+let pcSiteSortBound = false;
+
+function bindPcSiteTableSort() {
+  if (pcSiteSortBound) return;
+  const ths = document.querySelectorAll('#pc-site-table thead .pc-sortable-th');
+  ths.forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.sortKey;
+      if (!key) return;
+      const asc = PC_SITE_SORT_ASC[key];
+      const desc = PC_SITE_SORT_DESC[key];
+      // 같은 헤더를 다시 누르면 오름차순↔내림차순 토글, 다른 헤더를 누르면 오름차순부터 시작.
+      state.sortMode = (state.sortMode === asc) ? desc : asc;
+      pcSiteTablePage = 1;
+      renderPcSiteTable();
+    });
+  });
+  pcSiteSortBound = true;
+}
+
+function updatePcSiteTableSortIndicators() {
+  const ths = document.querySelectorAll('#pc-site-table thead .pc-sortable-th');
+  ths.forEach(th => {
+    const key = th.dataset.sortKey;
+    const indicator = th.querySelector('.pc-sort-indicator');
+    if (!indicator) return;
+    if (state.sortMode === PC_SITE_SORT_ASC[key]) { indicator.textContent = '▲'; th.classList.add('is-sorted'); }
+    else if (state.sortMode === PC_SITE_SORT_DESC[key]) { indicator.textContent = '▼'; th.classList.add('is-sorted'); }
+    else { indicator.textContent = ''; th.classList.remove('is-sorted'); }
+  });
+}
+
+// 사용자 요청(2026-10): 왼쪽 체크박스로 여러 건을 선택해 즐겨찾기 일괄 추가 / 엑셀 내보내기.
+// 선택 상태는 페이지를 넘겨도 유지되도록(여러 페이지에 걸쳐 선택) 모듈 전역 Set에 보관한다.
+const pcSiteTableSelected = new Set();
+
+function updatePcSiteTableBulkBar() {
+  const bar = document.getElementById('pc-site-table-bulkbar');
+  const countEl = document.getElementById('pc-site-table-bulkbar-count');
+  if (!bar) return;
+  const n = pcSiteTableSelected.size;
+  bar.hidden = n === 0;
+  if (countEl) countEl.textContent = `${n.toLocaleString('ko-KR')}건 선택됨`;
+}
+
+function updatePcSiteTableSelectAll(pageRows) {
+  const selectAll = document.getElementById('pc-site-table-select-all');
+  if (!selectAll) return;
+  const pageIds = pageRows.map(s => s.id);
+  const selectedOnPage = pageIds.filter(id => pcSiteTableSelected.has(id));
+  selectAll.checked = pageIds.length > 0 && selectedOnPage.length === pageIds.length;
+  selectAll.indeterminate = selectedOnPage.length > 0 && selectedOnPage.length < pageIds.length;
+}
+
+let pcSiteBulkBound = false;
+
+function bindPcSiteTableBulkActions() {
+  if (pcSiteBulkBound) return;
+  const selectAll = document.getElementById('pc-site-table-select-all');
+  if (selectAll) {
+    selectAll.addEventListener('click', e => e.stopPropagation());
+    selectAll.addEventListener('change', () => {
+      const body = document.getElementById('pc-site-table-body');
+      const rowChecks = body ? Array.from(body.querySelectorAll('tr[data-site-id] input[type="checkbox"]')) : [];
+      rowChecks.forEach(cb => {
+        const id = cb.closest('tr')?.dataset.siteId;
+        if (!id) return;
+        if (selectAll.checked) pcSiteTableSelected.add(id); else pcSiteTableSelected.delete(id);
+        cb.checked = selectAll.checked;
+      });
+      updatePcSiteTableBulkBar();
+    });
+  }
+
+  const favBtn = document.getElementById('pc-site-table-bulk-favorite');
+  if (favBtn) favBtn.addEventListener('click', () => bulkAddFavorites(Array.from(pcSiteTableSelected)));
+
+  const exportBtn = document.getElementById('pc-site-table-bulk-export');
+  if (exportBtn) exportBtn.addEventListener('click', () => {
+    const ids = new Set(pcSiteTableSelected);
+    const rows = getFilteredSortedSites().filter(s => ids.has(s.id));
+    exportSelectedSitesToExcel(rows);
+  });
+
+  const clearBtn = document.getElementById('pc-site-table-bulk-clear');
+  if (clearBtn) clearBtn.addEventListener('click', () => {
+    pcSiteTableSelected.clear();
+    renderPcSiteTable();
+  });
+
+  pcSiteBulkBound = true;
+}
+
+async function bulkAddFavorites(ids) {
+  if (!ids.length) return;
+  const favBtn = document.getElementById('pc-site-table-bulk-favorite');
+  if (favBtn) { favBtn.disabled = true; favBtn.textContent = '처리 중…'; }
+  let okCount = 0;
+  for (const id of ids) {
+    if (isFavorite(id)) { okCount++; continue; }
+    // eslint-disable-next-line no-await-in-loop
+    const ok = await addFavorite(id);
+    if (ok) okCount++;
+  }
+  if (favBtn) { favBtn.disabled = false; favBtn.textContent = '☆ 즐겨찾기 일괄 추가'; }
+  renderPcSiteTable();
+  alert(`${okCount}건을 즐겨찾기에 추가했습니다.`);
+}
+
+function exportSelectedSitesToExcel(sites) {
+  if (!sites.length) return;
+  if (typeof window.XLSX === 'undefined' || !window.XLSX.utils) {
+    alert('엑셀 내보내기 기능을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    return;
+  }
+  const data = sites.map(site => ({
+    '사업장명': site.site_name || site.company_name || '-',
+    '업체명': site.company_name || '-',
+    '주소': site.address || '-',
+    '공사금액': site.amount || 0,
+    '공사기간': formatPeriodKR(site.period_start, site.period_end),
+    '위치 정확도': pcLocationQuality(site)[0],
+  }));
+  const sheet = window.XLSX.utils.json_to_sheet(data);
+  const book = window.XLSX.utils.book_new();
+  window.XLSX.utils.book_append_sheet(book, sheet, '사업장 목록');
+  const today = new Date().toISOString().slice(0, 10);
+  window.XLSX.writeFile(book, `사업장_목록_${today}.xlsx`);
+}
+
 export function renderPcSiteTable() {
   const body = document.getElementById('pc-site-table-body');
   const panel = document.getElementById('pc-site-table-panel');
@@ -1083,7 +1219,14 @@ export function renderPcSiteTable() {
 
     const checkTd = document.createElement('td');
     const check = document.createElement('input'); check.type = 'checkbox'; check.setAttribute('aria-label', `${site.site_name || '사업장'} 선택`);
-    check.addEventListener('click', e => e.stopPropagation()); checkTd.appendChild(check); tr.appendChild(checkTd);
+    check.checked = pcSiteTableSelected.has(site.id);
+    check.addEventListener('click', e => e.stopPropagation());
+    check.addEventListener('change', () => {
+      if (check.checked) pcSiteTableSelected.add(site.id); else pcSiteTableSelected.delete(site.id);
+      updatePcSiteTableBulkBar();
+      updatePcSiteTableSelectAll(pageRows);
+    });
+    checkTd.appendChild(check); tr.appendChild(checkTd);
 
     const favTd = document.createElement('td');
     const fav = document.createElement('button'); fav.type='button'; fav.className=`pc-table-fav${isFavorite(site.id)?' on':''}`; fav.textContent=isFavorite(site.id)?'★':'☆';
@@ -1123,6 +1266,11 @@ export function renderPcSiteTable() {
   }
 
   movePcSiteFiltersIntoTable();
+  bindPcSiteTableSort();
+  updatePcSiteTableSortIndicators();
+  bindPcSiteTableBulkActions();
+  updatePcSiteTableSelectAll(pageRows);
+  updatePcSiteTableBulkBar();
 }
 
 export function renderSiteList(containerId) {
