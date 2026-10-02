@@ -1567,7 +1567,7 @@ export function renderDetail(site) {
     pcRouteAddBtn.className = 'site-detail-action-btn site-detail-btn-primary pc-route-add-btn';
     function refreshPcRouteAddBtn() {
       const added = state.routePlanSiteIds.includes(site.id);
-      pcRouteAddBtn.textContent = added ? '✓ 경로에 추가됨' : '⌖ 경로에 추가';
+      pcRouteAddBtn.textContent = added ? '✓ 경로에 추가됨' : '경로에 추가';
       pcRouteAddBtn.classList.toggle('is-added', added);
     }
     refreshPcRouteAddBtn();
@@ -3709,7 +3709,59 @@ export function bindSearchAndSort(containerId) {
     'under-5b': '50억 미만',
     '5b-12b': '50억 이상 ~ 120억 미만',
     'over-12b': '120억 이상',
+    custom: '직접입력',
   });
+
+  // 사용자 요청(2026-10, PC 전용): 공사금액 "자세히" — 억원 단위로 직접 범위를 입력해 조회.
+  // 모바일에는 이 버튼/입력창 자체가 보이지 않으므로(css/desktop.css 기본 숨김) 기존 모바일
+  // 동작에는 영향이 없다. matchesAmount()의 'custom' 분기(js/sites.js)와 짝을 이룬다.
+  {
+    const amountDetailsEl = document.getElementById('site-amount-filter');
+    const amountCustomToggle = document.getElementById('site-amount-filter-custom-toggle');
+    const amountCustomBody = document.getElementById('site-amount-filter-custom-body');
+    const amountMinInput = document.getElementById('site-amount-filter-min-input');
+    const amountMaxInput = document.getElementById('site-amount-filter-max-input');
+    const amountCustomApply = document.getElementById('site-amount-filter-custom-apply');
+    const amountLabelEl = document.getElementById('site-amount-filter-label');
+
+    if (amountCustomToggle && amountCustomBody) {
+      amountCustomToggle.addEventListener('click', () => {
+        amountCustomBody.hidden = !amountCustomBody.hidden;
+      });
+    }
+
+    if (amountCustomApply && amountMinInput && amountMaxInput) {
+      amountCustomApply.addEventListener('click', () => {
+        const minRaw = amountMinInput.value.trim();
+        const maxRaw = amountMaxInput.value.trim();
+        const minEok = minRaw === '' ? null : Number(minRaw);
+        const maxEok = maxRaw === '' ? null : Number(maxRaw);
+        const invalidNumber = (minEok !== null && !Number.isFinite(minEok)) || (maxEok !== null && !Number.isFinite(maxEok));
+        const bothEmpty = minEok === null && maxEok === null;
+        const minOverMax = minEok !== null && maxEok !== null && minEok > maxEok;
+        amountMinInput.classList.toggle('is-invalid', invalidNumber || minOverMax);
+        amountMaxInput.classList.toggle('is-invalid', invalidNumber || minOverMax);
+        if (invalidNumber || bothEmpty || minOverMax) return;
+
+        state.customAmountRange = {
+          min: minEok !== null ? minEok * 100000000 : -Infinity,
+          max: maxEok !== null ? maxEok * 100000000 : Infinity
+        };
+        state.amountFilter = 'custom';
+        if (amountDetailsEl) {
+          amountDetailsEl.querySelectorAll('input[type="radio"]').forEach(r => { r.checked = false; });
+          amountDetailsEl.dataset.active = 'true';
+        }
+        if (amountLabelEl) {
+          amountLabelEl.textContent = minEok !== null && maxEok !== null
+            ? `${minEok}억~${maxEok}억`
+            : (minEok !== null ? `${minEok}억 이상` : `${maxEok}억 이하`);
+        }
+        if (amountDetailsEl) amountDetailsEl.open = false;
+        renderSiteList(containerId);
+      });
+    }
+  }
   bindRadioFilterDetails('site-inspection-filter', 'siteInspectionFilter', containerId, {
     all: '점검',
     yes: '점검 유',
