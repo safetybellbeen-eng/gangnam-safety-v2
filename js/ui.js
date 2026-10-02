@@ -1078,8 +1078,18 @@ export function renderSiteList(containerId) {
   const visibleSites = getFilteredSortedSites();
 
   // PC 업무화면 상단 결과 건수. 모바일 DOM/표시는 건드리지 않는다.
+  // 사용자 디자인 의견 반영(2026-10): 숫자가 일반 텍스트와 같은 색이라 눈에 잘 안 띈다는
+  // 피드백 — 숫자만 별도 span으로 감싸 CSS에서 강조색을 줄 수 있게 한다(값 자체는 그대로).
   const pcCount = document.getElementById('pc-site-count');
-  if (pcCount) pcCount.textContent = `전체 ${visibleSites.length.toLocaleString('ko-KR')}개`;
+  if (pcCount) {
+    pcCount.textContent = '';
+    pcCount.appendChild(document.createTextNode('전체 '));
+    const numEl = document.createElement('span');
+    numEl.className = 'pc-site-count-num';
+    numEl.textContent = visibleSites.length.toLocaleString('ko-KR');
+    pcCount.appendChild(numEl);
+    pcCount.appendChild(document.createTextNode('개'));
+  }
 
   // 사용자 요청: 필터 옆 결과 건수("N건")와 확인필요 카운트 배지를 화면에서 없앴다
   // (해당 DOM 자체를 index.html에서 제거 — 여기서는 더 이상 채울 대상이 없다).
@@ -1425,6 +1435,18 @@ export function renderDetail(site) {
     }
 
     row.appendChild(valueEl);
+
+    // 사용자 디자인 의견 반영(2026-10, PC 전용): "정확/추정/확인필요" 배지가 패널 맨 위에
+    // 혼자 떠 있어 어색하다는 피드백 — PC에서는 사업장명 옆에 두는 별도 배지를 하나 더 만든다.
+    // 기존 qualityBadge(모바일 상단 배지)는 그대로 두고 건드리지 않으며(모바일 DOM/동작 불변),
+    // 이 새 배지는 기본적으로 숨겨두었다가(css/desktop.css 전역 기본 숨김 목록) PC 지도 탭에서만
+    // 보여준다 — 목록 카드의 .pc-site-quality와 동일한 "PC 전용 중복 배지" 패턴을 재사용한다.
+    if (key === 'name' && qualityInfo) {
+      const pcNameQualityBadge = document.createElement('span');
+      pcNameQualityBadge.className = `pc-detail-name-quality ${qualityInfo.className}`;
+      pcNameQualityBadge.textContent = qualityInfo.label;
+      row.appendChild(pcNameQualityBadge);
+    }
 
     // 사용자 피드백: 주소 옆에 텍스트를 바로 복사할 수 있는 버튼을 추가한다. 주소 값(site.address)은
     // 그대로 읽기만 하고 저장/검색/정렬 로직에는 전혀 관여하지 않는 순수 UI 기능이다.
