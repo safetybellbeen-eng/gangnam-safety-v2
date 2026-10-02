@@ -126,6 +126,16 @@ async function handleFavoriteToggle(siteId, triggerBtn) {
       btn.classList.toggle('is-favorite', nowFavorite);
     });
 
+  // 버그 수정(2026-10): PC 현장탭 표(#pc-site-table-body)의 ☆/★ 버튼은 이 함수가 갱신하는
+  // 대상에 빠져 있어, 실제로는 즐겨찾기 토글이 정상 처리됐는데도(DB/state 반영 완료) 표의
+  // 별표 아이콘만 그대로 남아 "눌러도 작동 안 하는 것처럼" 보이던 문제 — 해당 행의 버튼도
+  // 함께 갱신한다.
+  document.querySelectorAll(`#pc-site-table-body tr[data-site-id="${siteId}"] .pc-table-fav`)
+    .forEach(btn => {
+      btn.textContent = nowFavorite ? '★' : '☆';
+      btn.classList.toggle('on', nowFavorite);
+    });
+
   // PC 액션 버튼 행의 기존 즐겨찾기 버튼(모바일에서는 CSS로 숨김).
   const detailFavBtn = document.getElementById('site-detail-favorite-btn');
   if (detailFavBtn && detailFavBtn.dataset.siteId === String(siteId)) {
@@ -996,7 +1006,10 @@ function buildLoadErrorState(container, message, onRetry) {
 // 검색/정렬이 적용된 파생 배열(getFilteredSortedSites)만 받아서 렌더한다 — state.sites 원본은 건드리지 않는다.
 
 let pcSiteTablePage = 1;
-const PC_SITE_PAGE_SIZE = 10;
+// 사용자 요청(2026-10): 10개 고정 대신 10/50/100개 중 고를 수 있게 한다. 기본값은 기존과
+// 동일한 10개 — #pc-site-table-pagesize(select)에서 고른 값을 bindPcSiteTablePageSize()가
+// 여기에 반영한다.
+let pcSiteTablePageSize = 10;
 
 function pcLocationQuality(site) {
   const q = site?.location_quality;
@@ -1053,6 +1066,24 @@ export function restorePcSiteFiltersToRow() {
       anchor.parent.appendChild(el);
     }
   });
+}
+
+// 사용자 요청(2026-10): 페이지당 10/50/100개 중 선택. 선택값이 바뀌면 1페이지로 되돌리고
+// 다시 그린다(페이지 수가 줄어들어 지금 페이지가 범위를 벗어날 수 있으므로).
+let pcSitePageSizeBound = false;
+
+function bindPcSiteTablePageSize() {
+  if (pcSitePageSizeBound) return;
+  const select = document.getElementById('pc-site-table-pagesize');
+  if (!select) return;
+  select.value = String(pcSiteTablePageSize);
+  select.addEventListener('change', () => {
+    const n = parseInt(select.value, 10);
+    pcSiteTablePageSize = (n === 50 || n === 100) ? n : 10;
+    pcSiteTablePage = 1;
+    renderPcSiteTable();
+  });
+  pcSitePageSizeBound = true;
 }
 
 // 사용자 요청(2026-10): 표 헤더(사업장명/주소/공사금액/공사기간) 클릭 시 오름차순/내림차순
@@ -1197,10 +1228,10 @@ export function renderPcSiteTable() {
   if (!body || !panel || isMobileViewport()) return;
 
   const rows = getFilteredSortedSites();
-  const pageCount = Math.max(1, Math.ceil(rows.length / PC_SITE_PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(rows.length / pcSiteTablePageSize));
   pcSiteTablePage = Math.min(Math.max(1, pcSiteTablePage), pageCount);
-  const start = (pcSiteTablePage - 1) * PC_SITE_PAGE_SIZE;
-  const pageRows = rows.slice(start, start + PC_SITE_PAGE_SIZE);
+  const start = (pcSiteTablePage - 1) * pcSiteTablePageSize;
+  const pageRows = rows.slice(start, start + pcSiteTablePageSize);
   body.innerHTML = '';
 
   if (!pageRows.length) {
@@ -1266,6 +1297,7 @@ export function renderPcSiteTable() {
   }
 
   movePcSiteFiltersIntoTable();
+  bindPcSiteTablePageSize();
   bindPcSiteTableSort();
   updatePcSiteTableSortIndicators();
   bindPcSiteTableBulkActions();
@@ -3665,7 +3697,11 @@ function renderAddressSearchResults(query) {
 
 // 사용자 요청: "관할" 필터 버튼(summary)에 현재 선택 상태를 보여준다.
 // 0개 선택 = "관할"(기본표기, 전체), 1개 = 그 동 이름, 2개 이상 = "OO동 외 N".
-function updateDongFilterLabel() {
+// 버그 수정(2026-10): PC 현장탭 "필터 초기화" 버튼이 state.selectedDongs는 비웠지만 이 라벨/
+// 체크박스/강조 표시는 그대로 남겨둬 "초기화가 안 되는 것처럼" 보이던 문제 — js/app.js의
+// 리셋 핸들러가 체크박스를 직접 비운 뒤 이 함수를 호출해 라벨/강조까지 함께 되돌릴 수 있도록
+// export한다(관할은 체크박스 다중선택이라 다른 필터처럼 라디오 change 이벤트로 흉내낼 수 없다).
+export function updateDongFilterLabel() {
   const labelEl = document.getElementById('site-dong-filter-label');
   const filterEl = document.getElementById('site-dong-filter');
   if (!labelEl) return;
