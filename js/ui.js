@@ -1084,6 +1084,13 @@ export function renderSiteList(containerId) {
   // 사용자 요청: 필터 옆 결과 건수("N건")와 확인필요 카운트 배지를 화면에서 없앴다
   // (해당 DOM 자체를 index.html에서 제거 — 여기서는 더 이상 채울 대상이 없다).
 
+  // 사용자 요청(디자인 의견 반영): 지도 영역이 비어있을 때(검색/필터 결과 0건) 로딩 중인지
+  // 결과가 없는 것인지 구분이 안 된다는 피드백 — #map-container 위에 안내 문구를 겹쳐 보여준다.
+  // PC 전용 오버레이로, index.html에 hidden 속성으로 기본 숨김 처리된 요소의 hidden만 토글한다
+  // (지도/마커 렌더링 로직 자체는 건드리지 않음, 모바일은 css/desktop.css 기본 숨김 규칙으로 무관).
+  const pcMapEmptyState = document.getElementById('pc-map-empty-state');
+  if (pcMapEmptyState) pcMapEmptyState.hidden = visibleSites.length > 0;
+
   if (!visibleSites || visibleSites.length === 0) {
     // F2(STEP16.35): 조회 자체가 실패했을 때(state.sitesLoadError)는 "등록된 사업장이 없다"는
     // 기존 문구 대신 오류 상태를 명확히 보여준다 — 그렇지 않으면 네트워크 오류로 목록이 비어도
@@ -1207,8 +1214,9 @@ export function renderSiteList(containerId) {
       });
       item.appendChild(summary);
 
-      // PC 지도 목록 디자인: 품질 배지는 제목 행 오른쪽에, 업체명/공사금액은 한 줄로 묶어 표시한다.
-      // 기존 site 데이터(company_name/amount/location_quality)만 사용하며 모바일에서는 CSS로 숨긴다.
+      // PC 지도 목록 디자인: 품질 배지는 제목 행 오른쪽에, 업체명/공사금액은 상세패널과 같은
+      // 아이콘+텍스트 톤으로 한 줄에 묶어 표시한다. 기존 site 데이터(company_name/amount/
+      // location_quality/accident_report_count)만 사용하며 모바일에서는 CSS로 숨긴다.
       const q = site.location_quality;
       const qInfo = (q === 'EXACT' || q === 'MANUAL')
         ? ['정확', 'exact']
@@ -1218,11 +1226,38 @@ export function renderSiteList(containerId) {
       qualityTag.innerHTML = `<i aria-hidden="true"></i>${qInfo[0]}`;
       titleRow.appendChild(qualityTag);
 
+      // 사용자 요청(디자인 의견 반영): 산재표가 1건 이상 등록된 현장은 목록에서 바로 눈에
+      // 띄도록 경고색 배지를 하나 더 붙인다. accident_report_count는 읽기만 하며, 기존 상세
+      // 패널 산재표 행과 동일한 데이터를 그대로 재사용한다(새 필드 추가 없음).
+      const accidentCount = Number(site.accident_report_count);
+      if (Number.isFinite(accidentCount) && accidentCount > 0) {
+        const accidentTag = document.createElement('span');
+        accidentTag.className = 'pc-site-accident-flag';
+        accidentTag.textContent = `산재 ${accidentCount.toLocaleString('ko-KR')}건`;
+        titleRow.appendChild(accidentTag);
+      }
+
       const pcMeta = document.createElement('div');
       pcMeta.className = 'pc-site-row-meta';
+
       const companyName = displayValue(site.company_name);
       const amountText = formatAmountKRW(site.amount);
-      pcMeta.textContent = amountText === '-' ? companyName : `${companyName} | 공사금액 ${amountText}`;
+
+      const companyCell = document.createElement('span');
+      companyCell.className = 'pc-site-row-meta-company';
+      const companyIcon = document.createElement('span');
+      companyIcon.className = 'pc-site-row-meta-icon';
+      companyIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SITE_DETAIL_ICONS.company}</svg>`;
+      companyCell.appendChild(companyIcon);
+      companyCell.appendChild(document.createTextNode(companyName));
+      pcMeta.appendChild(companyCell);
+
+      if (amountText !== '-') {
+        const amountCell = document.createElement('span');
+        amountCell.className = 'pc-site-row-meta-amount';
+        amountCell.textContent = amountText;
+        pcMeta.appendChild(amountCell);
+      }
       item.appendChild(pcMeta);
 
       item.addEventListener('click', () => selectSite(site.id));
