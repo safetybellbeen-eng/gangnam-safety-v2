@@ -2196,8 +2196,30 @@
     margin:10px 6px 4px;padding:12px 10px;border-radius:10px;
     background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);
   }
-  .pc-mobile-qr-img{width:92px;height:92px;border-radius:6px;background:#fff;padding:5px;box-sizing:border-box}
+  /* 사용자 요청(2026-10): 이미지를 누르면 크게 볼 수 있다는 걸 알리도록 버튼 형태로 바꾸고
+     hover 시 살짝 확대되는 피드백을 준다. */
+  .pc-mobile-qr-trigger{display:block;padding:0;border:0;background:transparent;cursor:pointer;line-height:0}
+  .pc-mobile-qr-img{width:92px;height:92px;border-radius:6px;background:#fff;padding:5px;box-sizing:border-box;transition:transform .12s ease}
+  .pc-mobile-qr-trigger:hover .pc-mobile-qr-img{transform:scale(1.05)}
   .pc-mobile-qr-text{margin:0;color:rgba(255,255,255,.82);font-size:11px;font-weight:600;line-height:1.45;text-align:center}
+}
+
+/* ============================================================
+   사용자 요청(2026-10): 사이드바 QR코드 클릭 시 화면 중앙에 크게 보여주는 팝업.
+   #app 밖(body 최상위)에 있는 요소라 위 PC 전용 미디어쿼리(min-width:769px) 바깥에 둔다.
+   기본 hidden 속성 + [hidden]{display:none!important}로 평소엔 완전히 숨겨져 있고,
+   PC 사이드바의 트리거 버튼(모바일에서는 애초에 보이지도 클릭되지도 않는다)을 눌렀을 때만
+   js/app.js의 bindPcQrModal()이 hidden 속성을 떼어 보여준다. */
+.pc-qr-modal{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center}
+.pc-qr-modal[hidden]{display:none!important}
+.pc-qr-modal-backdrop{position:absolute;inset:0;background:rgba(10,24,46,.55)}
+.pc-qr-modal-box{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:16px;padding:34px 38px 28px;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(8,30,70,.35);max-width:90vw;box-sizing:border-box}
+.pc-qr-modal-close{position:absolute;top:8px;right:10px;width:34px;height:34px;border:0;background:transparent;color:#5473a4;font-size:26px;line-height:1;cursor:pointer;border-radius:6px}
+.pc-qr-modal-close:hover{background:#f3f7fd;color:#173467}
+.pc-qr-modal-img{width:320px;height:320px;max-width:62vw;max-height:52vh;object-fit:contain}
+.pc-qr-modal-text{margin:0;color:#36547f;font-size:14px;font-weight:750;text-align:center}
+
+@media (min-width: 769px) {
   .pc-nav-btn.active{
     background:linear-gradient(90deg,#1767c9,#176ed7)!important;
     box-shadow:0 5px 12px rgba(0,30,80,.16),inset 0 0 0 1px rgba(255,255,255,.08)!important;
@@ -2971,6 +2993,61 @@
   #app[data-pc-tab="site"] #site-detail-panel .site-detail-note-textarea{
     flex:1 1 120px!important;
     min-height:120px!important;
+  }
+
+  /* ============================================================
+     사용자 요청(2026-10): UI 정밀검토 후속 개선 4건.
+
+     1) 현장탭 표의 사업장명/주소 셀 — 한 줄 말줄임(...) 대신 2줄까지 보여주고 그 다음만
+        말줄임 처리해 맥락을 더 볼 수 있게 한다. 2줄 허용을 위해 각 행 높이도 함께 늘린다.
+     2) 현장탭 상세패널 너비를 지도탭과 동일하게 맞춰(358→347/302→308/274→272px) 두 탭의
+        "표(또는 지도) 영역↔상세패널" 사이 여백이 똑같아지도록 한다(기존엔 현장탭 패널이
+        지도탭보다 넓어 사실상 표에 거의 붙어 보였다).
+     3) "위치 정확도" 뱃지를 메타박스(공사금액~산재표)와 하나의 카드로 시각적으로 합친다
+        (배경/둥근모서리를 이어 붙이고 구분선만 넣는다 — DOM 구조는 그대로 둔다).
+     4) 활성 필터 칩 강조를 좀 더 또렷하게(테두리 진하게, 굵은 글씨) 한다 — 기존에도
+        [data-active="true"] 스타일은 있었지만 색 대비가 옅어 잘 안 보인다는 의견 반영. */
+
+  /* --- 1) 표 셀 2줄 허용 --- */
+  #pc-site-table tbody tr{height:auto!important}
+  #pc-site-table td{height:auto!important;min-height:55px!important;padding:8px!important;white-space:normal!important}
+  #pc-site-table td:not(:nth-child(3)):not(:nth-child(4)){white-space:nowrap!important}
+  .pc-table-site-name strong{
+    display:-webkit-box!important;-webkit-line-clamp:2!important;-webkit-box-orient:vertical!important;
+    overflow:hidden!important;text-overflow:ellipsis!important;white-space:normal!important;line-height:1.35!important;
+  }
+  #pc-site-table td:nth-child(4){
+    display:-webkit-box!important;-webkit-line-clamp:2!important;-webkit-box-orient:vertical!important;
+    overflow:hidden!important;text-overflow:ellipsis!important;white-space:normal!important;line-height:1.35!important;
+  }
+
+  /* --- 2) 상세패널 너비 지도탭과 통일 --- */
+  #app[data-pc-tab="site"] #site-detail-panel{width:347px!important}
+  @media(max-width:1450px){#app[data-pc-tab="site"] #site-detail-panel{width:308px!important}}
+  @media(max-width:1200px){#app[data-pc-tab="site"] #site-detail-panel{width:272px!important}}
+
+  /* --- 3) 위치 정확도를 메타박스와 한 카드로 병합 --- */
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-meta,
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-meta{
+    border-radius:8px 8px 0 0!important;
+  }
+  #app[data-pc-tab="site"] #site-detail-panel .pc-site-quality-row,
+  #app[data-pc-tab="map"] #site-detail-panel .pc-site-quality-row{
+    margin:0!important;
+    padding:9px 12px!important;
+    background:#f7f9fc!important;
+    border-top:1px solid #e7edf5!important;
+    border-bottom:0!important;
+    border-radius:0 0 8px 8px!important;
+  }
+
+  /* --- 4) 활성 필터 칩 강조 보강 --- */
+  #app[data-pc-tab="site"] .site-select-filter[data-active="true"] .site-select-filter-label,
+  #app[data-pc-tab="map"] .site-select-filter[data-active="true"] .site-select-filter-label{
+    border:1.5px solid #0b63f6!important;
+    background:#eaf2ff!important;
+    color:#0b63f6!important;
+    font-weight:800!important;
   }
 
   /* ===== Responsive desktop only ===== */
