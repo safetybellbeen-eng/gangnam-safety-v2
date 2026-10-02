@@ -245,6 +245,15 @@ function routeByProfile() {
       // 실제 데이터 접근/변경 보안은 RLS와 RPC 내부의 is_gnmap_v2_admin() 검증이 담당한다.
       document.getElementById('btn-admin-panel').style.display = isAdmin() ? 'inline-block' : 'none';
       document.getElementById('btn-upload-panel').style.display = isAdmin() ? 'inline-block' : 'none';
+      // 버그 수정(2026-10): PC 좌측 사이드바의 "관리자"(회원관리/사업장 관리) 구역은
+      // index.html에 .pc-admin-only / .pc-admin-sep 클래스까지 붙어 있었지만, 정작 이 클래스를
+      // 읽어 숨기는 코드가 어디에도 없어 admin/master가 아닌 일반 승인 사용자에게도 항상 그대로
+      // 보이고 있었다(모바일/TWA는 위 btn-admin-panel/btn-upload-panel처럼 isAdmin()으로 이미
+      // 가리고 있었음). 모바일과 동일하게 관리자 권한이 있을 때만 보이도록 맞춘다 — UI 숨김은
+      // 편의 목적일 뿐, 실제 데이터 접근 보안은 RLS/RPC 내부 검증이 담당하는 것도 동일하다.
+      document.querySelectorAll('.pc-admin-only, .pc-admin-sep').forEach(el => {
+        el.style.display = isAdmin() ? '' : 'none';
+      });
       // 감독일정 상황판은 approved 전체가 볼 수 있다(등록/수정/삭제만 admin — renderSupervisionPanel 내부에서 분기).
       document.getElementById('btn-supervision-panel').style.display = 'inline-block';
       showView('view-approved');
