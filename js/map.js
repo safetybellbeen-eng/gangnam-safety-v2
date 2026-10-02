@@ -245,6 +245,11 @@ export async function renderGangnamBoundaries() {
   }
 
   if (dong && Array.isArray(dong.features) && dongPolygonsData.length === 0) {
+    // 사용자 의견 반영(2026-10, PC 전용): 법정동 경계선(파란색)이 지도 위 도로/지하철 선과
+    // 색이 비슷해 구분이 어렵다는 피드백 — PC(>768px)에서만 선을 더 굵고 점선으로 바꿔
+    // 또렷하게 한다. js/ui.js의 isMobileViewport()와 동일한 768px 기준이며, 모바일은 이
+    // 분기에 들어오지 않으므로 기존 실선/굵기가 그대로 유지된다(모바일 화면 불변).
+    const isPcViewport = typeof window.matchMedia === 'function' && !window.matchMedia('(max-width: 768px)').matches;
     dong.features.forEach(f => {
       const name = f.properties.name;
       const bounds = new kakao.maps.LatLngBounds();
@@ -253,9 +258,10 @@ export async function renderGangnamBoundaries() {
       geometryToPaths(f.geometry).forEach(path => {
         const polygon = new kakao.maps.Polygon({
           path,
-          strokeWeight: 2,
+          strokeWeight: isPcViewport ? 3 : 2,
           strokeColor: '#2f6fed',
           strokeOpacity: 0.9,
+          strokeStyle: isPcViewport ? 'shortdash' : 'solid',
           fillColor: '#5b8def',
           fillOpacity: 0.04
         });
