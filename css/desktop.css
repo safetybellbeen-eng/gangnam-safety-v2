@@ -3072,3 +3072,24 @@
     .pc-global-search{width:520px!important}
   }
 }
+
+/* ============================================================
+   사용자 요청(2026-10): 현장탭 UI 추가 수정 4건.
+   1) 필터 칩 줄의 위아래 여백을 넉넉하게 조정(위쪽 여백 추가, 칩 사이 간격 소폭 확대)해
+      검색창/표 헤더와 너무 붙어 보이던 느낌을 줄인다.
+   2) 페이지당 10/50/100개 선택 드롭다운 스타일(기본값 10개, js/ui.js bindPcSiteTablePageSize).
+   이 블록은 파일 맨 끝이라 동일 selector 충돌 시 항상 마지막에 적용된다. */
+@media (min-width: 769px) {
+  #app[data-pc-tab="site"] #pc-site-table-filters{
+    padding:10px 12px 12px!important;
+    gap:10px!important;
+  }
+  #pc-site-table-pagesize-wrap{
+    display:flex;align-items:center;gap:6px;color:#61779c;font-size:12px;font-weight:650;
+  }
+  #pc-site-table-pagesize{
+    height:28px;padding:0 8px;border:1px solid #d1deef;border-radius:6px;background:#fff;
+    color:#173467;font-size:12px;font-weight:700;cursor:pointer;
+  }
+  #pc-site-table-pagesize:hover{border-color:#8bb1e9}
+}
