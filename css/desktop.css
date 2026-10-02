@@ -1295,6 +1295,10 @@
   #pc-site-table tbody tr{cursor:pointer;background:#fff}#pc-site-table tbody tr:hover{background:#f8fbff}#pc-site-table tbody tr.selected{background:#edf5ff}
   #pc-site-table th:nth-child(1),#pc-site-table td:nth-child(1){width:28px;text-align:center}#pc-site-table th:nth-child(2),#pc-site-table td:nth-child(2){width:32px;text-align:center}
   #pc-site-table th:nth-child(3){width:19%}#pc-site-table th:nth-child(4){width:23%}#pc-site-table th:nth-child(5){width:12%}#pc-site-table th:nth-child(6){width:17%}#pc-site-table th:nth-child(7){width:11%}#pc-site-table th:nth-child(8){width:48px;text-align:center}
+  /* 사용자 요청(2026-10): 공사금액/공사기간처럼 숫자·날짜 값은 왼쪽 정렬보다 오른쪽 정렬이
+     더 읽기 쉽다는 피드백 — 해당 두 열(5번째=공사금액, 6번째=공사기간)만 오른쪽 정렬한다. */
+  #pc-site-table th:nth-child(5),#pc-site-table td:nth-child(5),
+  #pc-site-table th:nth-child(6),#pc-site-table td:nth-child(6){text-align:right!important}
   .pc-table-site-name{display:flex;flex-direction:column;gap:3px;min-width:0}.pc-table-site-name strong{overflow:hidden;text-overflow:ellipsis;color:#092b66;font-size:12.5px}.pc-table-site-name small{width:max-content;padding:2px 5px;border-radius:4px;background:#eef5ff;color:#5c79a5;font-size:10px}
   .pc-table-fav{border:0;background:transparent;color:#7d99bf;font-size:19px;cursor:pointer}.pc-table-fav.on{color:#f59e0b}
   .pc-table-quality{display:inline-flex;align-items:center;gap:5px}.pc-table-quality i{width:8px;height:8px;border-radius:50%}.pc-table-quality.exact i{background:#2f9d61}.pc-table-quality.estimated i{background:#f59e0b}.pc-table-quality.review i{background:#ef3340}
@@ -1494,6 +1498,29 @@
   /* 버그 수정(2026-10, 정밀검토): 지도탭과 동일한 원인 — 위 공용 .site-detail-label 규칙이
      이 블록보다 앞에 있어 사업장명 라벨이 다시 보이던 문제. 가장 마지막에 둬서 숨김을 보장한다. */
   #app[data-pc-tab="site"] #site-detail-panel .site-detail-label-name{display:none!important}
+
+  /* 버그 수정(2026-10, 정밀검토): "개인 메모" 저장/삭제 버튼에 현장탭 전용 스타일이 없어
+     위 즐겨찾기/길찾기/경로추가용 공용 규칙(button:not(.site-detail-close-x), 3열 그리드용
+     44px 버튼)을 그대로 물려받아 레이아웃 없이 어정쩡하게 보이던 문제 — 지도탭과 동일하게
+     2열 그리드 전용 스타일을 추가한다. 동일 specificity+!important인 위 공용 버튼 규칙보다
+     나중에 와야 이긴다(소스 순서). */
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-note-actions{
+    display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;margin-top:8px!important;flex:none!important;
+  }
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-note-actions button{
+    order:0!important;min-height:38px!important;padding:0!important;border:1px solid #cbd9ec!important;
+    border-radius:8px!important;background:#fff!important;color:#075fcf!important;font-size:12px!important;font-weight:800!important;
+  }
+  /* 사용자 요청(2026-10): 메모 삭제는 되돌릴 수 없는 동작이라 "저장"과 똑같은 파란색이면
+     실수로 누르기 쉽다는 의견 — 삭제 버튼만 빨간 계열로 구분한다(지도탭/현장탭 공통 적용). */
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-note-actions .site-detail-btn-danger,
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-note-actions .site-detail-btn-danger{
+    border-color:#f3c0c7!important;color:#d6324a!important;background:#fff!important;
+  }
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-note-actions .site-detail-btn-danger:hover,
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-note-actions .site-detail-btn-danger:hover{
+    background:#fdecee!important;border-color:#e99aa5!important;
+  }
 
   /* 기능 버그 수정(2026-10, 정밀검토): "동 전체/공사금액 전체/점검여부 전체" 칩은 실제로는
      지도탭과 공유하는 <details> 드롭다운(#site-dong-filter 등, #site-filter-row 안)의
