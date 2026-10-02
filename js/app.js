@@ -7,7 +7,7 @@ import { initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites, rend
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
-import { renderSiteList, renderPcSiteTable, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView, renderHeaderUploadDate, setSiteSearchMode, renderSiteNotesPanel, renderAppSettingsPanel } from './ui.js';
+import { renderSiteList, renderPcSiteTable, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView, renderHeaderUploadDate, setSiteSearchMode, renderSiteNotesPanel, renderAppSettingsPanel, restorePcSiteFiltersToRow } from './ui.js';
 import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
 
 const VIEWS = [
@@ -524,7 +524,14 @@ function activatePcTab(tab) {
 
   // 기존 모바일 탭 전환 함수가 가진 필터/즐겨찾기/경로 렌더 로직을 그대로 재사용한다.
   activateMobileTab(tab);
-  if (tab === 'site') renderPcSiteTable();
+  if (tab === 'site') {
+    renderPcSiteTable();
+  } else {
+    // 버그 수정(2026-10): 현장 탭에서 실제 필터 <details>를 #pc-site-table-filters로
+    // 옮겨 썼다면(movePcSiteFiltersIntoTable), 지도 탭으로 돌아올 때 #site-filter-row의
+    // 원래 자리로 되돌려 지도 탭 필터 줄이 비어 보이지 않게 한다.
+    restorePcSiteFiltersToRow();
+  }
   if (tab === 'map' && state.map && typeof state.map.relayout === 'function') {
     requestAnimationFrame(() => state.map.relayout());
   }
