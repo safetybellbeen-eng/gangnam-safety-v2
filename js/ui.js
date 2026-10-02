@@ -1083,7 +1083,11 @@ export function renderPcSiteTable() {
     fav.addEventListener('click', e => { e.stopPropagation(); handleFavoriteToggle(site.id, fav); }); favTd.appendChild(fav); tr.appendChild(favTd);
 
     const nameTd = document.createElement('td'); const nameWrap=document.createElement('div'); nameWrap.className='pc-table-site-name';
-    const strong=document.createElement('strong'); strong.textContent=site.site_name || site.company_name || '-'; nameWrap.appendChild(strong);
+    const strong=document.createElement('strong'); strong.textContent=site.site_name || site.company_name || '-';
+    // 사용자 요청(2026-10): 긴 사업장명이 말줄임표로 잘릴 때(주소 열처럼) 마우스를 올리면
+    // 전체 이름을 볼 수 있도록 title 속성을 추가한다.
+    strong.title = site.site_name || site.company_name || '-';
+    nameWrap.appendChild(strong);
     if (site.company_name && site.company_name !== site.site_name) { const small=document.createElement('small'); small.textContent=site.company_name; nameWrap.appendChild(small); }
     nameTd.appendChild(nameWrap); tr.appendChild(nameTd);
 
@@ -1100,11 +1104,15 @@ export function renderPcSiteTable() {
   const pagination=document.getElementById('pc-site-table-pagination');
   if(pagination){
     pagination.innerHTML='';
-    const addBtn=(label,page,disabled=false,active=false)=>{const b=document.createElement('button');b.type='button';b.className=`pc-page-btn${active?' active':''}`;b.textContent=label;b.disabled=disabled;b.addEventListener('click',()=>{pcSiteTablePage=page;renderPcSiteTable();});pagination.appendChild(b);};
-    addBtn('‹', Math.max(1,pcSiteTablePage-1), pcSiteTablePage===1);
+    const addBtn=(label,page,disabled=false,active=false,title='')=>{const b=document.createElement('button');b.type='button';b.className=`pc-page-btn${active?' active':''}`;b.textContent=label;b.disabled=disabled;if(title)b.title=title;b.addEventListener('click',()=>{pcSiteTablePage=page;renderPcSiteTable();});pagination.appendChild(b);};
+    // 사용자 요청(2026-10): 전체 200여 페이지 중 뒤쪽으로 바로 이동할 방법이 ‹/› 뿐이라
+    // 불편하다는 피드백 — 맨 처음/맨 끝 페이지로 바로 이동하는 버튼을 양 끝에 추가한다.
+    addBtn('«', 1, pcSiteTablePage===1, false, '맨 처음');
+    addBtn('‹', Math.max(1,pcSiteTablePage-1), pcSiteTablePage===1, false, '이전');
     const from=Math.max(1,Math.min(pcSiteTablePage-2,pageCount-4)); const to=Math.min(pageCount,from+4);
     for(let i=from;i<=to;i++) addBtn(String(i),i,false,i===pcSiteTablePage);
-    addBtn('›', Math.min(pageCount,pcSiteTablePage+1), pcSiteTablePage===pageCount);
+    addBtn('›', Math.min(pageCount,pcSiteTablePage+1), pcSiteTablePage===pageCount, false, '다음');
+    addBtn('»', pageCount, pcSiteTablePage===pageCount, false, '맨 끝');
   }
 
   movePcSiteFiltersIntoTable();
