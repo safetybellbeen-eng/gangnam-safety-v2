@@ -822,11 +822,14 @@
                 <button type="button" id="site-amount-filter-custom-toggle" class="site-amount-filter-custom-toggle">자세히 설정</button>
                 <div id="site-amount-filter-custom-body" class="site-amount-filter-custom-body" hidden>
                   <div class="site-amount-filter-custom-row">
-                    <input type="number" id="site-amount-filter-min-input" class="site-amount-filter-custom-input" placeholder="최소" min="0" inputmode="numeric">
-                    <span class="site-amount-filter-custom-unit">억</span>
-                    <span class="site-amount-filter-custom-sep">~</span>
-                    <input type="number" id="site-amount-filter-max-input" class="site-amount-filter-custom-input" placeholder="최대" min="0" inputmode="numeric">
-                    <span class="site-amount-filter-custom-unit">억</span>
+                    <span class="site-amount-filter-custom-tag">최소</span>
+                    <input type="number" id="site-amount-filter-min-input" class="site-amount-filter-custom-input" placeholder="0" min="0" inputmode="numeric">
+                    <span class="site-amount-filter-custom-unit">억 이상</span>
+                  </div>
+                  <div class="site-amount-filter-custom-row">
+                    <span class="site-amount-filter-custom-tag">최대</span>
+                    <input type="number" id="site-amount-filter-max-input" class="site-amount-filter-custom-input" placeholder="0" min="0" inputmode="numeric">
+                    <span class="site-amount-filter-custom-unit">억 이하</span>
                   </div>
                   <button type="button" id="site-amount-filter-custom-apply" class="site-amount-filter-custom-apply">적용</button>
                 </div>
