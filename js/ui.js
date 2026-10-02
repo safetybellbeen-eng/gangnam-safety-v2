@@ -1259,6 +1259,32 @@ function scrollListItemIntoView(siteId) {
   if (el) el.scrollIntoView({ block: 'nearest' });
 }
 
+// PC 상세 패널 디자인: 정보 행 라벨 앞에 붙이는 작은 선 아이콘(정적 SVG, 사용자 데이터 없음 — XSS 영향 없음).
+// 모바일에서는 css/desktop.css 기본 숨김 목록(.site-detail-label-icon)에 의해 보이지 않는다.
+const SITE_DETAIL_ICONS = {
+  name: '<path d="M4 21V7l8-4 8 4v14"/><path d="M9 21v-6h6v6"/><path d="M9 11h.01M15 11h.01M9 15h.01M15 15h.01"/>',
+  company: '<rect x="3" y="7" width="18" height="13" rx="1.5"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+  address: '<path d="M12 21s7-6.1 7-11a7 7 0 1 0-14 0c0 4.9 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/>',
+  amount: '<circle cx="12" cy="12" r="9"/><path d="M9 9.5h4.5a1.5 1.5 0 0 1 0 3H10a1.5 1.5 0 0 0 0 3h5M12 7v2M12 15v2"/>',
+  period: '<rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M8 3v4M16 3v4M3.5 10h17"/>',
+  supervision: '<path d="M8 3h8l1 2h2v16H5V5h2l1-2Z"/><path d="M9 12.5l2 2 4-4.5"/>',
+  accident: '<path d="M6 3h9l3 3v15H6V3Z"/><path d="M14 3v4h4M9 13h6M9 17h4"/>'
+};
+
+function buildDetailLabel(key, text) {
+  const labelEl = document.createElement('span');
+  labelEl.className = `site-detail-label site-detail-label-${key}`;
+  const iconPaths = SITE_DETAIL_ICONS[key];
+  if (iconPaths) {
+    const iconWrap = document.createElement('span');
+    iconWrap.className = 'site-detail-label-icon';
+    iconWrap.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths}</svg>`;
+    labelEl.appendChild(iconWrap);
+  }
+  labelEl.appendChild(document.createTextNode(text));
+  return labelEl;
+}
+
 // 상세 패널 렌더. textContent만 사용해 XSS를 방지한다.
 export function renderDetail(site) {
   const panel = document.getElementById('site-detail-panel');
@@ -1313,6 +1339,10 @@ export function renderDetail(site) {
     panel.appendChild(qualityBadge);
   }
 
+  // 사용자 요청(2026-10): 탭 전환 없이 "기본정보" 내용과 "현장메모"를 한 패널에 이어서 보여준다
+  // (이전에 추가했던 기본정보/현장메모 탭 전환 UI는 제거). 아래 hero/meta/actions와
+  // renderNoteSection() 호출이 전부 panel에 순서대로 바로 붙는다.
+
   // 사용자 요청: "확인필요" 배지로 이미 의미가 전달되므로 별도 경고 문구는 넣지 않는다
   // (기존 STEP12-C의 "⚠ 위치 확인요망..." 문구 제거, 배지 자체는 그대로 유지).
 
@@ -1332,9 +1362,7 @@ export function renderDetail(site) {
     const row = document.createElement('div');
     row.className = `site-detail-row site-detail-row-${key}`;
 
-    const labelEl = document.createElement('span');
-    labelEl.className = `site-detail-label site-detail-label-${key}`;
-    labelEl.textContent = label;
+    const labelEl = buildDetailLabel(key, label);
 
     const valueEl = document.createElement('span');
     valueEl.className = `site-detail-value site-detail-value-${key}`;
@@ -1420,9 +1448,10 @@ export function renderDetail(site) {
   meta.className = 'site-detail-meta';
 
   const metaRows = [
-    // STEP16.5-C §8: 공사금액은 모바일(768px 이하)에서만 formatAmountKRW()로 억/만 단위로
-    // 바꿔 보여준다. PC(>768px)는 isMobileViewport()가 false라 기존 displayValue(raw) 그대로.
-    ['공사금액', 'amount', () => (isMobileViewport() ? formatAmountKRW(site.amount) : displayValue(site.amount))],
+    // 사용자 요청(2026-10): PC 상세 패널도 모바일과 동일하게 공사금액을 억/만 단위로 표시한다
+    // (기존에는 PC만 raw 숫자가 그대로 노출되는 버그가 있었다). DB 원본 값은 그대로 두고
+    // 화면 표시 문자열만 formatAmountKRW()로 통일한다.
+    ['공사금액', 'amount', () => formatAmountKRW(site.amount)],
     ['공사기간', 'period', () => formatPeriodKR(site.period_start, site.period_end)],
     ['지도점검', 'supervision', () => formatCount(site.supervision_count, '회')],
     ['산재표', 'accident', () => formatCount(site.accident_report_count, '건')]
@@ -1431,9 +1460,7 @@ export function renderDetail(site) {
     const row = document.createElement('div');
     row.className = `site-detail-row site-detail-row-${key}`;
 
-    const labelEl = document.createElement('span');
-    labelEl.className = `site-detail-label site-detail-label-${key}`;
-    labelEl.textContent = label;
+    const labelEl = buildDetailLabel(key, label);
 
     const valueEl = document.createElement('span');
     valueEl.className = `site-detail-value site-detail-value-${key}`;
@@ -1559,7 +1586,8 @@ export function renderDetail(site) {
 
   // 사용자 요청(STEP16.22): 모바일에서는 어느 탭(지도/경로/현장/즐겨찾기)에서 열든 상세 패널에
   // 인라인 메모를 더 이상 바로 보여주지 않는다 — 아래 "메모" 버튼을 눌러야 팝업으로 작성/열람/
-  // 수정/삭제한다(openNoteModal). PC는 기존과 동일하게 인라인 메모 섹션을 그대로 보여준다.
+  // 수정/삭제한다(openNoteModal). PC는 기존과 동일하게 인라인 메모 섹션을 기본정보 내용
+  // 바로 아래에 이어서 보여준다(탭 분리 없음, 패널 하나를 계속 스크롤).
   if (!isMobileViewport()) {
     renderNoteSection(panel, site.id);
   }
