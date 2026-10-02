@@ -1145,7 +1145,7 @@
 
 /* ===== PC 로그인 이후 업무화면 (2026-10) ===== */
 #pc-sidebar,#pc-app-header,#pc-page-heading{display:none}
-.pc-site-quality,.pc-site-row-meta,.site-detail-label-icon,.site-amount-filter-custom,.pc-site-accident-flag,.pc-map-empty-state,.pc-detail-name-quality{display:none}
+.pc-site-quality,.pc-site-row-meta,.site-detail-label-icon,.site-amount-filter-custom,.pc-site-accident-flag,.pc-map-empty-state,.pc-site-quality-row{display:none}
 @media (min-width:769px){
   #view-approved{--side:220px;--head:70px;--ink:#08265f;--blue:#0b63f6;--line:#d9e5f5;--soft:#f5f9ff;position:fixed!important;inset:0!important;overflow:hidden;background:#f8fbff;color:var(--ink);font-family:Arial,'Noto Sans KR',sans-serif}
   #view-approved>h1,#view-approved>#approved-role-badge,#view-approved>#btn-current-location,#view-approved>#location-message,#view-approved>#btn-admin-panel,#view-approved>#btn-upload-panel,#view-approved>#btn-supervision-panel,#view-approved>#logout-approved,#view-approved>#mobile-app-header,#view-approved>#mobile-bottom-nav,#view-approved>#favorite-subtabs{display:none!important}
@@ -2358,26 +2358,48 @@
     background:#e8f6ee!important;color:#1f8b53!important;
   }
   /* 사용자 디자인 의견 반영(2026-10): "정확/추정/확인필요" 배지가 패널 맨 위에 혼자 떠 있어
-     어색하다는 피드백 — PC에서는 이 상단 배지를 숨기고, 대신 사업장명 옆의 새 배지
-     (.pc-detail-name-quality, js/ui.js renderDetail)를 보여준다. 모바일 상단 배지는 이 규칙이
+     어색하다는 피드백 — PC에서는 이 상단 배지를 숨긴다. 모바일 상단 배지는 이 규칙이
      적용되지 않는 media query 밖이라 그대로 유지된다. */
   #app[data-pc-tab="map"] #site-detail-panel > .site-detail-quality-badge{display:none!important}
   #app[data-pc-tab="map"] #site-detail-panel .site-detail-row-name{align-items:center!important}
-  #app[data-pc-tab="map"] #site-detail-panel .pc-detail-name-quality{
+  /* 사용자 의견 반영(2026-10, 2차): 사업장명 옆 배지도 "줄 위에 떠 있는 느낌"이라는 추가
+     피드백 — 공사금액/공사기간/지도점검/산재표와 같은 표 형식으로 산재표 바로 아래에
+     "위치 정확도" 행으로 옮긴다(.pc-site-quality-row, js/ui.js renderDetail). PC 전용 중복
+     행 패턴을 그대로 재사용: 기본은 전역 숨김 목록(위 .pc-site-quality 등과 함께)에서 숨겨져
+     있다가 PC 지도 탭에서만 보인다. */
+  #app[data-pc-tab="map"] #site-detail-panel .pc-site-quality-row{
+    display:flex!important;
+    gap:10px!important;
+    align-items:flex-start!important;
+    margin:0!important;
+    padding:7px 0!important;
+    border-bottom:1px solid #edf2f8!important;
+  }
+  /* 사용자 의견 반영(2026-10, 3차): 다른 메타 행(공사금액/공사기간/지도점검/산재표)은 전부
+     검정 계열 텍스트인데 이 행만 배경이 있는 배지라 시각적으로 튄다는 피드백 — 배경을 없애고
+     점(●)+색 텍스트로 더 차분하게 바꾼다(의미/색 구분은 그대로 유지). */
+  #app[data-pc-tab="map"] #site-detail-panel .pc-site-quality-value{
     display:inline-flex!important;
     align-items:center!important;
-    flex:none!important;
-    order:3!important;
-    margin-left:8px!important;
-    padding:3px 8px!important;
-    border-radius:999px!important;
-    font-size:10.5px!important;
+    gap:6px!important;
+    padding:0!important;
+    background:transparent!important;
+    border-radius:0!important;
+    font-size:12.5px!important;
     font-weight:800!important;
     white-space:nowrap!important;
   }
-  #app[data-pc-tab="map"] #site-detail-panel .pc-detail-name-quality.site-detail-quality-exact{background:#fdecec!important;color:#d6324a!important}
-  #app[data-pc-tab="map"] #site-detail-panel .pc-detail-name-quality.site-detail-quality-estimated{background:#fef3dc!important;color:#b4740a!important}
-  #app[data-pc-tab="map"] #site-detail-panel .pc-detail-name-quality.site-detail-quality-review{background:#e8f6ee!important;color:#1f8b53!important}
+  #app[data-pc-tab="map"] #site-detail-panel .pc-site-quality-value::before{
+    content:'';
+    display:inline-block;
+    flex:none;
+    width:7px;height:7px;
+    border-radius:50%;
+    background:currentColor;
+  }
+  #app[data-pc-tab="map"] #site-detail-panel .pc-site-quality-value.site-detail-quality-exact{color:#d6324a!important}
+  #app[data-pc-tab="map"] #site-detail-panel .pc-site-quality-value.site-detail-quality-estimated{color:#b4740a!important}
+  #app[data-pc-tab="map"] #site-detail-panel .pc-site-quality-value.site-detail-quality-review{color:#1f8b53!important}
 
   /* 사용자 디자인 의견 반영(2026-10): 좌측 목록 카드의 "업체명 | 공사금액 10억원" 한 줄
      텍스트가 우측 상세패널(아이콘+라벨+값)과 톤이 달라 이질적이라는 피드백 — 같은 아이콘
@@ -2506,7 +2528,7 @@
     display:flex!important;
     align-items:flex-start!important;
     gap:7px!important;
-    padding:0 34px 11px 0!important;
+    padding:0 48px 11px 0!important;
     border:0!important;
   }
   #app[data-pc-tab="map"] #site-detail-panel .site-detail-label-name{display:none!important}
