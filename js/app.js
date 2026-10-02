@@ -629,6 +629,31 @@ function bindPcWorkspace() {
     });
     siteSearch.addEventListener('input', () => { globalSearch.value = siteSearch.value; if (pcSiteSearch) pcSiteSearch.value = siteSearch.value; });
   }
+
+  bindPcQrModal();
+}
+
+// 사용자 요청(2026-10): 사이드바의 모바일 QR코드를 클릭하면 화면 중앙에 크게 띄워
+// 모바일 카메라로 인식하기 쉽게 한다. 모달은 #app 바깥(body 최상위, index.html 끝)에
+// 있고 기본 hidden 상태 — 이 함수는 열기/닫기 토글만 담당한다. 트리거 버튼
+// (#pc-mobile-qr-trigger)이 #pc-sidebar 안에 있어 모바일에서는 애초에 보이지도
+// 클릭되지도 않으므로 모바일 동작에는 영향이 없다.
+function bindPcQrModal() {
+  const trigger = document.getElementById('pc-mobile-qr-trigger');
+  const modal = document.getElementById('pc-qr-modal');
+  if (!trigger || !modal) return;
+  const backdrop = document.getElementById('pc-qr-modal-backdrop');
+  const closeBtn = document.getElementById('pc-qr-modal-close');
+
+  const open = () => { modal.hidden = false; };
+  const close = () => { modal.hidden = true; };
+
+  trigger.addEventListener('click', open);
+  if (backdrop) backdrop.addEventListener('click', close);
+  if (closeBtn) closeBtn.addEventListener('click', close);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.hidden) close();
+  });
 }
 
 function bindEvents() {
