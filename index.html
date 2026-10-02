@@ -961,7 +961,21 @@
           <tbody id="pc-site-table-body"></tbody>
         </table>
       </div>
-      <div id="pc-site-table-footer"><span id="pc-site-table-summary"></span><div id="pc-site-table-pagination"></div></div>
+      <div id="pc-site-table-footer">
+        <span id="pc-site-table-summary"></span>
+        <!-- 사용자 요청(2026-10): 한 페이지에 10개씩만 보여 페이지 이동이 잦다는 의견 —
+             10/50/100개 중 고를 수 있게 하고 기본값은 기존과 동일하게 10개로 둔다
+             (js/ui.js renderPcSiteTable, PC_SITE_PAGE_SIZE 참고). -->
+        <label id="pc-site-table-pagesize-wrap">
+          <span>페이지당</span>
+          <select id="pc-site-table-pagesize">
+            <option value="10" selected>10개</option>
+            <option value="50">50개</option>
+            <option value="100">100개</option>
+          </select>
+        </label>
+        <div id="pc-site-table-pagination"></div>
+      </div>
     </section>
     <div id="site-detail-panel" style="display:none"></div>
     <button type="button" id="logout-approved">로그아웃</button>
