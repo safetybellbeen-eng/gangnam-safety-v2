@@ -1225,7 +1225,15 @@ function exportSelectedSitesToExcel(sites) {
 export function renderPcSiteTable() {
   const body = document.getElementById('pc-site-table-body');
   const panel = document.getElementById('pc-site-table-panel');
-  if (!body || !panel || isMobileViewport()) return;
+  // 버그 수정(2026-10): selectSite()(지도 마커/목록 클릭과 현장 표 행 클릭이 공통으로 쓰는
+  // 함수)가 끝에서 항상 renderPcSiteTable()을 호출한다. 현장 탭이 아닐 때도(#pc-site-table-body
+  // 등은 CSS로 숨겨져 있을 뿐 DOM에는 항상 있으므로) 이 함수가 그대로 실행되면
+  // movePcSiteFiltersIntoTable()이 지도탭 사이드바의 #site-filter-row 안 필터 <details>들을
+  // (현재 보이지도 않는) 현장 탭 표 쪽으로 옮겨버려 — 지도탭에서 아무 현장이나 클릭하는 순간
+  // 필터 칩 줄이 통째로 사라지는 현상(탭을 다시 전환해야만 복구됨)이 발생했다. 현장 탭이 실제
+  // 활성 탭일 때만 표를 그리고 필터를 옮기도록 막는다.
+  const activeTab = document.getElementById('app')?.dataset.pcTab;
+  if (!body || !panel || isMobileViewport() || activeTab !== 'site') return;
 
   const rows = getFilteredSortedSites();
   const pageCount = Math.max(1, Math.ceil(rows.length / pcSiteTablePageSize));
