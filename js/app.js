@@ -505,16 +505,21 @@ function activatePcTab(tab) {
     btn.classList.toggle('active', btn.dataset.pcTab === tab);
   });
 
+  // 사용자 요청(2026-10): 최상단 제목("지도"/"현장"/"경로"/"즐겨찾기") 옆에 아이콘을 붙인다.
+  // 새 아이콘을 만들지 않고 왼쪽 사이드바 네비게이션 버튼과 완전히 같은 SVG path를 재사용해
+  // 같은 탭을 가리키는 아이콘이 두 군데서 항상 동일하게 보이도록 한다.
   const meta = {
-    map: ['지도', '강남구 사업장을 지도에서 확인하고 현장 정보를 조회할 수 있습니다.'],
-    site: ['현장', '강남구 사업장 목록을 조회하고, 상세 정보를 확인할 수 있습니다.'],
-    route: ['경로', '선택한 현장의 방문 순서를 확인하고 경로를 관리할 수 있습니다.'],
-    favorite: ['즐겨찾기', '자주 방문하는 현장을 즐겨찾기로 등록하여 빠르게 확인할 수 있습니다.']
+    map: ['지도', '강남구 사업장을 지도에서 확인하고 현장 정보를 조회할 수 있습니다.', '<path d="M3 6.5 8 4l8 2.5L21 4v13.5L16 20l-8-2.5L3 20V6.5Z"/><path d="M8 4v13.5M16 6.5V20"/>'],
+    site: ['현장', '강남구 사업장 목록을 조회하고, 상세 정보를 확인할 수 있습니다.', '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 9h6M9 13h6M9 17h4"/>'],
+    route: ['경로', '선택한 현장의 방문 순서를 확인하고 경로를 관리할 수 있습니다.', '<circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h2a3 3 0 0 0 3-3V9a3 3 0 0 1 3-3"/>'],
+    favorite: ['즐겨찾기', '자주 방문하는 현장을 즐겨찾기로 등록하여 빠르게 확인할 수 있습니다.', '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z"/>']
   };
-  const [title, desc] = meta[tab] || meta.map;
-  const titleEl = document.getElementById('pc-page-title');
+  const [title, desc, iconPath] = meta[tab] || meta.map;
+  const titleTextEl = document.getElementById('pc-page-title-text');
+  const titleIconEl = document.getElementById('pc-page-title-icon');
   const descEl = document.getElementById('pc-page-desc');
-  if (titleEl) titleEl.textContent = title;
+  if (titleTextEl) titleTextEl.textContent = title;
+  if (titleIconEl) titleIconEl.innerHTML = iconPath;
   if (descEl) descEl.textContent = desc;
 
   // 기존 모바일 탭 전환 함수가 가진 필터/즐겨찾기/경로 렌더 로직을 그대로 재사용한다.
