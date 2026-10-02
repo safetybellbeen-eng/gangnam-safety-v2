@@ -134,16 +134,37 @@ function matchesAccidentReportFilter(site, filter) {
   return filter === 'yes' ? has : !has;
 }
 
+// 공사기간이 없는 사업장은 Infinity로 취급해 오름차순 정렬 시 항상 맨 뒤로 밀린다(toSortableEndTime과 동일한 규칙).
+function toSortableStartTime(v) {
+  if (!v) return Infinity;
+  const t = new Date(v).getTime();
+  return Number.isFinite(t) ? t : Infinity;
+}
+
 function compareBySort(a, b, sortMode) {
   switch (sortMode) {
     case 'name-asc':
       return (a.site_name || '').localeCompare(b.site_name || '', 'ko');
+    // 사용자 요청(2026-10, 현장탭): 표 헤더를 클릭해 오름차순/내림차순을 바로 토글할 수 있게
+    // 한다. 기존 "기본순서" 드롭다운 옵션(사업장명/업체명/공사금액/공사기간임박순/즐겨찾기)은
+    // 그대로 두고, 헤더 클릭에서만 쓰는 모드(name-desc/address-asc/address-desc/period-asc/
+    // period-desc)를 추가한다 — 드롭다운 목록에는 없는 값이라 모바일 UI는 전혀 바뀌지 않는다.
+    case 'name-desc':
+      return (b.site_name || '').localeCompare(a.site_name || '', 'ko');
+    case 'address-asc':
+      return (a.address || '').localeCompare(b.address || '', 'ko');
+    case 'address-desc':
+      return (b.address || '').localeCompare(a.address || '', 'ko');
     case 'company-asc':
       return (a.company_name || '').localeCompare(b.company_name || '', 'ko');
     case 'amount-desc':
       return toSafeAmount(b.amount) - toSafeAmount(a.amount);
     case 'amount-asc':
       return toSafeAmount(a.amount) - toSafeAmount(b.amount);
+    case 'period-asc': // 공사기간 열 헤더 클릭(오름차순) — period_start 기준.
+      return toSortableStartTime(a.period_start) - toSortableStartTime(b.period_start);
+    case 'period-desc':
+      return toSortableStartTime(b.period_start) - toSortableStartTime(a.period_start);
     case 'deadline': // 공사기간 임박순 — period_end 오름차순, 없는 값은 맨 뒤로.
       return toSortableEndTime(a.period_end) - toSortableEndTime(b.period_end);
     case 'favorite': { // 즐겨찾기 우선 — 현재 사용자의 favoriteSiteIds 기준.
