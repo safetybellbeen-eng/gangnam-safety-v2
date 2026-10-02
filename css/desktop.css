@@ -1224,9 +1224,13 @@
   #app[data-pc-tab="map"] .pc-site-row-meta{display:block;font-size:11.5px;line-height:1.3;color:#7284a4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pc-site-quality{display:inline-flex!important;flex:0 0 auto!important;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:750;white-space:nowrap}
   .pc-site-quality i{width:7px;height:7px;border-radius:50%;display:inline-block}
-  .pc-site-quality-exact{background:#fdecec;color:#d6324a}.pc-site-quality-exact i{background:#ef3340}
+  /* 사용자 확인(2026-10): 지도 범례(정확=초록/중간=주황/낮음=빨강)와 색 기준을 통일한다.
+     기존에는 exact(정확)=빨강, review(낮음)=초록으로 범례와 정반대였다(PC 목록/상세 전용
+     색상이었을 뿐 모바일 쪽 .site-detail-quality-*(css/mobile.css)는 원래부터 범례와 같은
+     색이었다 — 이번에 PC만 범례 기준으로 맞춘다). */
+  .pc-site-quality-exact{background:#e8f6ee;color:#1f8b53}.pc-site-quality-exact i{background:#2f9d61}
   .pc-site-quality-estimated{background:#fef3dc;color:#b4740a}.pc-site-quality-estimated i{background:#f59e0b}
-  .pc-site-quality-review{background:#e8f6ee;color:#1f8b53}.pc-site-quality-review i{background:#2f9d61}
+  .pc-site-quality-review{background:#fdecec;color:#d6324a}.pc-site-quality-review i{background:#ef3340}
 
   #app[data-pc-tab="map"] #map-container{left:calc(var(--side) + 370px)!important;right:370px!important;top:90px!important;bottom:20px!important;border-radius:10px!important;border:1px solid var(--pc-border)!important;background:#eef5fb!important}
   #pc-map-toolbar{display:none}
@@ -1997,6 +2001,10 @@
     font-size:15px!important;
     font-weight:750!important;
   }
+  /* 사용자 피드백(2026-10): "사업장 데이터 관리"처럼 긴 메뉴명이 "관" / "리"로 단어 중간에서
+     줄바꿈됐다 — 한글은 기본적으로 글자 단위로 줄바꿈되므로 단어(어절) 단위로만 끊어지게
+     한다(공간이 부족하면 "사업장 데이터" / "관리"처럼 자연스럽게 나뉜다). */
+  .pc-nav-btn>span{word-break:keep-all!important;overflow-wrap:break-word!important;line-height:1.3!important}
   .pc-nav-btn.active{
     background:linear-gradient(90deg,#1767c9,#176ed7)!important;
     box-shadow:0 5px 12px rgba(0,30,80,.16),inset 0 0 0 1px rgba(255,255,255,.08)!important;
@@ -2199,6 +2207,16 @@
   }
   #app[data-pc-tab="map"] #site-filter-row::-webkit-scrollbar{height:4px!important}
   #app[data-pc-tab="map"] #site-filter-row::-webkit-scrollbar-thumb{background:#dbe5f1!important;border-radius:4px!important}
+  /* 사용자 피드백(2026-10): 얇은 커스텀 스크롤바를 의도했지만 실제 화면에서는 화살표 버튼이
+     달린 두꺼운 기본(OS/브라우저 네이티브) 스크롤바가 그대로 보였다 — 브라우저에 따라
+     ::-webkit-scrollbar 커스터마이징이 기대대로 적용되지 않을 수 있으므로, 더 확실하게
+     스크롤바 자체를 숨긴다(가로 스크롤 동작은 트랙패드/시프트+휠/드래그로 그대로 가능).
+     모바일은 이 규칙이 적용되지 않는 media query 밖이라 영향 없다. */
+  #app[data-pc-tab="map"] #site-filter-row{
+    scrollbar-width:none!important;
+    -ms-overflow-style:none!important;
+  }
+  #app[data-pc-tab="map"] #site-filter-row::-webkit-scrollbar{display:none!important;height:0!important}
   #app[data-pc-tab="map"] .site-select-filter{flex:0 0 auto!important}
   /* 사용자 요청(2026-10): 필터 칩을 pill 형태 + 펼침 화살표 + hover 전환으로 더 정밀하게 다듬는다. */
   #app[data-pc-tab="map"] .site-select-filter-label{
@@ -2348,14 +2366,18 @@
   }
   /* 사용자 요청(2026-10): 최종 시안의 "정확/추정/확인필요" 배지 색(목록의 .pc-site-quality와
      동일 팔레트)을 상세 패널 배지에도 그대로 적용한다. */
+  /* 사용자 확인(2026-10): 지도 범례 기준(정확=초록/중간=주황/낮음=빨강)으로 통일 — 기존엔
+     exact(정확)/review(낮음) 색이 서로 바뀌어 있었다. 이 배지 자체는 바로 아래 규칙에서
+     PC 화면에 숨겨지지만(사업장명 옆 대신 "위치 정확도" 행으로 이동) 색 정의는 일관성을
+     위해 맞춰둔다. */
   #app[data-pc-tab="map"] #site-detail-panel .site-detail-quality-badge.site-detail-quality-exact{
-    background:#fdecec!important;color:#d6324a!important;
+    background:#e8f6ee!important;color:#1f8b53!important;
   }
   #app[data-pc-tab="map"] #site-detail-panel .site-detail-quality-badge.site-detail-quality-estimated{
     background:#fef3dc!important;color:#b4740a!important;
   }
   #app[data-pc-tab="map"] #site-detail-panel .site-detail-quality-badge.site-detail-quality-review{
-    background:#e8f6ee!important;color:#1f8b53!important;
+    background:#fdecec!important;color:#d6324a!important;
   }
   /* 사용자 디자인 의견 반영(2026-10): "정확/추정/확인필요" 배지가 패널 맨 위에 혼자 떠 있어
      어색하다는 피드백 — PC에서는 이 상단 배지를 숨긴다. 모바일 상단 배지는 이 규칙이
@@ -2397,9 +2419,9 @@
     border-radius:50%;
     background:currentColor;
   }
-  #app[data-pc-tab="map"] #site-detail-panel .pc-site-quality-value.site-detail-quality-exact{color:#d6324a!important}
+  #app[data-pc-tab="map"] #site-detail-panel .pc-site-quality-value.site-detail-quality-exact{color:#1f8b53!important}
   #app[data-pc-tab="map"] #site-detail-panel .pc-site-quality-value.site-detail-quality-estimated{color:#b4740a!important}
-  #app[data-pc-tab="map"] #site-detail-panel .pc-site-quality-value.site-detail-quality-review{color:#1f8b53!important}
+  #app[data-pc-tab="map"] #site-detail-panel .pc-site-quality-value.site-detail-quality-review{color:#d6324a!important}
 
   /* 사용자 디자인 의견 반영(2026-10): 좌측 목록 카드의 "업체명 | 공사금액 10억원" 한 줄
      텍스트가 우측 상세패널(아이콘+라벨+값)과 톤이 달라 이질적이라는 피드백 — 같은 아이콘
