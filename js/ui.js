@@ -1031,6 +1031,13 @@ function movePcSiteFiltersIntoTable() {
     const el = document.getElementById(id);
     if (el && el.parentNode !== container) container.appendChild(el);
   });
+  // 사용자 요청(2026-10): 상단 전역 검색창(#pc-global-search-input)과 표 툴바의 검색창
+  // (#pc-site-table-search-input)이 같은 기능을 하는데 세로로 겹쳐 보여 어색하다는 피드백 —
+  // 표 자체 검색창/툴바는 CSS로 숨기고(둘은 이미 값이 서로 동기화된다, js/app.js bindPcWorkspace
+  // 참고), "필터 초기화" 버튼만 필터 칩 줄 끝으로 옮겨 한 줄로 합친다. 이 버튼은 지도탭과
+  // 공유하는 요소가 아니라 현장탭 전용이라 되돌릴 자리가 없다(항상 여기 있으면 된다).
+  const resetBtn = document.getElementById('pc-site-filter-reset');
+  if (resetBtn && resetBtn.parentNode !== container) container.appendChild(resetBtn);
 }
 
 // 지도 탭으로 돌아갈 때 #site-filter-row의 원래 자리로 되돌린다(js/app.js activatePcTab에서 호출).
