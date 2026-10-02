@@ -590,12 +590,20 @@ function bindPcWorkspace() {
   }
   if (pcSiteReset) {
     pcSiteReset.addEventListener('click', () => {
-      state.searchQuery = ''; state.selectedDongs = []; state.amountFilter = 'all';
+      state.searchQuery = ''; state.selectedDongs = []; state.amountFilter = 'all'; state.customAmountRange = null;
       state.siteInspectionFilter = 'all'; state.siteAccidentReportFilter = 'all'; state.sortMode = 'default';
       const target = document.getElementById('site-search-input');
       if (target) { target.value = ''; target.dispatchEvent(new Event('input', { bubbles: true })); }
       if (pcSiteSearch) pcSiteSearch.value = '';
       document.querySelectorAll('#site-filter-row input[type="radio"][value="all"]').forEach(el => { el.checked = true; });
+      const amountMinEl = document.getElementById('site-amount-filter-min-input');
+      const amountMaxEl = document.getElementById('site-amount-filter-max-input');
+      if (amountMinEl) amountMinEl.value = '';
+      if (amountMaxEl) amountMaxEl.value = '';
+      const amountCustomBodyEl = document.getElementById('site-amount-filter-custom-body');
+      if (amountCustomBodyEl) amountCustomBodyEl.hidden = true;
+      const amountLabelResetEl = document.getElementById('site-amount-filter-label');
+      if (amountLabelResetEl) amountLabelResetEl.textContent = '공사금액';
       renderSiteList('site-list');
     });
   }
