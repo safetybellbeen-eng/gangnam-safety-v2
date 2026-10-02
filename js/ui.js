@@ -1207,26 +1207,22 @@ export function renderSiteList(containerId) {
       });
       item.appendChild(summary);
 
-      // PC 지도 목록용 한 줄 보조정보. 기존 site 데이터만 표시하고 모바일에서는 CSS로 숨긴다.
-      const pcMeta = document.createElement('div');
-      pcMeta.className = 'pc-site-row-meta';
-      const amountTag = document.createElement('span');
-      amountTag.className = 'pc-site-amount-tag';
-      const amountNum = Number(site.amount);
-      if (Number.isFinite(amountNum)) {
-        amountTag.textContent = amountNum < 5000000000 ? '50억미만' : (amountNum < 12000000000 ? '50~120억' : '120억이상');
-      } else {
-        amountTag.textContent = '금액미상';
-      }
-      const qualityTag = document.createElement('span');
+      // PC 지도 목록 디자인: 품질 배지는 제목 행 오른쪽에, 업체명/공사금액은 한 줄로 묶어 표시한다.
+      // 기존 site 데이터(company_name/amount/location_quality)만 사용하며 모바일에서는 CSS로 숨긴다.
       const q = site.location_quality;
       const qInfo = (q === 'EXACT' || q === 'MANUAL')
         ? ['정확', 'exact']
         : (q === 'ESTIMATED' ? ['중간', 'estimated'] : ['낮음', 'review']);
+      const qualityTag = document.createElement('span');
       qualityTag.className = `pc-site-quality pc-site-quality-${qInfo[1]}`;
       qualityTag.innerHTML = `<i aria-hidden="true"></i>${qInfo[0]}`;
-      pcMeta.appendChild(amountTag);
-      pcMeta.appendChild(qualityTag);
+      titleRow.appendChild(qualityTag);
+
+      const pcMeta = document.createElement('div');
+      pcMeta.className = 'pc-site-row-meta';
+      const companyName = displayValue(site.company_name);
+      const amountText = formatAmountKRW(site.amount);
+      pcMeta.textContent = amountText === '-' ? companyName : `${companyName} | 공사금액 ${amountText}`;
       item.appendChild(pcMeta);
 
       item.addEventListener('click', () => selectSite(site.id));
