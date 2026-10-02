@@ -1704,14 +1704,20 @@
   #app[data-pc-tab="map"] .site-select-filter-clear.is-checked .site-select-filter-check{display:inline!important}
   #app[data-pc-tab="map"] .site-select-filter[data-active="true"] .site-select-filter-label{border-color:#78a8ef!important;background:#f3f8ff!important;color:#0b63f6!important}
 
-  /* 사용자 요청(2026-10): 공사금액 필터 "자세히 설정" — 억원 단위 직접 입력 UI (PC 전용). */
-  #app[data-pc-tab="map"] .site-amount-filter-custom{
+  /* 사용자 요청(2026-10): 공사금액 필터 "자세히 설정" — 억원 단위 직접 입력 UI (PC 전용).
+     사용자 요청(2026-10 추가): 현장탭의 공사금액 필터도 지도탭과 완전히 동일하게 "자세히 설정"이
+     보이도록 한다 — 이 필터 자체는 지도탭/현장탭이 같은 DOM 요소를 공유(movePcSiteFiltersIntoTable)
+     하므로 JS 쪽은 그대로 두고, data-pc-tab="map"에만 걸려 있던 아래 규칙들을 site 탭에도 동일하게
+     적용되도록 선택자만 넓힌다. */
+  #app[data-pc-tab="map"] .site-amount-filter-custom,
+  #app[data-pc-tab="site"] .site-amount-filter-custom{
     display:block!important;
     margin:4px 2px 0!important;
     padding:8px 2px 0!important;
     border-top:1px solid #edf2f8!important;
   }
-  #app[data-pc-tab="map"] .site-amount-filter-custom-toggle{
+  #app[data-pc-tab="map"] .site-amount-filter-custom-toggle,
+  #app[data-pc-tab="site"] .site-amount-filter-custom-toggle{
     display:block!important;
     width:100%!important;
     min-height:30px!important;
@@ -1724,37 +1730,44 @@
     cursor:pointer!important;
     padding:0 8px!important;
   }
-  #app[data-pc-tab="map"] .site-amount-filter-custom-toggle:hover{color:#0b63f6!important}
-  #app[data-pc-tab="map"] .site-amount-filter-custom-body{
+  #app[data-pc-tab="map"] .site-amount-filter-custom-toggle:hover,
+  #app[data-pc-tab="site"] .site-amount-filter-custom-toggle:hover{color:#0b63f6!important}
+  #app[data-pc-tab="map"] .site-amount-filter-custom-body,
+  #app[data-pc-tab="site"] .site-amount-filter-custom-body{
     display:block!important;
     margin-top:4px!important;
     padding:8px!important;
     border-radius:8px!important;
     background:#f6f9fd!important;
   }
-  #app[data-pc-tab="map"] .site-amount-filter-custom-body[hidden]{display:none!important}
+  #app[data-pc-tab="map"] .site-amount-filter-custom-body[hidden],
+  #app[data-pc-tab="site"] .site-amount-filter-custom-body[hidden]{display:none!important}
   /* 사용자 피드백: 좁은 패널(170~230px) 안에서 "최소 억 ~ 최대 억"을 한 줄에 다 넣으니
      입력칸이 거의 0px로 눌려 플레이스홀더조차 한 글자만 보였다. 최소/최대를 각각 독립된
      줄로 나누고("최소" 태그는 고정 폭, 입력칸은 충분한 고정 폭을 확보) 패널 자체도 이 필터만
      살짝 넓혀서 더 이상 찌그러지지 않게 한다. */
-  #app[data-pc-tab="map"] #site-amount-filter-panel{
+  #app[data-pc-tab="map"] #site-amount-filter-panel,
+  #app[data-pc-tab="site"] #site-amount-filter-panel{
     min-width:216px!important;
     max-width:216px!important;
   }
-  #app[data-pc-tab="map"] .site-amount-filter-custom-row{
+  #app[data-pc-tab="map"] .site-amount-filter-custom-row,
+  #app[data-pc-tab="site"] .site-amount-filter-custom-row{
     display:flex!important;
     align-items:center!important;
     gap:6px!important;
     margin-bottom:6px!important;
   }
-  #app[data-pc-tab="map"] .site-amount-filter-custom-tag{
+  #app[data-pc-tab="map"] .site-amount-filter-custom-tag,
+  #app[data-pc-tab="site"] .site-amount-filter-custom-tag{
     flex:0 0 auto!important;
     width:28px!important;
     font-size:11.5px!important;
     font-weight:700!important;
     color:#4a5e82!important;
   }
-  #app[data-pc-tab="map"] .site-amount-filter-custom-input{
+  #app[data-pc-tab="map"] .site-amount-filter-custom-input,
+  #app[data-pc-tab="site"] .site-amount-filter-custom-input{
     flex:0 0 76px!important;
     width:76px!important;
     height:30px!important;
@@ -1766,17 +1779,20 @@
     color:#173467!important;
     box-sizing:border-box!important;
   }
-  #app[data-pc-tab="map"] .site-amount-filter-custom-input.is-invalid{
+  #app[data-pc-tab="map"] .site-amount-filter-custom-input.is-invalid,
+  #app[data-pc-tab="site"] .site-amount-filter-custom-input.is-invalid{
     border-color:#e5484d!important;
     background:#fff5f5!important;
   }
-  #app[data-pc-tab="map"] .site-amount-filter-custom-unit{
+  #app[data-pc-tab="map"] .site-amount-filter-custom-unit,
+  #app[data-pc-tab="site"] .site-amount-filter-custom-unit{
     flex:1 1 auto!important;
     font-size:11.5px!important;
     color:#7284a4!important;
     white-space:nowrap!important;
   }
-  #app[data-pc-tab="map"] .site-amount-filter-custom-apply{
+  #app[data-pc-tab="map"] .site-amount-filter-custom-apply,
+  #app[data-pc-tab="site"] .site-amount-filter-custom-apply{
     display:block!important;
     width:100%!important;
     min-height:32px!important;
@@ -1788,7 +1804,8 @@
     font-weight:750!important;
     cursor:pointer!important;
   }
-  #app[data-pc-tab="map"] .site-amount-filter-custom-apply:hover{background:#0a56d6!important}
+  #app[data-pc-tab="map"] .site-amount-filter-custom-apply:hover,
+  #app[data-pc-tab="site"] .site-amount-filter-custom-apply:hover{background:#0a56d6!important}
 
   /* 상세패널: 공통 components.css의 기본 button/label 규칙보다 강하게 PC 스타일 고정 */
   #app[data-pc-tab="map"] #site-detail-panel{padding:16px!important}
@@ -3129,7 +3146,14 @@
     flex-wrap:nowrap!important;
     white-space:nowrap!important;
   }
+  /* 버그 수정(2026-10): components.css의 "#app label{display:flex;flex-direction:column}"
+     공통 규칙이 id 선택자 하나뿐인 기존 #pc-site-table-pagesize-wrap 규칙보다 상세도가 더
+     높아(동일 id 1개 기준 요소선택자가 하나 더 있으면 더 상세함) 이겨버려, "페이지당"/선택box가
+     세로로 2줄로 쌓이고 있었다. !important로 명시적으로 가로 정렬을 강제한다. */
   #pc-site-table-pagesize-wrap{
+    display:flex!important;
+    flex-direction:row!important;
+    align-items:center!important;
     flex:0 0 auto!important;
     margin-left:auto!important;
     white-space:nowrap!important;
