@@ -1470,6 +1470,14 @@
     border:1px solid #cddbf0!important;
     border-radius:10px!important;
     box-shadow:0 10px 26px rgba(18,58,111,.16)!important;
+    animation:pcFilterPanelIn .12s ease!important;
+  }
+  /* 사용자 의견(2026-10): 필터 패널이 열릴 때 전환 없이 뚝 나타나 보였다. <details> 패널은
+     열리는 순간 display:none→block으로 바뀌어 일반 transition은 재생되지 않으므로(시작 상태가
+     즉시 사라짐), 매번 새로 재생되는 animation으로 짧게 나타나게 한다. */
+  @keyframes pcFilterPanelIn{
+    from{opacity:0;transform:translateY(-4px) scale(.97)}
+    to{opacity:1;transform:translateY(0) scale(1)}
   }
   #app[data-pc-tab="map"] .site-select-filter-options{display:block!important}
   #app[data-pc-tab="map"] .site-select-filter-clear,
@@ -2403,8 +2411,8 @@
   #app[data-pc-tab="map"] .pc-site-row-meta-icon svg{width:100%!important;height:100%!important;display:block!important}
   #app[data-pc-tab="map"] .pc-site-row-meta-amount{
     flex:none!important;
-    font-weight:800!important;
-    color:#1c4e9c!important;
+    font-weight:700!important;
+    color:#44618f!important;
   }
 
   /* 사용자 디자인 의견 반영(2026-10): 색 사용이 파란색/빨간 배지 외에 거의 없다는 피드백 —
@@ -2414,13 +2422,23 @@
     display:inline-flex!important;
     flex:0 0 auto!important;
     align-items:center!important;
-    padding:3px 8px!important;
+    padding:3px 9px!important;
     border-radius:999px!important;
     background:#fdecec!important;
     color:#d6324a!important;
-    font-size:10.5px!important;
+    font-size:11.5px!important;
     font-weight:800!important;
     white-space:nowrap!important;
+  }
+  /* 사용자 의견(2026-10): 목록 카드 배지가 한 줄에 몰려 위계가 약했다 — 우선순위를
+     산재(가장 시급) > 품질 > 금액 순으로 둔다. DOM 순서(JS)는 그대로 두고 flex order만
+     바꿔 산재 배지가 품질 배지보다 먼저 보이게 하고, 품질 배지는 살짝 작게 낮춘다.
+     금액은 배지가 아닌 보조 정보라 위 .pc-site-row-meta-amount에서 톤을 더 낮췄다. */
+  #app[data-pc-tab="map"] .site-list-title-row .pc-site-accident-flag{order:1!important}
+  #app[data-pc-tab="map"] .site-list-title-row .pc-site-quality{
+    order:2!important;
+    font-size:10.5px!important;
+    font-weight:700!important;
   }
 
   /* 사용자 디자인 의견 반영(2026-10): hover/선택 상태 피드백이 약하다는 피드백 — hover는
@@ -2631,6 +2649,12 @@
     font-size:12.5px!important;
     line-height:1.6!important;
     resize:none!important;
+  }
+  /* 사용자 의견(2026-10): placeholder가 본문 텍스트(#173467 계열 진한 남색)와 명도 차이가
+     작아 안내문이 잘 안 보였다 — placeholder만 더 옅은 회색으로 분리한다(본문 색은 그대로). */
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-note-textarea::placeholder{
+    color:#9fadc4!important;
+    opacity:1!important;
   }
   #app[data-pc-tab="map"] #site-detail-panel .site-detail-section-title{flex:none!important}
   #app[data-pc-tab="map"] #site-detail-panel .site-detail-note-actions{
