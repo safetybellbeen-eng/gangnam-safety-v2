@@ -3093,3 +3093,68 @@
   }
   #pc-site-table-pagesize:hover{border-color:#8bb1e9}
 }
+
+/* ============================================================
+   사용자 요청(2026-10, 추가): 현장탭/지도탭 UI 수정 2건.
+   1) 표 하단 바가 "전체 N개/페이지" - "페이지당 N개" - "« ‹ 1 2 3 › »" 세 요소가
+      좁은 폭에서 2줄로 줄바꿈되던 문제. 페이지 번호 목록을 바 중앙에 절대배치로
+      고정해 flex 흐름에서 완전히 빼버리면(요약/페이지당 셀렉트 2개만 flex로 남음)
+      폭이 좁아져도 더 이상 줄바꿈될 일이 없다. 동시에 사용자 요청대로 페이지 번호를
+      가운데, 페이지당 선택을 맨 오른쪽으로 보낸다(기존엔 가운데가 페이지당, 오른쪽이
+      페이지 번호였다).
+   2) 지도탭 필터 칩 줄(#site-filter-row)은 이전 라운드에서 가로 스크롤 자체는
+      가능하게 해두었지만, 스크롤바를 완전히 숨겨서(scrollbar-width:none 등) 사용자가
+      "칩이 더 있다"는 것 자체를 알아챌 수 없었다. 네이티브 두꺼운 스크롤바 대신
+      얇고 옅은 색의 커스텀 스크롤바를 다시 보이게 해 "더 있다"는 단서를 준다.
+      이 블록은 파일 맨 끝이라 기존 숨김 규칙보다 항상 나중에 적용된다. */
+@media (min-width: 769px) {
+  /* --- 1) 표 하단 바: 페이지 번호 중앙 고정 + 페이지당 선택 오른쪽 --- */
+  #pc-site-table-footer{
+    position:relative!important;
+    display:flex!important;
+    flex-wrap:nowrap!important;
+  }
+  #pc-site-table-summary{
+    flex:0 1 auto!important;
+    min-width:0!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+  }
+  #pc-site-table-pagination{
+    position:absolute!important;
+    left:50%!important;
+    top:50%!important;
+    transform:translate(-50%, -50%)!important;
+    flex-wrap:nowrap!important;
+    white-space:nowrap!important;
+  }
+  #pc-site-table-pagesize-wrap{
+    flex:0 0 auto!important;
+    margin-left:auto!important;
+    white-space:nowrap!important;
+  }
+
+  /* --- 2) 지도탭 필터 칩 줄: 얇고 옅은 가로 스크롤바를 다시 보이게 한다 --- */
+  #app[data-pc-tab="map"] #site-filter-row{
+    scrollbar-width:thin!important;
+    scrollbar-color:#bcd0ea #eef3fa!important;
+    -ms-overflow-style:auto!important;
+    padding-bottom:8px!important;
+  }
+  #app[data-pc-tab="map"] #site-filter-row::-webkit-scrollbar{
+    display:block!important;
+    height:6px!important;
+  }
+  #app[data-pc-tab="map"] #site-filter-row::-webkit-scrollbar-track{
+    background:#eef3fa!important;
+    border-radius:4px!important;
+  }
+  #app[data-pc-tab="map"] #site-filter-row::-webkit-scrollbar-thumb{
+    background:#bcd0ea!important;
+    border-radius:4px!important;
+  }
+  #app[data-pc-tab="map"] #site-filter-row::-webkit-scrollbar-thumb:hover{
+    background:#8fb3e0!important;
+  }
+}
