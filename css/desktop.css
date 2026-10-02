@@ -1439,9 +1439,16 @@
   #app[data-pc-tab="map"] .site-select-filter-label::-webkit-details-marker,
   #app[data-pc-tab="map"] .site-select-filter-label::marker{display:none!important}
   #app[data-pc-tab="map"] .site-select-filter-panel{
-    position:absolute!important;
-    left:0!important;
-    top:calc(100% + 6px)!important;
+    /* #site-filter-row를 한 줄(overflow-x:auto)로 만들면서 overflow-y도 auto로 강제
+       승격되어 absolute 패널이 잘리는 문제가 발생했다. mobile.css와 동일하게 position:fixed로
+       바꾼다 — js/ui.js가 이미 모든 패널(관할/공사금액/점검/산재표/검색모드)에 대해 toggle
+       시점마다 버튼의 getBoundingClientRect() 기준 뷰포트 좌표를 top/left에 직접 계산해
+       넣고 있으므로(관할·bindRadioFilterDetails·검색모드 공통), fixed로 바꿔도 위치 계산은
+       그대로 맞고 조상 overflow에도 더 이상 영향받지 않는다. */
+    /* top/left는 !important로 고정값을 주지 않는다 — js/ui.js가 패널을 열 때마다 인라인
+       style.top/left로 버튼의 실제 화면 좌표를 직접 써 넣는데(mobile.css와 동일한 방식),
+       여기서 !important를 쓰면 그 인라인 스타일을 막아버려 패널이 항상 (0,0)에 붙어버린다. */
+    position:fixed!important;
     z-index:120!important;
     min-width:170px!important;
     max-width:230px!important;
@@ -1521,21 +1528,36 @@
     background:#f6f9fd!important;
   }
   #app[data-pc-tab="map"] .site-amount-filter-custom-body[hidden]{display:none!important}
+  /* 사용자 피드백: 좁은 패널(170~230px) 안에서 "최소 억 ~ 최대 억"을 한 줄에 다 넣으니
+     입력칸이 거의 0px로 눌려 플레이스홀더조차 한 글자만 보였다. 최소/최대를 각각 독립된
+     줄로 나누고("최소" 태그는 고정 폭, 입력칸은 충분한 고정 폭을 확보) 패널 자체도 이 필터만
+     살짝 넓혀서 더 이상 찌그러지지 않게 한다. */
+  #app[data-pc-tab="map"] #site-amount-filter-panel{
+    min-width:216px!important;
+    max-width:216px!important;
+  }
   #app[data-pc-tab="map"] .site-amount-filter-custom-row{
     display:flex!important;
     align-items:center!important;
-    gap:5px!important;
+    gap:6px!important;
     margin-bottom:6px!important;
   }
+  #app[data-pc-tab="map"] .site-amount-filter-custom-tag{
+    flex:0 0 auto!important;
+    width:28px!important;
+    font-size:11.5px!important;
+    font-weight:700!important;
+    color:#4a5e82!important;
+  }
   #app[data-pc-tab="map"] .site-amount-filter-custom-input{
-    width:0!important;
-    flex:1 1 auto!important;
-    min-width:0!important;
+    flex:0 0 76px!important;
+    width:76px!important;
     height:30px!important;
-    padding:0 7px!important;
+    padding:0 8px!important;
     border:1px solid #cfddf1!important;
     border-radius:6px!important;
-    font-size:12px!important;
+    background:#fff!important;
+    font-size:13px!important;
     color:#173467!important;
     box-sizing:border-box!important;
   }
@@ -1544,11 +1566,11 @@
     background:#fff5f5!important;
   }
   #app[data-pc-tab="map"] .site-amount-filter-custom-unit{
-    flex:none!important;
-    font-size:11px!important;
+    flex:1 1 auto!important;
+    font-size:11.5px!important;
     color:#7284a4!important;
+    white-space:nowrap!important;
   }
-  #app[data-pc-tab="map"] .site-amount-filter-custom-sep{flex:none!important;color:#9aabc4!important;font-size:11px!important}
   #app[data-pc-tab="map"] .site-amount-filter-custom-apply{
     display:block!important;
     width:100%!important;
@@ -1604,7 +1626,6 @@
   .pc-nav-btn.active .pc-nav-icon{stroke-width:2}
 
   /* Map filters requested for PC. */
-  #app[data-pc-tab="map"] #site-inspection-filter-label::before{content:none!important}
   #app[data-pc-tab="map"] #site-accident-report-filter{display:block!important}
   #app[data-pc-tab="map"] #site-accident-report-filter-label{white-space:nowrap}
   #app[data-pc-tab="map"] #favorite-subtabs{display:none!important}
@@ -2096,17 +2117,27 @@
     color:#183d70!important;
   }
   #app[data-pc-tab="map"] #site-search-input::placeholder{color:#8092ad!important}
+  /* 사용자 요청(2026-10): 필터 칩 5개가 2줄로 줄바꿈되던 것을 한 줄로 고정한다. 칩 패딩/폰트를
+     살짝 줄이고, 혹시 사이드바가 더 좁아지는 해상도에서도 줄바꿈 대신 가로 스크롤로만
+     대응하게 한다(스크롤바는 얇게, 평소엔 거의 안 보이게). */
   #app[data-pc-tab="map"] #site-filter-row{
     display:flex!important;
-    flex-wrap:wrap!important;
-    gap:8px!important;
+    flex-wrap:nowrap!important;
+    gap:6px!important;
+    overflow-x:auto!important;
+    overflow-y:visible!important;
+    scrollbar-width:thin!important;
+    padding-bottom:2px!important;
   }
+  #app[data-pc-tab="map"] #site-filter-row::-webkit-scrollbar{height:4px!important}
+  #app[data-pc-tab="map"] #site-filter-row::-webkit-scrollbar-thumb{background:#dbe5f1!important;border-radius:4px!important}
   #app[data-pc-tab="map"] .site-select-filter{flex:0 0 auto!important}
   /* 사용자 요청(2026-10): 필터 칩을 pill 형태 + 펼침 화살표 + hover 전환으로 더 정밀하게 다듬는다. */
   #app[data-pc-tab="map"] .site-select-filter-label{
     height:34px!important;
     min-height:34px!important;
-    padding:0 13px!important;
+    padding:0 11px!important;
+    white-space:nowrap!important;
     display:flex!important;
     align-items:center!important;
     gap:5px!important;
