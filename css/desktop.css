@@ -1297,7 +1297,7 @@
   #pc-site-table th:nth-child(3){width:19%}#pc-site-table th:nth-child(4){width:23%}#pc-site-table th:nth-child(5){width:12%}#pc-site-table th:nth-child(6){width:17%}#pc-site-table th:nth-child(7){width:11%}#pc-site-table th:nth-child(8){width:48px;text-align:center}
   .pc-table-site-name{display:flex;flex-direction:column;gap:3px;min-width:0}.pc-table-site-name strong{overflow:hidden;text-overflow:ellipsis;color:#092b66;font-size:12.5px}.pc-table-site-name small{width:max-content;padding:2px 5px;border-radius:4px;background:#eef5ff;color:#5c79a5;font-size:10px}
   .pc-table-fav{border:0;background:transparent;color:#7d99bf;font-size:19px;cursor:pointer}.pc-table-fav.on{color:#f59e0b}
-  .pc-table-quality{display:inline-flex;align-items:center;gap:5px}.pc-table-quality i{width:8px;height:8px;border-radius:50%}.pc-table-quality.exact i{background:#ef3340}.pc-table-quality.estimated i{background:#f59e0b}.pc-table-quality.review i{background:#2f9d61}
+  .pc-table-quality{display:inline-flex;align-items:center;gap:5px}.pc-table-quality i{width:8px;height:8px;border-radius:50%}.pc-table-quality.exact i{background:#2f9d61}.pc-table-quality.estimated i{background:#f59e0b}.pc-table-quality.review i{background:#ef3340}
   .pc-table-note{border:0;background:transparent;color:#0b63f6;font-size:17px;cursor:pointer}
   #pc-site-table-footer{height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-top:1px solid #e1eaf6;background:#fff;box-sizing:border-box;color:#61779c;font-size:12px}
   #pc-site-table-pagination{display:flex;gap:4px}.pc-page-btn{min-width:30px;height:30px;border:1px solid #d1deef;border-radius:6px;background:#fff;color:#36547f;cursor:pointer}.pc-page-btn.active{background:#0b63f6;border-color:#0b63f6;color:#fff}.pc-page-btn:disabled{opacity:.45;cursor:default}
@@ -1401,28 +1401,156 @@
     border:0!important;background:transparent!important;color:#173467!important;font-size:24px!important;cursor:pointer!important
   }
   #app[data-pc-tab="site"] #site-detail-panel .site-detail-close-text{display:none!important}
-  #app[data-pc-tab="site"] #site-detail-panel .site-detail-quality-badge{
-    display:inline-flex!important;margin:0 0 12px!important;padding:4px 8px!important;border-radius:5px!important;
-    font-size:11px!important;font-weight:700!important;background:#f3f7fd!important;color:#315b92!important
+  /* 사용자 의견 반영(2026-10): 상단에 떠 있던 색 구분 없는 "정확" 배지는 지도 탭과 동일하게
+     숨기고, 산재표 하단의 "위치 정확도" 행(.pc-site-quality-row, js/ui.js renderDetail 공용
+     생성)으로 통일한다. 이 공용 행은 .site-detail-row 클래스도 함께 갖고 있어 아래
+     .site-detail-row 규칙(display:flex!important)에 의해 라벨/값 레이아웃만 상속해
+     "위치 정확도: 정확" 형태의 민짜 텍스트로 노출되고 있었다 — 지도 탭과 같은 점(●)+색
+     텍스트 스타일을 명시적으로 적용해 통일한다. */
+  #app[data-pc-tab="site"] #site-detail-panel > .site-detail-quality-badge{display:none!important}
+  #app[data-pc-tab="site"] #site-detail-panel .pc-site-quality-value{
+    display:inline-flex!important;
+    align-items:center!important;
+    gap:6px!important;
+    padding:0!important;
+    background:transparent!important;
+    border-radius:0!important;
+    font-size:12px!important;
+    font-weight:800!important;
+    white-space:nowrap!important;
   }
+  #app[data-pc-tab="site"] #site-detail-panel .pc-site-quality-value::before{
+    content:'';
+    display:inline-block;
+    flex:none;
+    width:7px;height:7px;
+    border-radius:50%;
+    background:currentColor;
+  }
+  #app[data-pc-tab="site"] #site-detail-panel .pc-site-quality-value.site-detail-quality-exact{color:#1f8b53!important}
+  #app[data-pc-tab="site"] #site-detail-panel .pc-site-quality-value.site-detail-quality-estimated{color:#b4740a!important}
+  #app[data-pc-tab="site"] #site-detail-panel .pc-site-quality-value.site-detail-quality-review{color:#d6324a!important}
   #app[data-pc-tab="site"] #site-detail-panel .site-detail-hero{padding:8px 0 14px!important;border-bottom:1px solid #e4ecf7!important}
   #app[data-pc-tab="site"] #site-detail-panel .site-detail-row{
     display:flex!important;gap:10px!important;align-items:flex-start!important;justify-content:flex-start!important;
     margin:0!important;padding:8px 0!important;border-bottom:1px solid #edf2f8!important
   }
   #app[data-pc-tab="site"] #site-detail-panel .site-detail-row-name{padding-top:0!important;border-bottom:0!important}
-  #app[data-pc-tab="site"] #site-detail-panel .site-detail-label{flex:0 0 76px!important;color:#7284a4!important;font-size:12px!important;line-height:1.5!important}
-  #app[data-pc-tab="site"] #site-detail-panel .site-detail-value{flex:1!important;min-width:0!important;color:#173467!important;font-size:12px!important;font-weight:650!important;line-height:1.5!important;overflow-wrap:anywhere!important}
   #app[data-pc-tab="site"] #site-detail-panel .site-detail-label-name{display:none!important}
   #app[data-pc-tab="site"] #site-detail-panel .site-detail-value-name{font-size:20px!important;font-weight:900!important;letter-spacing:-.035em!important;color:#08265f!important;line-height:1.25!important}
-  #app[data-pc-tab="site"] #site-detail-panel .site-detail-meta{display:block!important;margin-top:12px!important;padding:4px 12px!important;background:#f8fbff!important;border-radius:7px!important}
+  /* 사용자 의견 반영(2026-10, 현장탭): 지도탭과 동일한 "디테일" 수준으로 맞춘다 —
+     라벨 좌측에 아이콘을 보이고(공용 buildDetailLabel()이 항상 만들어두지만 기본은
+     전역 숨김), 값은 라벨과 양끝 정렬한다. 모바일은 이 media query 밖이라 기존
+     라벨만 있는 레이아웃 그대로 유지된다. */
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-row:not(.site-detail-row-name){
+    justify-content:space-between!important;
+  }
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-label{
+    flex:0 0 auto!important;
+    display:inline-flex!important;
+    align-items:center!important;
+    gap:5px!important;
+    color:#7284a4!important;
+    font-size:12px!important;
+    line-height:1.5!important;
+  }
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-label-icon{
+    display:inline-flex!important;
+    flex:none!important;
+    width:14px!important;
+    height:14px!important;
+    color:#8b9fc2!important;
+  }
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-label-icon svg{width:100%!important;height:100%!important}
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-value{
+    flex:0 1 auto!important;min-width:0!important;color:#173467!important;font-size:12px!important;
+    font-weight:700!important;line-height:1.5!important;overflow-wrap:anywhere!important;text-align:right!important;
+  }
+  /* 사용자 의견 반영(2026-10, 현장탭): 메타 영역(공사금액/공사기간/지도점검/산재표/위치
+     정확도)을 지도탭처럼 연한 파란 박스 배경 대신 흰 배경+줄 구분선 스타일로 통일한다. */
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-meta{
+    display:block!important;margin:12px 0 0!important;padding:4px 12px!important;
+    border-radius:8px!important;background:#f7f9fc!important;
+  }
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-meta .site-detail-row{padding:9px 0!important;border-bottom:1px solid #e7edf5!important}
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-meta .site-detail-row:last-child{border-bottom:0!important}
   #app[data-pc-tab="site"] #site-detail-panel .site-detail-section-title{margin:16px 0 8px!important;padding:9px 10px!important;border-left:3px solid #0b67f5!important;background:#f7faff!important;color:#173467!important;font-size:13px!important;font-weight:800!important}
   #app[data-pc-tab="site"] #site-detail-panel .site-detail-note-textarea{width:100%!important;min-height:92px!important;box-sizing:border-box!important;border:1px solid #d6e2f3!important;border-radius:7px!important;padding:10px!important;font-size:12px!important;resize:vertical!important}
-  #app[data-pc-tab="site"] #site-detail-panel .site-detail-actions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;margin-top:14px!important}
+  /* 사용자 의견 반영(2026-10, 현장탭): 즐겨찾기/경로에 추가/길찾기 3개 버튼을 지도탭과
+     동일하게 한 줄 3열로 배치한다(기존엔 2열+1행 wrap으로 "경로에 추가"만 혼자 떨어졌다). */
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-actions{
+    display:grid!important;grid-template-columns:1fr 1fr 1fr!important;gap:8px!important;margin-top:13px!important;
+  }
   #app[data-pc-tab="site"] #site-detail-panel .site-detail-action-btn,
-  #app[data-pc-tab="site"] #site-detail-panel button:not(.site-detail-close-x){min-height:36px;border:1px solid #cbdaf0;border-radius:6px;background:#fff;color:#0b56c7;font-size:12px;font-weight:750;cursor:pointer}
+  #app[data-pc-tab="site"] #site-detail-panel button:not(.site-detail-close-x){
+    order:3!important;min-height:44px!important;padding:0 2px!important;border:1px solid #d7e2f0!important;
+    border-radius:8px!important;background:#fff!important;color:#1c3a63!important;font-size:10.5px!important;
+    font-weight:750!important;line-height:1.25!important;white-space:normal!important;word-break:keep-all!important;cursor:pointer!important;
+  }
   #app[data-pc-tab="site"] #site-detail-panel button:not(.site-detail-close-x):hover{background:#f3f8ff;border-color:#8bb1e9}
-  #app[data-pc-tab="site"] #site-detail-panel #site-detail-favorite-btn{display:block!important}
+  #app[data-pc-tab="site"] #site-detail-panel #site-detail-favorite-btn{display:block!important;order:1!important}
+  #app[data-pc-tab="site"] #site-detail-panel .pc-route-add-btn{order:2!important;background:#fff!important;border-color:#d7e2f0!important;color:#1c3a63!important;box-shadow:none!important}
+  #app[data-pc-tab="site"] #site-detail-panel .pc-route-add-btn.is-added{background:#eaf1fd!important;border-color:#0867ee!important;color:#0867ee!important}
+  /* 버그 수정(2026-10, 정밀검토): 지도탭과 동일한 원인 — 위 공용 .site-detail-label 규칙이
+     이 블록보다 앞에 있어 사업장명 라벨이 다시 보이던 문제. 가장 마지막에 둬서 숨김을 보장한다. */
+  #app[data-pc-tab="site"] #site-detail-panel .site-detail-label-name{display:none!important}
+
+  /* 기능 버그 수정(2026-10, 정밀검토): "동 전체/공사금액 전체/점검여부 전체" 칩은 실제로는
+     지도탭과 공유하는 <details> 드롭다운(#site-dong-filter 등, #site-filter-row 안)의
+     <summary>로 클릭을 전달만 하는 가짜 버튼이었다. 그런데 그 진짜 드롭다운은 현장탭에서
+     display:none인 #site-list-panel 안에 있어 클릭해도 패널이 전혀 보이지 않았다 — 현장탭에서
+     관할/공사금액/점검여부/산재표/정렬로 실제 필터링이 불가능한 상태였다.
+     js/ui.js movePcSiteFiltersIntoTable()이 그 실제 <details> 요소들(검색모드 제외)을
+     #pc-site-table-filters 안으로 옮기고, 지도탭으로 돌아가면 restorePcSiteFiltersToRow()가
+     원래 위치로 되돌린다(id/이벤트 바인딩은 요소 자체에 붙어 있으므로 위치 이동과 무관하게
+     그대로 동작 — js/ui.js가 패널을 열 때 getBoundingClientRect()로 직접 위치를 계산하는
+     방식도 컨테이너와 무관하다). 아래는 지도탭의 최종 pill+드롭다운 스타일(2270~2325행
+     부근)을 현장탭에도 그대로 재사용하는 동일 규칙이다. */
+  #app[data-pc-tab="site"] .site-select-filter{position:relative!important;flex:0 0 auto!important;margin:0!important}
+  #app[data-pc-tab="site"] .site-select-filter-label{
+    list-style:none!important;cursor:pointer!important;white-space:nowrap!important;
+    height:34px!important;min-height:34px!important;padding:0 11px!important;
+    display:flex!important;align-items:center!important;gap:5px!important;
+    border:1px solid #d3e0f2!important;border-radius:999px!important;background:#fff!important;
+    color:#355a86!important;font-size:11.5px!important;font-weight:750!important;
+    transition:border-color .12s ease,background .12s ease,color .12s ease!important;
+  }
+  #app[data-pc-tab="site"] .site-select-filter-label::-webkit-details-marker,
+  #app[data-pc-tab="site"] .site-select-filter-label::marker{display:none!important}
+  #app[data-pc-tab="site"] .site-select-filter-label:hover{border-color:#aecaf2!important;background:#f6faff!important;color:#0b63f6!important}
+  #app[data-pc-tab="site"] .site-select-filter-label::before{
+    content:'';order:2;width:6px;height:6px;margin-top:-2px;
+    border-right:1.6px solid currentColor;border-bottom:1.6px solid currentColor;
+    opacity:.55;transform:rotate(45deg);
+  }
+  #app[data-pc-tab="site"] .site-select-filter[data-active="true"] .site-select-filter-label{border-color:#78a8ef!important;background:#f3f8ff!important;color:#0b63f6!important}
+  #app[data-pc-tab="site"] .site-select-filter-panel{
+    position:fixed!important;z-index:120!important;min-width:170px!important;max-width:230px!important;
+    max-height:280px!important;overflow-y:auto!important;box-sizing:border-box!important;padding:6px!important;
+    background:#fff!important;border:1px solid #cddbf0!important;border-radius:10px!important;
+    box-shadow:0 10px 26px rgba(18,58,111,.16)!important;animation:pcFilterPanelIn .12s ease!important;
+  }
+  #app[data-pc-tab="site"] .site-select-filter-options{display:block!important}
+  #app[data-pc-tab="site"] .site-select-filter-clear,
+  #app[data-pc-tab="site"] .site-select-filter-option{
+    position:relative!important;display:flex!important;flex-direction:row!important;align-items:center!important;
+    justify-content:space-between!important;gap:8px!important;width:100%!important;min-height:36px!important;
+    box-sizing:border-box!important;margin:0 0 2px!important;padding:0 10px!important;border:0!important;
+    border-radius:6px!important;background:transparent!important;color:#173467!important;font:inherit!important;
+    font-size:12px!important;line-height:1.3!important;text-align:left!important;cursor:pointer!important;white-space:normal!important;
+  }
+  #app[data-pc-tab="site"] .site-select-filter-clear:hover,
+  #app[data-pc-tab="site"] .site-select-filter-option:hover{background:#f3f7fd!important}
+  #app[data-pc-tab="site"] .site-select-filter-option input[type="checkbox"],
+  #app[data-pc-tab="site"] .site-select-filter-option input[type="radio"]{
+    position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important;
+  }
+  #app[data-pc-tab="site"] .site-select-filter-check{display:none!important;color:#0b63f6!important;font-weight:800!important}
+  #app[data-pc-tab="site"] .site-select-filter-option:has(input:checked),
+  #app[data-pc-tab="site"] .site-select-filter-clear.is-checked{background:#edf5ff!important;color:#0b5ee5!important;font-weight:750!important}
+  #app[data-pc-tab="site"] .site-select-filter-option:has(input:checked) .site-select-filter-check,
+  #app[data-pc-tab="site"] .site-select-filter-clear.is-checked .site-select-filter-check{display:inline!important}
+  #app[data-pc-tab="site"] #pc-site-table-filters{overflow:visible!important}
 
   @media(max-width:1450px){
     #app[data-pc-tab="site"] #pc-site-table-panel{right:322px!important}
@@ -2667,6 +2795,11 @@
     border-color:#0867ee!important;
     color:#0867ee!important;
   }
+  /* 버그 수정(2026-10, 정밀검토): 위 공용 .site-detail-label 규칙(display:inline-flex)이
+     이 블록보다 뒤에 있어(동일 specificity+!important는 소스 순서로 승부) 사업장명 줄의
+     라벨("🏠 사업장명")을 다시 보이게 만들고 있었다 — 이 규칙이 가장 마지막에 와야
+     의도대로(제목만 크게, 라벨 숨김) 적용된다. */
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-label-name{display:none!important}
 
   /* 사용자 요청(2026-10): 최종 시안의 "현장 메모" 섹션 제목처럼 박스/좌측 강조선 없이
      일반 텍스트 헤더로 보여준다(탭이 없어졌으니 구분선 역할로 위쪽 여백만 넉넉히 둔다). */
