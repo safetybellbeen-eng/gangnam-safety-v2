@@ -604,7 +604,14 @@
         <button class="pc-nav-btn" data-pc-action="notes"><svg class="pc-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l3 3v15H6V3Z"/><path d="M14 3v4h4M9 11h6M9 15h6"/></svg><span>현장 메모</span></button>
         <div class="pc-nav-sep pc-admin-sep"><span class="pc-nav-sep-label">관리자</span></div>
         <button class="pc-nav-btn pc-admin-only" data-pc-action="admin"><svg class="pc-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0M17 11v6M14 14h6"/></svg><span>회원관리</span></button>
-        <button class="pc-nav-btn pc-admin-only" data-pc-action="upload"><svg class="pc-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v6c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 11v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg><span>사업장 데이터 관리</span></button>
+        <button class="pc-nav-btn pc-admin-only" data-pc-action="upload"><svg class="pc-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v6c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 11v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg><span>사업장 관리</span></button>
+        <!-- 사용자 요청(2026-10): 모바일(PWA)로도 사용할 수 있다는 걸 알리기 위해 "사업장 관리"
+             메뉴 바로 아래에 모바일 접속용 QR코드를 넣는다. 새 nav 버튼이 아니라 순수 안내용
+             카드라 data-pc-tab/data-pc-action이 없고 클릭 동작도 없다. -->
+        <div class="pc-mobile-qr-card">
+          <img src="assets/icons/mobile-qr.png" alt="모바일 접속 QR코드" class="pc-mobile-qr-img">
+          <p class="pc-mobile-qr-text">QR코드를 스캔하면<br>모바일에서도 이용할 수 있습니다.</p>
+        </div>
       </nav>
       <div class="pc-nav-bottom">
         <button class="pc-nav-btn" data-pc-action="settings"><svg class="pc-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1A7 7 0 0 0 15 6l-.3-2.6h-4L10.4 6A7 7 0 0 0 8.8 7L6.4 6l-2 3.4 2 1.5a7 7 0 0 0 0 2L4.4 14.5l2 3.4 2.4-1A7 7 0 0 0 10.4 18l.3 2.6h4L15 18a7 7 0 0 0 1.6-1l2.4 1 2-3.4-2-1.5a7 7 0 0 0 .1-1Z"/></svg><span>설정</span></button>
