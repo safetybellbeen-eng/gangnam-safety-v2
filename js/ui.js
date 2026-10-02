@@ -1313,7 +1313,8 @@ const SITE_DETAIL_ICONS = {
   amount: '<circle cx="12" cy="12" r="9"/><path d="M9 9.5h4.5a1.5 1.5 0 0 1 0 3H10a1.5 1.5 0 0 0 0 3h5M12 7v2M12 15v2"/>',
   period: '<rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M8 3v4M16 3v4M3.5 10h17"/>',
   supervision: '<path d="M8 3h8l1 2h2v16H5V5h2l1-2Z"/><path d="M9 12.5l2 2 4-4.5"/>',
-  accident: '<path d="M6 3h9l3 3v15H6V3Z"/><path d="M14 3v4h4M9 13h6M9 17h4"/>'
+  accident: '<path d="M6 3h9l3 3v15H6V3Z"/><path d="M14 3v4h4M9 13h6M9 17h4"/>',
+  quality: '<circle cx="12" cy="12" r="9"/><path d="M8.5 12.3l2.3 2.3 4.7-5"/>'
 };
 
 function buildDetailLabel(key, text) {
@@ -1436,17 +1437,10 @@ export function renderDetail(site) {
 
     row.appendChild(valueEl);
 
-    // 사용자 디자인 의견 반영(2026-10, PC 전용): "정확/추정/확인필요" 배지가 패널 맨 위에
-    // 혼자 떠 있어 어색하다는 피드백 — PC에서는 사업장명 옆에 두는 별도 배지를 하나 더 만든다.
-    // 기존 qualityBadge(모바일 상단 배지)는 그대로 두고 건드리지 않으며(모바일 DOM/동작 불변),
-    // 이 새 배지는 기본적으로 숨겨두었다가(css/desktop.css 전역 기본 숨김 목록) PC 지도 탭에서만
-    // 보여준다 — 목록 카드의 .pc-site-quality와 동일한 "PC 전용 중복 배지" 패턴을 재사용한다.
-    if (key === 'name' && qualityInfo) {
-      const pcNameQualityBadge = document.createElement('span');
-      pcNameQualityBadge.className = `pc-detail-name-quality ${qualityInfo.className}`;
-      pcNameQualityBadge.textContent = qualityInfo.label;
-      row.appendChild(pcNameQualityBadge);
-    }
+    // 사용자 의견 반영(2026-10): 사업장명 옆 PC 전용 품질 배지는 제목 줄이 복잡해 보인다는
+    // 이유로 제거하고, 아래 메타 표(공사금액/공사기간/지도점검/산재표)에 "위치 정확도" 행으로
+    // 옮긴다(metaRows 참고). PC 전용이었던 이전 배지(.pc-detail-name-quality)는 더 이상
+    // 만들지 않는다 — 모바일 쪽 qualityBadge(패널 상단)는 이번에도 그대로 둔다.
 
     // 사용자 피드백: 주소 옆에 텍스트를 바로 복사할 수 있는 버튼을 추가한다. 주소 값(site.address)은
     // 그대로 읽기만 하고 저장/검색/정렬 로직에는 전혀 관여하지 않는 순수 UI 기능이다.
@@ -1528,6 +1522,22 @@ export function renderDetail(site) {
     meta.appendChild(row);
   });
   panel.appendChild(meta);
+
+  // 사용자 요청(2026-10): 사업장명 옆에 떠 있던 "정확/추정/확인필요" 배지를 치우고, 공사금액/
+  // 공사기간/지도점검/산재표와 같은 표 형식으로 산재표 바로 아래에 "위치 정확도" 행을 추가한다.
+  // PC 전용(css/desktop.css 전역 기본 숨김 목록에 들어 있다가 지도 탭에서만 보임) — 모바일
+  // DOM에는 존재하지만 항상 숨겨져 모바일 화면/동작에는 영향이 없다.
+  if (qualityInfo) {
+    const qualityRow = document.createElement('div');
+    qualityRow.className = 'site-detail-row pc-site-quality-row';
+    const qualityLabelEl = buildDetailLabel('quality', '위치 정확도');
+    const qualityValueEl = document.createElement('span');
+    qualityValueEl.className = `site-detail-value pc-site-quality-value ${qualityInfo.className}`;
+    qualityValueEl.textContent = qualityInfo.label;
+    qualityRow.appendChild(qualityLabelEl);
+    qualityRow.appendChild(qualityValueEl);
+    panel.appendChild(qualityRow);
+  }
 
   // STEP16.5-C §9: 즐겨찾기/길찾기를 action row로 묶는다. id/데이터셋/클릭 핸들러/disabled 조건은
   // 전부 기존 그대로이며, 시각적 클래스만 추가한다.
