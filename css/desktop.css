@@ -1145,7 +1145,7 @@
 
 /* ===== PC 로그인 이후 업무화면 (2026-10) ===== */
 #pc-sidebar,#pc-app-header,#pc-page-heading{display:none}
-.pc-site-quality,.pc-site-row-meta,.site-detail-label-icon,.site-amount-filter-custom{display:none}
+.pc-site-quality,.pc-site-row-meta,.site-detail-label-icon,.site-amount-filter-custom,.pc-site-accident-flag,.pc-map-empty-state{display:none}
 @media (min-width:769px){
   #view-approved{--side:220px;--head:70px;--ink:#08265f;--blue:#0b63f6;--line:#d9e5f5;--soft:#f5f9ff;position:fixed!important;inset:0!important;overflow:hidden;background:#f8fbff;color:var(--ink);font-family:Arial,'Noto Sans KR',sans-serif}
   #view-approved>h1,#view-approved>#approved-role-badge,#view-approved>#btn-current-location,#view-approved>#location-message,#view-approved>#btn-admin-panel,#view-approved>#btn-upload-panel,#view-approved>#btn-supervision-panel,#view-approved>#logout-approved,#view-approved>#mobile-app-header,#view-approved>#mobile-bottom-nav,#view-approved>#favorite-subtabs{display:none!important}
@@ -2273,6 +2273,106 @@
   }
   #app[data-pc-tab="map"] #site-detail-panel .site-detail-quality-badge.site-detail-quality-review{
     background:#e8f6ee!important;color:#1f8b53!important;
+  }
+
+  /* 사용자 디자인 의견 반영(2026-10): 좌측 목록 카드의 "업체명 | 공사금액 10억원" 한 줄
+     텍스트가 우측 상세패널(아이콘+라벨+값)과 톤이 달라 이질적이라는 피드백 — 같은 아이콘
+     언어로 통일한다. 업체명은 아이콘+줄임말, 공사금액은 오른쪽 정렬된 굵은 값으로 분리한다.
+     기존 company_name/amount 데이터만 사용하며 모바일은 위 전역 기본 숨김 규칙으로 무관하다. */
+  #app[data-pc-tab="map"] .pc-site-row-meta{
+    display:flex!important;
+    align-items:center!important;
+    justify-content:space-between!important;
+    gap:8px!important;
+    font-size:11.5px!important;
+    line-height:1.3!important;
+    color:#7284a4!important;
+  }
+  #app[data-pc-tab="map"] .pc-site-row-meta-company{
+    display:flex!important;
+    align-items:center!important;
+    gap:4px!important;
+    flex:1 1 auto!important;
+    min-width:0!important;
+    white-space:nowrap!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+  }
+  #app[data-pc-tab="map"] .pc-site-row-meta-icon{
+    flex:none!important;
+    width:12px!important;
+    height:12px!important;
+    color:#9aabc4!important;
+  }
+  #app[data-pc-tab="map"] .pc-site-row-meta-icon svg{width:100%!important;height:100%!important;display:block!important}
+  #app[data-pc-tab="map"] .pc-site-row-meta-amount{
+    flex:none!important;
+    font-weight:800!important;
+    color:#1c4e9c!important;
+  }
+
+  /* 사용자 디자인 의견 반영(2026-10): 색 사용이 파란색/빨간 배지 외에 거의 없다는 피드백 —
+     산재표(accident_report_count)가 1건 이상인 현장만 경고색 배지로 목록에서 바로 드러나게
+     한다. 새 데이터 필드를 만들지 않고 상세패널 산재표 행과 같은 값을 그대로 재사용한다. */
+  #app[data-pc-tab="map"] .pc-site-accident-flag{
+    display:inline-flex!important;
+    flex:0 0 auto!important;
+    align-items:center!important;
+    padding:3px 8px!important;
+    border-radius:999px!important;
+    background:#fdecec!important;
+    color:#d6324a!important;
+    font-size:10.5px!important;
+    font-weight:800!important;
+    white-space:nowrap!important;
+  }
+
+  /* 사용자 디자인 의견 반영(2026-10): hover/선택 상태 피드백이 약하다는 피드백 — hover는
+     그림자를 더해 "클릭 가능"함을 분명히 하고, 선택된 카드는 왼쪽에 굵은 강조 바를 추가한다. */
+  #app[data-pc-tab="map"] .site-list-item{
+    position:relative!important;
+    transition:background .12s ease,box-shadow .12s ease!important;
+  }
+  #app[data-pc-tab="map"] .site-list-item:hover{
+    box-shadow:inset 0 0 0 1px #d8e6fb!important;
+  }
+  #app[data-pc-tab="map"] .site-list-item.active::before,
+  #app[data-pc-tab="map"] .site-list-item.selected::before{
+    content:'';
+    position:absolute!important;
+    left:0!important;top:8px!important;bottom:8px!important;
+    width:3px!important;
+    border-radius:2px!important;
+    background:#0b63f6!important;
+  }
+
+  /* 사용자 디자인 의견 반영(2026-10): 검색/필터 결과가 0건이면 지도가 그냥 비어 보여
+     "로딩 중인지 결과가 없는지" 구분이 안 된다는 피드백 — 안내 문구를 지도 위에 겹쳐 보여준다.
+     js/ui.js가 hidden 속성만 토글하며, 지도/마커 렌더링 로직 자체는 건드리지 않는다. */
+  #app[data-pc-tab="map"] .pc-map-empty-state{
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:center!important;
+    justify-content:center!important;
+    gap:4px!important;
+    position:absolute!important;
+    top:50%!important;left:50%!important;
+    transform:translate(-50%,-50%)!important;
+    z-index:30!important;
+    padding:18px 24px!important;
+    border:1px solid #e4ecf7!important;
+    border-radius:10px!important;
+    background:rgba(255,255,255,.95)!important;
+    box-shadow:0 6px 20px rgba(16,52,94,.10)!important;
+    text-align:center!important;
+    pointer-events:none!important;
+  }
+  #app[data-pc-tab="map"] .pc-map-empty-state[hidden]{display:none!important}
+  #app[data-pc-tab="map"] .pc-map-empty-state-title{
+    margin:0!important;font-size:13.5px!important;font-weight:800!important;color:#173467!important;
+  }
+  #app[data-pc-tab="map"] .pc-map-empty-state-desc{
+    margin:0!important;font-size:11.5px!important;color:#7284a4!important;
   }
 
   /* 사용자 요청(2026-10): 최종 시안 순서(주소→업체명)로 PC에서만 "보이는 순서"를 바꾼다.
