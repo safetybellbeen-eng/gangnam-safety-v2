@@ -916,6 +916,14 @@
         <span class="mobile-map-legend-item"><span class="mobile-map-legend-dot mobile-map-legend-dot-estimated"></span>중간</span>
         <span class="mobile-map-legend-item"><span class="mobile-map-legend-dot mobile-map-legend-dot-review"></span>낮음</span>
       </div>
+      <!-- 사용자 요청(2026-10, PC 전용): 검색/필터 결과가 0건일 때 지도가 그냥 비어 보여
+           "로딩 중인지 결과가 없는지" 구분이 안 된다는 피드백 — 안내 문구 오버레이.
+           js/ui.js renderSiteList가 hidden만 토글하며, 모바일은 css/desktop.css 기본 숨김
+           규칙(.pc-map-empty-state)으로 항상 숨겨져 기존 모바일 지도 화면은 바뀌지 않는다. -->
+      <div id="pc-map-empty-state" class="pc-map-empty-state" hidden>
+        <p class="pc-map-empty-state-title">표시할 현장이 없습니다</p>
+        <p class="pc-map-empty-state-desc">검색어나 필터 조건을 확인해 보세요.</p>
+      </div>
     </div>
     <!-- PC STEP3: 현장 탭 전용 테이블. 모바일에서는 desktop.css 기본값으로 숨김. -->
     <section id="pc-site-table-panel" aria-label="현장 목록">
