@@ -815,6 +815,22 @@
                 <label class="site-select-filter-option"><input type="radio" name="site-amount-filter-radio" value="5b-12b"><span>50억 이상 ~ 120억 미만</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
                 <label class="site-select-filter-option"><input type="radio" name="site-amount-filter-radio" value="over-12b"><span>120억 이상</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
               </div>
+              <!-- 사용자 요청(2026-10, PC 전용): 고정 3구간 외에 금액을 직접 입력해 조회하는 기능.
+                   모바일에서는 css/desktop.css 기본 숨김 규칙으로 항상 숨겨져 기존 모바일 필터
+                   패널(4개 라디오만 있는 구성)은 전혀 바뀌지 않는다. -->
+              <div class="site-amount-filter-custom">
+                <button type="button" id="site-amount-filter-custom-toggle" class="site-amount-filter-custom-toggle">자세히 설정</button>
+                <div id="site-amount-filter-custom-body" class="site-amount-filter-custom-body" hidden>
+                  <div class="site-amount-filter-custom-row">
+                    <input type="number" id="site-amount-filter-min-input" class="site-amount-filter-custom-input" placeholder="최소" min="0" inputmode="numeric">
+                    <span class="site-amount-filter-custom-unit">억</span>
+                    <span class="site-amount-filter-custom-sep">~</span>
+                    <input type="number" id="site-amount-filter-max-input" class="site-amount-filter-custom-input" placeholder="최대" min="0" inputmode="numeric">
+                    <span class="site-amount-filter-custom-unit">억</span>
+                  </div>
+                  <button type="button" id="site-amount-filter-custom-apply" class="site-amount-filter-custom-apply">적용</button>
+                </div>
+              </div>
             </div>
           </details>
           <!-- 사용자 요청: 필터 순서를 "관할ㅣ공사금액ㅣ점검ㅣ산재표 / 즐겨찾기"로 바꾼다.
