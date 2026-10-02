@@ -79,7 +79,10 @@ const AMOUNT_RANGES = {
   'over-12b': { min: 12000000000, max: Infinity }      // 120억 이상
 };
 
-// amount가 숫자로 변환 불가능하거나 비어있으면 '전체'가 아닌 구간 선택 시 결과에서 제외한다.
+// 사용자 요청(2026-10, PC 전용): 고정 3구간 외에 사용자가 직접 금액 범위(억원 단위)를
+// 입력해 조회할 수 있는 "자세히" 옵션. amountFilter === 'custom'일 때 state.customAmountRange
+// ({min,max}, 원 단위)를 사용한다. 모바일에는 이 값을 설정할 UI 자체가 없으므로(아래 ui.js/
+// index.html 변경은 전부 PC 전용 CSS로 숨김) 기존 모바일 동작에는 영향이 없다.
 function matchesAmount(site, amountFilter) {
   if (!amountFilter || amountFilter === 'all') return true;
   const raw = site.amount;
@@ -87,6 +90,13 @@ function matchesAmount(site, amountFilter) {
   if (typeof raw === 'string' && raw.trim() === '') return false;
   const n = Number(raw);
   if (!Number.isFinite(n)) return false;
+  if (amountFilter === 'custom') {
+    const range = state.customAmountRange;
+    if (!range) return true;
+    const min = Number.isFinite(range.min) ? range.min : -Infinity;
+    const max = Number.isFinite(range.max) ? range.max : Infinity;
+    return n >= min && n <= max;
+  }
   const range = AMOUNT_RANGES[amountFilter];
   if (!range) return true;
   return n >= range.min && n < range.max;
