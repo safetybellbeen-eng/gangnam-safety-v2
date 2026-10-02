@@ -7,7 +7,7 @@ import { initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites, rend
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
-import { renderSiteList, renderPcSiteTable, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView, renderHeaderUploadDate, setSiteSearchMode, renderSiteNotesPanel, renderAppSettingsPanel, restorePcSiteFiltersToRow } from './ui.js';
+import { renderSiteList, renderPcSiteTable, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView, renderHeaderUploadDate, setSiteSearchMode, renderSiteNotesPanel, renderAppSettingsPanel, restorePcSiteFiltersToRow, updateDongFilterLabel } from './ui.js';
 import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
 
 const VIEWS = [
@@ -602,21 +602,48 @@ function bindPcWorkspace() {
   }
   if (pcSiteReset) {
     pcSiteReset.addEventListener('click', () => {
+      // 버그 수정(2026-10): 이 핸들러는 원래 지도탭 목록(renderSiteList('site-list'))용으로
+      // 작성된 것을 현장탭 "필터 초기화" 버튼이 그대로 재사용하고 있었다. 문제는 두 가지였다 —
+      // (1) 관할/점검/산재표/기본순서 필터 칩의 라벨 텍스트·강조(data-active) 표시를 전혀
+      //     되돌리지 않았고(공사금액만 수동으로 되돌림), 관할 체크박스도 지워지지 않았다.
+      //     거기다 movePcSiteFiltersIntoTable()로 필터 요소들이 #site-filter-row 밖으로
+      //     옮겨진 뒤라 '#site-filter-row input[type="radio"]' 선택자 자체가 더 이상 그 요소들을
+      //     찾지 못했다.
+      // (2) 현장탭에서 실제로 보이는 목록은 PC 표(renderPcSiteTable)인데 지도탭 목록만
+      //     다시 그려 표에는 반영되지 않았다.
+      // state 값은 그대로 초기화하고, 화면 쪽은 각 필터의 "전체/기본" 라디오에 change 이벤트를
+      // 직접 발생시켜(실제 클릭했을 때와 동일하게) 해당 필터가 스스로 라벨/강조를 되돌리게 하고,
+      // 체크박스 기반인 관할만 별도로 비운 뒤 updateDongFilterLabel()을 호출한다.
       state.searchQuery = ''; state.selectedDongs = []; state.amountFilter = 'all'; state.customAmountRange = null;
       state.siteInspectionFilter = 'all'; state.siteAccidentReportFilter = 'all'; state.sortMode = 'default';
+
       const target = document.getElementById('site-search-input');
       if (target) { target.value = ''; target.dispatchEvent(new Event('input', { bubbles: true })); }
       if (pcSiteSearch) pcSiteSearch.value = '';
-      document.querySelectorAll('#site-filter-row input[type="radio"][value="all"]').forEach(el => { el.checked = true; });
+
+      // 관할: 체크박스 다중선택이라 라디오 change로 흉내낼 수 없어 직접 비운다.
+      document.querySelectorAll('#site-dong-filter-options input[type="checkbox"]').forEach(el => { el.checked = false; });
+      updateDongFilterLabel();
+
+      // 공사금액/점검/산재표/기본순서: "전체"/"기본순서" 라디오를 체크하고 change를 발생시켜
+      // js/ui.js bindRadioFilterDetails의 기존 로직(라벨/강조/정렬 재적용)을 그대로 재사용한다.
+      ['site-amount-filter-radio', 'site-inspection-filter-radio', 'site-accident-report-filter-radio', 'site-sort-filter-radio'].forEach(name => {
+        const radio = document.querySelector(`input[name="${name}"][value="all"], input[name="${name}"][value="default"]`);
+        if (radio && !radio.checked) {
+          radio.checked = true;
+          radio.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+
       const amountMinEl = document.getElementById('site-amount-filter-min-input');
       const amountMaxEl = document.getElementById('site-amount-filter-max-input');
       if (amountMinEl) amountMinEl.value = '';
       if (amountMaxEl) amountMaxEl.value = '';
       const amountCustomBodyEl = document.getElementById('site-amount-filter-custom-body');
       if (amountCustomBodyEl) amountCustomBodyEl.hidden = true;
-      const amountLabelResetEl = document.getElementById('site-amount-filter-label');
-      if (amountLabelResetEl) amountLabelResetEl.textContent = '공사금액';
+
       renderSiteList('site-list');
+      renderPcSiteTable();
     });
   }
 
