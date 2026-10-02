@@ -1005,6 +1005,49 @@ function pcLocationQuality(site) {
   return ['낮음', 'review'];
 }
 
+// 버그 수정(2026-10, 정밀검토): 이전에는 "동 전체/공사금액 전체/점검여부 전체" 칩이
+// 실제 <details> 드롭다운(#site-filter-row, #site-list-panel 안 — 현장 탭에서는
+// display:none)의 <summary>로 클릭만 전달하는 가짜 버튼이어서, 클릭해도 진짜 패널이
+// 전혀 보이지 않아 현장 탭에서 관할/공사금액/점검여부/산재표/정렬 필터를 실제로 쓸 수
+// 없었다. 검색모드(지도 탭 전용)를 제외한 실제 <details> 요소를 그대로 옮겨와 쓴다 —
+// id/이벤트 바인딩은 요소 자체에 있으므로 위치 이동과 무관하게 그대로 동작하고,
+// 패널을 열 때 버튼의 getBoundingClientRect()로 위치를 계산하는 방식(css/desktop.css
+// position:fixed 주석 참고)도 컨테이너가 바뀌어도 그대로 맞는다.
+const PC_SITE_FILTER_IDS = ['site-dong-filter', 'site-amount-filter', 'site-inspection-filter', 'site-accident-report-filter', 'site-sort-filter'];
+let pcSiteFilterAnchors = null;
+
+function movePcSiteFiltersIntoTable() {
+  const container = document.getElementById('pc-site-table-filters');
+  if (!container) return;
+  if (!pcSiteFilterAnchors) {
+    // 처음 한 번만, 아직 아무것도 옮기기 전(index.html 원래 위치)에 원위치를 기록해둔다.
+    pcSiteFilterAnchors = {};
+    PC_SITE_FILTER_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) pcSiteFilterAnchors[id] = { parent: el.parentNode, nextSibling: el.nextSibling };
+    });
+  }
+  PC_SITE_FILTER_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.parentNode !== container) container.appendChild(el);
+  });
+}
+
+// 지도 탭으로 돌아갈 때 #site-filter-row의 원래 자리로 되돌린다(js/app.js activatePcTab에서 호출).
+export function restorePcSiteFiltersToRow() {
+  if (!pcSiteFilterAnchors) return;
+  PC_SITE_FILTER_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    const anchor = pcSiteFilterAnchors[id];
+    if (!el || !anchor || !anchor.parent || el.parentNode === anchor.parent) return;
+    if (anchor.nextSibling && anchor.nextSibling.parentNode === anchor.parent) {
+      anchor.parent.insertBefore(el, anchor.nextSibling);
+    } else {
+      anchor.parent.appendChild(el);
+    }
+  });
+}
+
 export function renderPcSiteTable() {
   const body = document.getElementById('pc-site-table-body');
   const panel = document.getElementById('pc-site-table-panel');
@@ -1064,11 +1107,7 @@ export function renderPcSiteTable() {
     addBtn('›', Math.min(pageCount,pcSiteTablePage+1), pcSiteTablePage===pageCount);
   }
 
-  const filters=document.getElementById('pc-site-table-filters');
-  if(filters && !filters.dataset.ready){
-    filters.dataset.ready='1';
-    [['동 전체','site-dong-filter-label'],['공사금액 전체','site-amount-filter-label'],['점검여부 전체','site-inspection-filter-label']].forEach(([label,targetId])=>{const b=document.createElement('button');b.type='button';b.className='pc-filter-chip';b.textContent=label;if(targetId)b.addEventListener('click',()=>document.getElementById(targetId)?.click());filters.appendChild(b);});
-  }
+  movePcSiteFiltersIntoTable();
 }
 
 export function renderSiteList(containerId) {
