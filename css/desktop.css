@@ -1145,7 +1145,7 @@
 
 /* ===== PC 로그인 이후 업무화면 (2026-10) ===== */
 #pc-sidebar,#pc-app-header,#pc-page-heading{display:none}
-.pc-site-quality,.pc-site-row-meta,.site-detail-label-icon{display:none}
+.pc-site-quality,.pc-site-row-meta,.site-detail-label-icon,.site-amount-filter-custom{display:none}
 @media (min-width:769px){
   #view-approved{--side:220px;--head:70px;--ink:#08265f;--blue:#0b63f6;--line:#d9e5f5;--soft:#f5f9ff;position:fixed!important;inset:0!important;overflow:hidden;background:#f8fbff;color:var(--ink);font-family:Arial,'Noto Sans KR',sans-serif}
   #view-approved>h1,#view-approved>#approved-role-badge,#view-approved>#btn-current-location,#view-approved>#location-message,#view-approved>#btn-admin-panel,#view-approved>#btn-upload-panel,#view-approved>#btn-supervision-panel,#view-approved>#logout-approved,#view-approved>#mobile-app-header,#view-approved>#mobile-bottom-nav,#view-approved>#favorite-subtabs{display:none!important}
@@ -1491,6 +1491,77 @@
   #app[data-pc-tab="map"] .site-select-filter-option:has(input:checked) .site-select-filter-check,
   #app[data-pc-tab="map"] .site-select-filter-clear.is-checked .site-select-filter-check{display:inline!important}
   #app[data-pc-tab="map"] .site-select-filter[data-active="true"] .site-select-filter-label{border-color:#78a8ef!important;background:#f3f8ff!important;color:#0b63f6!important}
+
+  /* 사용자 요청(2026-10): 공사금액 필터 "자세히 설정" — 억원 단위 직접 입력 UI (PC 전용). */
+  #app[data-pc-tab="map"] .site-amount-filter-custom{
+    display:block!important;
+    margin:4px 2px 0!important;
+    padding:8px 2px 0!important;
+    border-top:1px solid #edf2f8!important;
+  }
+  #app[data-pc-tab="map"] .site-amount-filter-custom-toggle{
+    display:block!important;
+    width:100%!important;
+    min-height:30px!important;
+    border:0!important;
+    background:transparent!important;
+    color:#5e7aa6!important;
+    font-size:11.5px!important;
+    font-weight:700!important;
+    text-align:left!important;
+    cursor:pointer!important;
+    padding:0 8px!important;
+  }
+  #app[data-pc-tab="map"] .site-amount-filter-custom-toggle:hover{color:#0b63f6!important}
+  #app[data-pc-tab="map"] .site-amount-filter-custom-body{
+    display:block!important;
+    margin-top:4px!important;
+    padding:8px!important;
+    border-radius:7px!important;
+    background:#f6f9fd!important;
+  }
+  #app[data-pc-tab="map"] .site-amount-filter-custom-body[hidden]{display:none!important}
+  #app[data-pc-tab="map"] .site-amount-filter-custom-row{
+    display:flex!important;
+    align-items:center!important;
+    gap:5px!important;
+    margin-bottom:6px!important;
+  }
+  #app[data-pc-tab="map"] .site-amount-filter-custom-input{
+    width:0!important;
+    flex:1 1 auto!important;
+    min-width:0!important;
+    height:30px!important;
+    padding:0 7px!important;
+    border:1px solid #cfddf1!important;
+    border-radius:6px!important;
+    font-size:12px!important;
+    color:#173467!important;
+    box-sizing:border-box!important;
+  }
+  #app[data-pc-tab="map"] .site-amount-filter-custom-input.is-invalid{
+    border-color:#e5484d!important;
+    background:#fff5f5!important;
+  }
+  #app[data-pc-tab="map"] .site-amount-filter-custom-unit{
+    flex:none!important;
+    font-size:11px!important;
+    color:#7284a4!important;
+  }
+  #app[data-pc-tab="map"] .site-amount-filter-custom-sep{flex:none!important;color:#9aabc4!important;font-size:11px!important}
+  #app[data-pc-tab="map"] .site-amount-filter-custom-apply{
+    display:block!important;
+    width:100%!important;
+    min-height:32px!important;
+    border:0!important;
+    border-radius:6px!important;
+    background:#0b63f6!important;
+    color:#fff!important;
+    font-size:12px!important;
+    font-weight:750!important;
+    cursor:pointer!important;
+  }
+  #app[data-pc-tab="map"] .site-amount-filter-custom-apply:hover{background:#0a56d6!important}
 
   /* 상세패널: 공통 components.css의 기본 button/label 규칙보다 강하게 PC 스타일 고정 */
   #app[data-pc-tab="map"] #site-detail-panel{padding:16px!important}
@@ -1903,11 +1974,15 @@
     align-items:center!important;
     justify-content:flex-start!important;
   }
+  /* 버그 수정(2026-10): components.css의 "#app label{flex-direction:column}"(ID 선택자라
+     우선순위가 더 높음)이 검색창에도 적용돼 돋보기 아이콘이 위, 입력창이 아래로 쌓이며
+     아이콘이 세로로 찌그러지는 문제가 있었다. flex-direction:row로 명시해 되돌린다. */
   .pc-global-search{
     width:614px!important;
     height:46px!important;
     padding:0 14px!important;
     display:flex!important;
+    flex-direction:row!important;
     align-items:center!important;
     gap:11px!important;
     border:1px solid #cbd9ec!important;
@@ -1916,6 +1991,8 @@
     flex:0 0 auto!important;
     margin-left:auto!important;
   }
+  .pc-search-icon{flex:none!important}
+  .pc-global-search input{flex:1 1 auto!important;min-width:0!important}
   .pc-search-icon{width:20px;height:20px;fill:none;stroke:#31588f;stroke-width:1.8;stroke-linecap:round}
   .pc-global-search input{height:100%!important;font-size:14px!important;color:#173a6b!important}
   .pc-global-search input::placeholder{color:#8293ad!important}
@@ -2025,18 +2102,38 @@
     gap:8px!important;
   }
   #app[data-pc-tab="map"] .site-select-filter{flex:0 0 auto!important}
+  /* 사용자 요청(2026-10): 필터 칩을 pill 형태 + 펼침 화살표 + hover 전환으로 더 정밀하게 다듬는다. */
   #app[data-pc-tab="map"] .site-select-filter-label{
-    height:36px!important;
-    min-height:36px!important;
-    padding:0 11px!important;
+    height:34px!important;
+    min-height:34px!important;
+    padding:0 13px!important;
     display:flex!important;
     align-items:center!important;
-    border:1px solid #cedcf0!important;
-    border-radius:7px!important;
+    gap:5px!important;
+    border:1px solid #d3e0f2!important;
+    border-radius:999px!important;
     background:#fff!important;
-    color:#183d70!important;
-    font-size:11px!important;
-    font-weight:800!important;
+    color:#355a86!important;
+    font-size:11.5px!important;
+    font-weight:750!important;
+    transition:border-color .12s ease,background .12s ease,color .12s ease!important;
+  }
+  #app[data-pc-tab="map"] .site-select-filter-label:hover{
+    border-color:#aecaf2!important;
+    background:#f6faff!important;
+    color:#0b63f6!important;
+  }
+  /* "행정동" 라벨은 ::after를 이미 텍스트 치환 트릭(관할→행정동, 아래 별도 규칙)으로 쓰고
+     있으므로, 화살표는 ::before + order로 넣어 겹치지 않게 한다(순서는 order로 뒤로 보냄). */
+  #app[data-pc-tab="map"] .site-select-filter-label::before{
+    content:'';
+    order:2;
+    width:6px;height:6px;
+    margin-top:-2px;
+    border-right:1.6px solid currentColor;
+    border-bottom:1.6px solid currentColor;
+    opacity:.55;
+    transform:rotate(45deg);
   }
   #app[data-pc-tab="map"] #site-search-mode-filter{display:none!important}
 
@@ -2053,6 +2150,8 @@
     border-radius:0!important;
     box-sizing:border-box!important;
     background:#fff!important;
+    transition:background .12s ease!important;
+    cursor:pointer!important;
   }
   #app[data-pc-tab="map"] .site-list-item:hover,
   #app[data-pc-tab="map"] .site-item:hover{background:#f7faff!important}
@@ -2064,7 +2163,7 @@
     border:1.5px solid #0a6cff!important;
     border-radius:7px!important;
     background:#f2f7ff!important;
-    box-shadow:0 0 0 1px rgba(10,108,255,.04)!important;
+    box-shadow:0 1px 6px rgba(10,108,255,.10)!important;
   }
   #app[data-pc-tab="map"] .site-name{
     font-size:13px!important;
@@ -2081,13 +2180,20 @@
     height:40px!important;
     padding:0 14px!important;
     border:1px solid #d1deed!important;
-    border-radius:7px!important;
+    border-radius:8px!important;
     background:rgba(255,255,255,.97)!important;
     color:#113e78!important;
     font-size:12px!important;
     font-weight:800!important;
     box-shadow:0 2px 8px rgba(16,52,94,.10)!important;
+    transition:border-color .12s ease,box-shadow .12s ease,transform .12s ease!important;
   }
+  #app[data-pc-tab="map"] #pc-map-toolbar button:hover{
+    border-color:#8fb6f2!important;
+    box-shadow:0 4px 12px rgba(16,52,94,.16)!important;
+    transform:translateY(-1px)!important;
+  }
+  #app[data-pc-tab="map"] #pc-map-toolbar button:active{transform:translateY(0)!important}
   #app[data-pc-tab="map"] #mobile-map-legend{
     left:12px!important;bottom:12px!important;
     padding:10px 14px!important;
