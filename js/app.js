@@ -548,14 +548,25 @@ function activatePcTab(tab) {
     // 원래 자리로 되돌려 지도 탭 필터 줄이 비어 보이지 않게 한다.
     restorePcSiteFiltersToRow();
   }
-  // STEP16.37: 경로 탭은 위 activateMobileTab(tab) 안에서 이미 relayout()+setCenter() 후
-  // renderMobileRouteView()가 setBounds()까지 호출해 지도를 올바른 위치/줌으로 맞춰둔다.
-  // 그 뒤에 여기서 relayout()을 한 번 더(다음 프레임에) 걸면 setBounds 직후의 지도를
-  // 다시 흔들어 "지도가 나왔다 안 나왔다" 하는 깜빡임의 원인이 되므로, 이 지연 relayout은
-  // 지도 탭에만 적용한다(경로 탭은 적용하지 않음 — 지도 탭은 setBounds를 호출하지 않아
-  // 이 보정이 여전히 필요하다).
-  if (tab === 'map' && state.map && typeof state.map.relayout === 'function') {
-    requestAnimationFrame(() => state.map.relayout());
+  // STEP16.37: 위 activateMobileTab(tab) 안에서 이미 relayout()+setCenter()를 동기로 한 번
+  // 호출했지만, 레이아웃이 실제로 완전히 자리잡기 전(같은 틱)이라 카카오맵이 타일을 흰 화면
+  // 그대로 두는 경우가 있어(기존에도 지도 탭에 있던 문제) 다음 애니메이션 프레임에 한 번 더
+  // relayout()을 걸어준다.
+  // STEP16.39: 경로 탭에서는 이 지연 relayout()을 그냥 단독으로 걸면(이전 STEP16.37에서처럼)
+  // 그 직전에 renderMobileRouteView()가 setBounds()로 맞춰둔 중심/줌을 다시 흔들어버려
+  // "지도가 나왔다 안 나왔다" 하는 깜빡임이 났다(그래서 한 차례 아예 빼봤더니, 이번엔 반대로
+  // relayout 보정 자체가 없어져 지도가 흰 화면인 채로 안 나오는 경우가 생겼다). 두 문제를 함께
+  // 해결하려면 relayout()은 그대로 걸되, 그 직후에 renderMobileRouteView()를 다시 호출해
+  // setBounds()까지 같이 재실행해서 relayout이 흔든 중심/줌을 바로 제자리로 되돌린다.
+  if (state.map && typeof state.map.relayout === 'function') {
+    if (tab === 'map') {
+      requestAnimationFrame(() => state.map.relayout());
+    } else if (tab === 'route') {
+      requestAnimationFrame(() => {
+        state.map.relayout();
+        renderMobileRouteView('mobile-route-content');
+      });
+    }
   }
 }
 
