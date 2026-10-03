@@ -2376,7 +2376,7 @@ function openRouteAddressSearchSheet(containerId) {
   const searchInput = document.createElement('input');
   searchInput.type = 'text';
   searchInput.className = 'sv-manager-sheet-search';
-  searchInput.placeholder = '예: 테헤란로 152, 강남구청';
+  searchInput.placeholder = '예: 테헤란로 411, 성담빌딩';
   searchRow.appendChild(searchInput);
   const searchBtn = document.createElement('button');
   searchBtn.type = 'button';
