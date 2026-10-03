@@ -3182,3 +3182,222 @@
     background:#8fb3e0!important;
   }
 }
+
+/* ===== PC 경로(route) 탭: 경로 만들기 / 경로 상세 화면 ===================================
+   모바일 전용으로 만들어졌던 #mobile-route-content(경로 만들기)와 #route-detail-panel(경로
+   상세) DOM/JS를 그대로 재사용하고, PC에서는 숨겨져 있던 공용 바텀시트(.admin-sheet-overlay)를
+   중앙 모달로 보이게 한 뒤 각 요소에 데스크톱 스타일만 입힌다. mobile.css는 건드리지 않는다
+   (여기 선택자는 모두 min-width:769px 안에만 있어 모바일 폭에는 영향이 없다). */
+@media (min-width: 769px) {
+  /* 공용 바텀시트(방문 현장 선택/주소 검색/담당 감독관 선택 등)를 PC에서 중앙 모달로.
+     overlay는 document.body에 직접 붙으므로 #app[data-pc-tab] 하위로 스코프할 수 없다 —
+     이 요소는 JS가 열 때만 DOM에 생성되고 닫으면 즉시 제거되므로 전역으로 켜도 안전하다. */
+  .admin-sheet-overlay{
+    display:flex!important;
+    position:fixed!important;
+    inset:0!important;
+    align-items:center!important;
+    justify-content:center!important;
+    background:rgba(15,23,42,0.45)!important;
+    z-index:300!important;
+  }
+  .admin-sheet{
+    width:min(480px,92vw)!important;
+    max-height:80vh!important;
+    overflow-y:auto!important;
+    box-sizing:border-box!important;
+    padding:22px 24px!important;
+    border-radius:12px!important;
+    background:#fff!important;
+    box-shadow:0 12px 32px rgba(15,23,42,0.18)!important;
+  }
+  .admin-sheet-name{
+    font-size:16px;font-weight:800;color:#173467;text-align:center;
+    padding-bottom:14px;margin-bottom:10px;border-bottom:1px solid #e1eaf6;
+  }
+  .sv-manager-sheet-search{
+    width:100%;min-height:38px;padding:0 12px;border:1px solid #cddbf0;border-radius:6px;
+    font-size:13px;box-sizing:border-box;margin-bottom:10px;color:#173467;
+  }
+  .sv-manager-sheet-search:focus{ outline:none;border-color:#8bb1e9; }
+  .sv-manager-option{
+    width:100%;text-align:left;min-height:40px;padding:8px 4px;border:none;
+    border-bottom:1px solid #e4ecf7;background:none;font-size:13px;color:#173467;cursor:pointer;
+  }
+  .sv-manager-option:hover{ background:#f6f9fd; }
+  .sv-manager-option:last-child{ border-bottom:none; }
+  .sv-manager-empty{ padding:20px 4px;text-align:center;color:#61779c;font-size:13px; }
+
+  /* 경로 만들기 화면: 중앙 정렬된 단일 컬럼 레이아웃 */
+  #mobile-route-content{ width:100%;max-width:640px;margin:0 auto; }
+  .route-start-card{
+    background:#fff;border:1px solid #e1eaf6;border-radius:10px;
+    box-shadow:0 1px 3px rgba(15,23,42,0.05);padding:16px;margin-bottom:14px;
+  }
+  .route-card-title{ font-size:14px;font-weight:800;color:#173467;margin-bottom:8px; }
+  .route-start-row{ display:flex;align-items:center;justify-content:space-between;gap:14px; }
+  .route-start-text{ flex:1;min-width:0; }
+  .route-start-label{ font-size:14px;font-weight:650;color:#173467; }
+  .route-start-address{
+    font-size:12px;color:#61779c;margin-top:3px;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;
+  }
+  .route-start-btn-group{ display:flex;flex-direction:column;gap:6px;flex-shrink:0; }
+  .route-start-btn{
+    min-height:32px;width:92px;padding:0 10px;text-align:center;border:1px solid #0b63f6;
+    background:#fff;color:#0b63f6;border-radius:6px;font-size:12px;font-weight:650;cursor:pointer;
+  }
+  .route-start-btn:hover{ background:#f3f8ff; }
+  .route-start-btn:disabled{ opacity:0.5;cursor:not-allowed; }
+  .route-start-btn-secondary{ border-color:#cddbf0;color:#61779c; }
+  .route-start-error{
+    color:#c0392b;background:#fdf0ee;border-radius:6px;padding:8px 12px;
+    font-size:12px;margin-bottom:12px;
+  }
+  .route-add-site-btn{
+    width:100%;min-height:42px;border:1px dashed #0b63f6;background:#f3f8ff;color:#0b63f6;
+    border-radius:8px;font-size:13px;font-weight:800;margin-bottom:14px;cursor:pointer;
+  }
+  .route-add-site-btn:hover{ background:#e9f2ff; }
+  .route-site-list{ display:flex;flex-direction:column;gap:8px;margin-bottom:14px; }
+  .route-site-card{
+    display:flex;align-items:flex-start;gap:10px;background:#fff;border:1px solid #e1eaf6;
+    border-radius:8px;padding:12px;
+  }
+  .route-site-card.route-card-dragging{ box-shadow:0 4px 12px rgba(15,23,42,0.12);background:#f3f8ff; }
+  .route-drag-handle{
+    flex-shrink:0;display:flex;align-items:center;justify-content:center;width:24px;height:24px;
+    color:#8fa2c2;font-size:15px;cursor:grab;
+  }
+  .route-site-number{
+    flex-shrink:0;display:flex;align-items:center;justify-content:center;width:20px;height:20px;
+    border-radius:50%;background:#173467;color:#fff;font-size:11px;font-weight:800;margin-top:2px;
+  }
+  .route-site-text{ flex:1;min-width:0; }
+  .route-site-text-clickable{ cursor:pointer; }
+  .route-site-name{ font-size:13px;font-weight:650;color:#173467; }
+  .route-site-addr{ font-size:12px;color:#61779c;margin-top:2px; }
+  .route-site-warn{ font-size:11px;color:#b9770e;margin-top:2px; }
+  .route-site-delete-btn{
+    flex-shrink:0;width:24px;height:24px;border:none;background:transparent;
+    color:#8fa2c2;font-size:16px;line-height:1;cursor:pointer;
+  }
+  .route-site-delete-btn:hover{ color:#c0392b; }
+  .route-cta-btn{
+    width:100%;min-height:44px;border:none;border-radius:8px;background:#0b63f6;
+    color:#fff;font-size:14px;font-weight:800;cursor:pointer;
+  }
+  .route-cta-btn:hover{ background:#0a56d6; }
+  .route-cta-btn:disabled{ background:#e4ecf7;color:#8fa2c2;cursor:not-allowed; }
+  .route-cta-hint{ text-align:center;font-size:11px;color:#61779c;margin-top:8px; }
+  .route-clear-all-btn{
+    width:100%;min-height:38px;border:none;border-radius:8px;background:#f3f8ff;
+    color:#c0392b;font-size:12px;font-weight:650;margin-top:8px;cursor:pointer;
+  }
+  .route-clear-all-btn:hover{ background:#fdf0ee; }
+
+  /* 방문 현장 선택 / 주소 검색 시트(공용 route-picker-*) */
+  .route-picker-list{ max-height:50vh;overflow-y:auto; }
+  .route-picker-row{ display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #e4ecf7; }
+  .route-picker-row:last-child{ border-bottom:none; }
+  .route-picker-row input[type="checkbox"]{ flex-shrink:0;width:17px;height:17px;cursor:pointer; }
+  .route-picker-row-text{ flex:1;min-width:0; }
+  .route-picker-row-name{ font-size:13px;font-weight:650;color:#173467; }
+  .route-picker-row-addr{ font-size:11px;color:#61779c;margin-top:2px; }
+  .route-picker-row-warn{ flex-shrink:0;font-size:11px;color:#b9770e; }
+  .route-picker-row-fav{ color:#0b63f6; }
+  .route-picker-confirm-btn{
+    width:100%;min-height:40px;border:none;border-radius:8px;background:#0b63f6;
+    color:#fff;font-size:13px;font-weight:800;margin-top:14px;cursor:pointer;
+  }
+  .route-picker-confirm-btn:hover{ background:#0a56d6; }
+  .route-addr-search-row{ display:flex;gap:8px;align-items:center; }
+  .route-addr-search-row .sv-manager-sheet-search{ flex:1;min-width:0;margin-bottom:0; }
+  .route-addr-search-btn{
+    flex-shrink:0;min-height:38px;padding:0 14px;border:none;border-radius:6px;
+    background:#0b63f6;color:#fff;font-size:12px;font-weight:650;cursor:pointer;
+  }
+  .route-addr-search-btn:hover{ background:#0a56d6; }
+  .route-addr-search-btn:disabled{ opacity:0.5;cursor:not-allowed; }
+  .route-addr-candidate-row{
+    display:block;width:100%;text-align:left;background:none;border:none;
+    border-bottom:1px solid #e4ecf7;padding:8px 0;font-size:12px;color:#173467;cursor:pointer;
+  }
+  .route-addr-candidate-row:hover{ background:#f6f9fd; }
+  .route-addr-candidate-row:last-child{ border-bottom:none; }
+
+  /* 경로 상세(#route-detail-panel) — "경로 보기"로 열었을 때만(.is-open) 2단 그리드로 표시.
+     닫힌 상태는 기존 inline style.display:none이 그대로 유지되어(이 선택자는 .is-open이 없으면
+     아무 display도 지정하지 않음) PC 진입 시 패널이 잘못 보이는 일이 없다. */
+  #app[data-pc-tab="route"] #route-detail-panel.is-open{
+    display:grid!important;
+    position:absolute;
+    left:calc(var(--side) + 12px);
+    right:12px;
+    top:90px;
+    bottom:20px;
+    z-index:45;
+    background:#fff;
+    border:1px solid #d9e5f5;
+    border-radius:10px;
+    padding:16px;
+    grid-template-columns:360px 1fr;
+    grid-template-rows:auto auto 1fr;
+    grid-template-areas:"header header" "note note" "timeline map";
+    column-gap:20px;
+    row-gap:4px;
+    box-sizing:border-box;
+  }
+  #app[data-pc-tab="route"] #route-detail-panel .sv-mobile-subheader{
+    grid-area:header;display:flex;align-items:center;gap:10px;
+    padding:0 0 12px;border-bottom:1px solid #e1eaf6;margin-bottom:4px;
+  }
+  #app[data-pc-tab="route"] #route-detail-panel .sv-mobile-back-btn{
+    width:30px;height:30px;border:none;background:#f3f8ff;border-radius:50%;color:#173467;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;
+  }
+  #app[data-pc-tab="route"] #route-detail-panel .sv-mobile-back-btn:hover{ background:#e9f2ff; }
+  #app[data-pc-tab="route"] #route-detail-panel .sv-mobile-back-btn svg{ width:18px;height:18px; }
+  #app[data-pc-tab="route"] #route-detail-panel .sv-mobile-subheader-title{
+    font-size:16px;font-weight:800;color:#173467;
+  }
+  #app[data-pc-tab="route"] #route-detail-panel .route-order-note{
+    grid-area:note;font-size:12px;color:#61779c;background:#f6f9fd;border-radius:6px;
+    padding:8px 12px;margin:0 0 4px;line-height:1.5;
+  }
+  #app[data-pc-tab="route"] #route-detail-panel .route-mini-map{
+    grid-area:map;width:100%;height:100%;min-height:320px;border-radius:8px;
+    overflow:hidden;background:#f6f9fd;border:1px solid #e1eaf6;
+  }
+  #app[data-pc-tab="route"] #route-detail-panel .route-timeline{
+    grid-area:timeline;overflow-y:auto;padding-right:4px;
+  }
+  #app[data-pc-tab="route"] #route-detail-panel .route-timeline-row{ display:flex;gap:10px; }
+  #app[data-pc-tab="route"] #route-detail-panel .route-timeline-rail{
+    flex-shrink:0;width:22px;display:flex;flex-direction:column;align-items:center;
+  }
+  #app[data-pc-tab="route"] #route-detail-panel .route-timeline-dot{
+    flex-shrink:0;width:22px;height:22px;border-radius:50%;background:#173467;color:#fff;
+    font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;
+  }
+  #app[data-pc-tab="route"] #route-detail-panel .route-timeline-line{
+    flex:1;width:2px;background:#e1eaf6;margin:2px 0;min-height:20px;
+  }
+  #app[data-pc-tab="route"] #route-detail-panel .route-timeline-body{ flex:1;min-width:0;padding-bottom:16px; }
+  #app[data-pc-tab="route"] #route-detail-panel .route-timeline-top{ display:flex;align-items:center;gap:8px; }
+  #app[data-pc-tab="route"] #route-detail-panel .route-timeline-name{
+    flex:1;min-width:0;font-size:13px;font-weight:650;color:#173467;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  #app[data-pc-tab="route"] #route-detail-panel .route-timeline-actions{ display:flex;gap:8px;margin-top:8px; }
+  #app[data-pc-tab="route"] #route-detail-panel .route-timeline-action-btn{
+    flex:1;min-height:32px;border:1px solid #cddbf0;background:#fff;color:#173467;
+    border-radius:6px;font-size:12px;font-weight:650;cursor:pointer;
+  }
+  #app[data-pc-tab="route"] #route-detail-panel .route-timeline-action-btn:hover{ background:#f6f9fd; }
+  #app[data-pc-tab="route"] #route-detail-panel .route-timeline-action-btn:disabled{ opacity:0.5;cursor:not-allowed; }
+  #app[data-pc-tab="route"] #route-detail-panel .route-timeline-action-primary{
+    border-color:#0b63f6;background:#0b63f6;color:#fff;
+  }
+  #app[data-pc-tab="route"] #route-detail-panel .route-timeline-action-primary:hover{ background:#0a56d6; }
+}
