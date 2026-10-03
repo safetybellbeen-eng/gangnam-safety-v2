@@ -167,7 +167,7 @@ function activateMobileTab(tab) {
   if (previousTab === 'route' && tab !== previousTab) {
     ['route-order-panel', 'route-detail-panel'].forEach(id => {
       const panelEl = document.getElementById(id);
-      if (panelEl) panelEl.style.display = 'none';
+      if (panelEl) { panelEl.style.display = 'none'; panelEl.classList.remove('is-open'); }
     });
     state.routeMobileView = 'plan';
   }
