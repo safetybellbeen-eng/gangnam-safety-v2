@@ -3,7 +3,7 @@
 import { state } from './state.js';
 import { sb } from './api.js';
 import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, verifySignupCode, checkIdExists, checkLoginLock, translateAuthError } from './auth.js';
-import { initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites, renderHqMarker } from './map.js';
+import { initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites, renderHqMarker, clearRouteSelectionOnMainMap } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
@@ -112,7 +112,9 @@ function activateMobileTab(tab) {
   // 지도 탭으로 복귀(또는 최초 진입) 시, display:none 상태였던 동안 틀어진 지도 크기를 보정한다(재초기화 아님).
   // STEP15-C.1: kakao.maps.event.trigger(map,'relayout')는 relayout을 실제로 트리거하지 않는 잘못된
   // 호출이었다(흰 화면 원인) — Kakao Maps SDK가 제공하는 실제 인스턴스 메서드 map.relayout()으로 수정.
-  if (tab === 'map' && state.map && typeof state.map.relayout === 'function') {
+  // STEP16.36: PC 경로 탭도 이제 이 메인 지도(#map-container)를 그대로 보여주므로(모바일은
+  // 여전히 숨김 — css/mobile.css 미변경), 지도/경로 탭 전환 시 모두 relayout이 필요하다.
+  if ((tab === 'map' || tab === 'route') && state.map && typeof state.map.relayout === 'function') {
     state.map.relayout();
     state.map.setCenter(state.map.getCenter()); // relayout 직후 타일이 흰 화면으로 남는 것을 방지(중심 재설정으로 강제 리드로우)
   }
@@ -170,6 +172,11 @@ function activateMobileTab(tab) {
       if (panelEl) { panelEl.style.display = 'none'; panelEl.classList.remove('is-open'); }
     });
     state.routeMobileView = 'plan';
+    // STEP16.36(PC 전용): 경로 탭을 벗어나면 메인 지도 위에 얹어뒀던 "경로 만들기" 번호 핀을
+    // 지운다 — 그대로 두면 지도/현장 탭으로 돌아갔을 때도 경로 핀이 남아있게 된다.
+    // 모바일은 애초에 이 핀을 그리지 않으므로(렌더 쪽 isMobileViewport 가드) 여기서 그냥
+    // 호출해도 지울 대상이 없어 안전하다.
+    clearRouteSelectionOnMainMap();
   }
 }
 
@@ -541,7 +548,7 @@ function activatePcTab(tab) {
     // 원래 자리로 되돌려 지도 탭 필터 줄이 비어 보이지 않게 한다.
     restorePcSiteFiltersToRow();
   }
-  if (tab === 'map' && state.map && typeof state.map.relayout === 'function') {
+  if ((tab === 'map' || tab === 'route') && state.map && typeof state.map.relayout === 'function') {
     requestAnimationFrame(() => state.map.relayout());
   }
 }
