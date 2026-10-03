@@ -1145,7 +1145,7 @@
 
 /* ===== PC 로그인 이후 업무화면 (2026-10) ===== */
 #pc-sidebar,#pc-app-header,#pc-page-heading{display:none}
-.pc-site-quality,.pc-site-row-meta,.site-detail-label-icon,.site-amount-filter-custom,.pc-site-accident-flag,.pc-map-empty-state,.pc-site-quality-row{display:none}
+.pc-site-quality,.pc-site-row-meta,.site-detail-label-icon,.site-amount-filter-custom,.pc-site-accident-flag,.pc-map-empty-state,.pc-site-quality-row,.route-picker-quality-filter,.route-label-toggle{display:none}
 @media (min-width:769px){
   #view-approved{--side:220px;--head:70px;--ink:#08265f;--blue:#0b63f6;--line:#d9e5f5;--soft:#f5f9ff;position:fixed!important;inset:0!important;overflow:hidden;background:#f8fbff;color:var(--ink);font-family:Arial,'Noto Sans KR',sans-serif}
   #view-approved>h1,#view-approved>#approved-role-badge,#view-approved>#btn-current-location,#view-approved>#location-message,#view-approved>#btn-admin-panel,#view-approved>#btn-upload-panel,#view-approved>#btn-supervision-panel,#view-approved>#logout-approved,#view-approved>#mobile-app-header,#view-approved>#mobile-bottom-nav,#view-approved>#favorite-subtabs{display:none!important}
@@ -1167,14 +1167,20 @@
   /* STEP16.36: 사용자 요청 — 경로탭을 모바일과 똑같은 중앙 박스가 아니라, 다른 업무탭처럼
      "좌측 패널 + 중앙 지도" 구조로 바꾼다. #mobile-view-route(경로 만들기 박스)는
      #site-list-panel과 동일한 폭의 좌측 컬럼으로, #map-container(메인 지도 — 지도/현장 탭과
-     완전히 같은 인스턴스)는 그 오른쪽 나머지 전체 영역을 채운다. #site-detail-panel은 경로
-     탭에서 쓰지 않으므로 계속 숨긴다. */
-  #app[data-pc-tab="route"] #site-list-panel,#app[data-pc-tab="route"] #site-detail-panel{display:none!important}
+     완전히 같은 인스턴스)는 그 오른쪽 나머지 전체 영역을 채운다.
+     STEP16.38: #site-detail-panel은 평소(계획 화면)에는 계속 숨기지만, 경로 핀/목록을 눌러
+     상세를 열면(§ js/ui.js renderDetail이 #app에 data-detail-open="true" 설정) 지도 탭과
+     동일하게 우측에 떠서 보이도록 재활성화한다 — #site-detail-panel 자체의 위치/크기는
+     위쪽(공통, 탭 무관)의 #site-detail-panel 규칙을 그대로 쓰고, 여기서는 지도 폭만
+     조정한다(상세가 열려 있지 않으면 지도를 그대로 꽉 채운다). */
+  #app[data-pc-tab="route"] #site-list-panel{display:none!important}
+  #app[data-pc-tab="route"]:not([data-detail-open="true"]) #site-detail-panel{display:none!important}
   #app[data-pc-tab="route"] #mobile-view-route{display:block!important;position:absolute!important;left:calc(var(--side) + 12px)!important;right:auto!important;top:90px!important;bottom:20px!important;width:340px!important;overflow:auto!important;background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;box-sizing:border-box;z-index:20}
   #app[data-pc-tab="route"] #map-container{right:12px!important}
+  #app[data-pc-tab="route"][data-detail-open="true"] #map-container{right:370px!important}
   #admin-panel,#upload-panel,#supervision-panel,#site-notes-panel,#app-settings-panel{z-index:60}
-  @media(max-width:1450px){#view-approved{--side:190px}.pc-nav-btn{padding:0 12px}.pc-brand{padding-left:8px}.pc-brand span{font-size:13px}#site-list-panel{width:300px!important}#map-container{left:calc(var(--side) + 324px)!important;right:320px!important}#site-detail-panel{width:300px!important}.pc-global-search{width:520px}#app[data-pc-tab="route"] #mobile-view-route{width:300px!important}#app[data-pc-tab="route"] #map-container{right:12px!important}}
-  @media(max-width:1200px){#view-approved{--side:176px}.pc-nav-btn{font-size:13px;gap:9px}#site-list-panel{width:280px!important}#map-container{left:calc(var(--side) + 304px)!important;right:292px!important}#site-detail-panel{width:272px!important}#app[data-pc-tab="route"] #mobile-view-route{width:280px!important}#app[data-pc-tab="route"] #map-container{right:12px!important}}
+  @media(max-width:1450px){#view-approved{--side:190px}.pc-nav-btn{padding:0 12px}.pc-brand{padding-left:8px}.pc-brand span{font-size:13px}#site-list-panel{width:300px!important}#map-container{left:calc(var(--side) + 324px)!important;right:320px!important}#site-detail-panel{width:300px!important}.pc-global-search{width:520px}#app[data-pc-tab="route"] #mobile-view-route{width:300px!important}#app[data-pc-tab="route"] #map-container{right:12px!important}#app[data-pc-tab="route"][data-detail-open="true"] #map-container{right:320px!important}}
+  @media(max-width:1200px){#view-approved{--side:176px}.pc-nav-btn{font-size:13px;gap:9px}#site-list-panel{width:280px!important}#map-container{left:calc(var(--side) + 304px)!important;right:292px!important}#site-detail-panel{width:272px!important}#app[data-pc-tab="route"] #mobile-view-route{width:280px!important}#app[data-pc-tab="route"] #map-container{right:12px!important}#app[data-pc-tab="route"][data-detail-open="true"] #map-container{right:292px!important}}
 }
 
 
@@ -3305,6 +3311,14 @@
   }
   .route-clear-all-btn:hover{ background:#fdf0ee; }
 
+  /* STEP16.38: "지도에 현장명 표시" 토글(PC 전용 — 상단 top-level display:none을
+     여기서 다시 보이게 함). + 현장 검색 버튼 바로 아래, 선택 현장 목록 위에 배치. */
+  .route-label-toggle{
+    display:flex!important;align-items:center;gap:8px;margin:-6px 0 14px;
+    font-size:12px;color:#61779c;cursor:pointer;user-select:none;
+  }
+  .route-label-toggle input[type="checkbox"]{ width:15px;height:15px;cursor:pointer; }
+
   /* 방문 현장 선택 / 주소 검색 시트(공용 route-picker-*) */
   .route-picker-list{ max-height:50vh;overflow-y:auto; }
   .route-picker-row{ display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #e4ecf7; }
@@ -3320,6 +3334,14 @@
     color:#fff;font-size:13px;font-weight:800;margin-top:14px;cursor:pointer;
   }
   .route-picker-confirm-btn:hover{ background:#0a56d6; }
+  /* STEP16.38: "정확도 필터" select(PC 전용 — 상단 top-level display:none을 여기서
+     다시 보이게 함). 검색창과 한 줄에 나란히 배치. */
+  .route-picker-search-row{ display:flex;gap:8px;align-items:center;margin-bottom:10px; }
+  .route-picker-search-row .sv-manager-sheet-search{ flex:1;min-width:0;margin-bottom:0; }
+  .route-picker-quality-filter{
+    display:block!important;flex-shrink:0;min-height:38px;padding:0 10px;border:1px solid #cddbf0;
+    border-radius:6px;background:#fff;color:#173467;font-size:12px;cursor:pointer;
+  }
   .route-addr-search-row{ display:flex;gap:8px;align-items:center; }
   .route-addr-search-row .sv-manager-sheet-search{ flex:1;min-width:0;margin-bottom:0; }
   .route-addr-search-btn{
