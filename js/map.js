@@ -500,6 +500,34 @@ let hqMarker = null;
 let hqLabelOverlay = null;
 let hqRenderRequested = false;
 
+// STEP16.36: HQ 좌표 지오코딩 결과를 메인 지도뿐 아니라 경로 탭의 별도 미니맵(routeMaps
+// 레지스트리)에도 재사용할 수 있도록, 좌표 조회 자체를 캐시된 Promise로 분리했다.
+// 여러 곳에서 동시에 호출해도 Geocoder는 실제로 1회만 조회한다.
+let hqLatLngPromise = null;
+function getHqLatLng() {
+  if (hqLatLngPromise) return hqLatLngPromise;
+  hqLatLngPromise = new Promise((resolve) => {
+    if (!window.kakao || !kakao.maps.services || !kakao.maps.services.Geocoder) {
+      console.warn('[지청 마커] kakao.maps.services를 사용할 수 없습니다(SDK 로드 옵션 확인 필요).');
+      resolve(null);
+      return;
+    }
+    const geocoder = new kakao.maps.services.Geocoder();
+    geocoder.addressSearch(HQ_ADDRESS, (result, status) => {
+      if (status !== kakao.maps.services.Status.OK || !result || !result[0]) {
+        console.warn('[지청 마커] 주소 지오코딩 실패:', HQ_ADDRESS, status);
+        resolve(null);
+        return;
+      }
+      const lat = Number(result[0].y);
+      const lng = Number(result[0].x);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) { resolve(null); return; }
+      resolve({ lat, lng });
+    });
+  });
+  return hqLatLngPromise;
+}
+
 function buildHqMarkerImage() {
   // 일반 사업장 핀(24x35 내외)보다 눈에 띄게 크고 색이 다른 별 모양 마커 — 확대/축소와 무관하게
   // 클러스터러 밖에서 항상 단독으로 렌더링되므로, 배지 형태의 진한 남색 별 아이콘으로 구분한다.
@@ -518,22 +546,9 @@ export function renderHqMarker() {
   if (!state.map || hqRenderRequested) return;
   hqRenderRequested = true;
 
-  if (!window.kakao || !kakao.maps.services || !kakao.maps.services.Geocoder) {
-    console.warn('[커맨드센터 마커] kakao.maps.services를 사용할 수 없습니다(SDK 로드 옵션 확인 필요).');
-    return;
-  }
-
-  const geocoder = new kakao.maps.services.Geocoder();
-  geocoder.addressSearch(HQ_ADDRESS, (result, status) => {
-    if (status !== kakao.maps.services.Status.OK || !result || !result[0]) {
-      console.warn('[커맨드센터 마커] 주소 지오코딩 실패:', HQ_ADDRESS, status);
-      return;
-    }
-    const lat = Number(result[0].y);
-    const lng = Number(result[0].x);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-
-    const position = new kakao.maps.LatLng(lat, lng);
+  getHqLatLng().then((latLng) => {
+    if (!latLng) return;
+    const position = new kakao.maps.LatLng(latLng.lat, latLng.lng);
 
     if (hqMarker) hqMarker.setMap(null);
     hqMarker = new kakao.maps.Marker({
@@ -554,6 +569,37 @@ export function renderHqMarker() {
       zIndex: 1000
     });
     hqLabelOverlay.setMap(state.map);
+  });
+}
+
+// STEP16.36: 경로 탭 "경로 상세"(경로 보기) 화면의 별도 미니맵(routeMaps 레지스트리, 메인
+// 지도와 무관한 인스턴스)에도 동일한 지청 마커를 찍는다. containerId별로 1회만 찍고,
+// clearRouteMarkers()가 지우는 entry.markers와는 별도 필드(entry.hqMarker/hqLabel)에 보관해
+// 방문 현장 마커를 다시 그릴 때마다 지청 마커까지 매번 지웠다 다시 만들지 않는다.
+export function renderHqMarkerOnRouteMap(containerId) {
+  const entry = routeMaps.get(containerId);
+  if (!entry || entry.hqRenderRequested) return;
+  entry.hqRenderRequested = true;
+
+  getHqLatLng().then((latLng) => {
+    if (!latLng) return;
+    const position = new kakao.maps.LatLng(latLng.lat, latLng.lng);
+    entry.hqMarker = new kakao.maps.Marker({
+      position,
+      image: buildHqMarkerImage(),
+      map: entry.map,
+      zIndex: 999
+    });
+    const labelEl = document.createElement('div');
+    labelEl.className = 'hq-marker-label';
+    labelEl.textContent = HQ_LABEL;
+    entry.hqLabel = new kakao.maps.CustomOverlay({
+      position,
+      content: labelEl,
+      yAnchor: 2.55,
+      zIndex: 1000
+    });
+    entry.hqLabel.setMap(entry.map);
   });
 }
 
@@ -853,6 +899,66 @@ export function panToRouteSite(containerId, site) {
     lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
   if (!isValid) return;
   entry.map.panTo(new kakao.maps.LatLng(lat, lng));
+}
+
+// ============================================================
+// STEP16.36(PC 경로 탭 재설계): PC에서는 경로 만들기 화면 전용의 작은 미니맵 대신, 메인 지도
+// (state.map — 지도/현장 탭과 완전히 동일한 인스턴스/클러스터러)를 그대로 보여줘 사용자가
+// 현장을 추가·삭제·순서변경할 때마다 번호 핀이 "라이브로" 찍히는 걸 볼 수 있게 한다.
+// 일반 사업장 클러스터러 마커(state.markers)는 건드리지 않고, 그 위에 번호 마커만 별도로
+// 얹었다 지웠다 한다(모바일에서는 이 함수를 아예 호출하지 않는다 — ui.js의 isMobileViewport()
+// 가드 참고, 모바일 화면/동작은 전혀 바뀌지 않는다).
+// ============================================================
+let routeSelectionMarkers = [];
+
+export function clearRouteSelectionOnMainMap() {
+  routeSelectionMarkers.forEach(marker => marker.setMap(null));
+  routeSelectionMarkers = [];
+}
+
+export function renderRouteSelectionOnMainMap(currentLocation, orderedSites, onMarkerClick) {
+  if (!state.map) return;
+  clearRouteSelectionOnMainMap();
+
+  const bounds = new kakao.maps.LatLngBounds();
+  let hasPoint = false;
+
+  const validLocation =
+    currentLocation && Number.isFinite(currentLocation.lat) && Number.isFinite(currentLocation.lng) &&
+    currentLocation.lat >= -90 && currentLocation.lat <= 90 &&
+    currentLocation.lng >= -180 && currentLocation.lng <= 180;
+
+  if (validLocation) {
+    const position = new kakao.maps.LatLng(currentLocation.lat, currentLocation.lng);
+    const marker = new kakao.maps.Marker({ position, image: getCurrentLocationMarkerImage(), zIndex: 500 });
+    marker.setMap(state.map);
+    routeSelectionMarkers.push(marker);
+    bounds.extend(position);
+    hasPoint = true;
+  }
+
+  (orderedSites || []).forEach((site, index) => {
+    const lat = Number(site.lat);
+    const lng = Number(site.lng);
+    const isValid =
+      Number.isFinite(lat) && Number.isFinite(lng) &&
+      lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+    if (!isValid) return;
+
+    const position = new kakao.maps.LatLng(lat, lng);
+    const marker = new kakao.maps.Marker({ position, image: getRouteNumberMarkerImage(index + 1), zIndex: 500 });
+    if (typeof onMarkerClick === 'function') {
+      kakao.maps.event.addListener(marker, 'click', () => onMarkerClick(site.id));
+    }
+    marker.setMap(state.map);
+    routeSelectionMarkers.push(marker);
+    bounds.extend(position);
+    hasPoint = true;
+  });
+
+  if (hasPoint) {
+    state.map.setBounds(bounds, 60, 60, 60, 60);
+  }
 }
 
 // 사용자 피드백: 지도 탭에서 상세 시트가 하단 일부를 가릴 때, 핀이 "실제로 보이는" 지도
