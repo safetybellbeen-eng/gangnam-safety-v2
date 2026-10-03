@@ -1164,10 +1164,17 @@
   #mobile-view-route{display:none!important}
   #app[data-pc-tab="site"] #map-container{display:none!important}#app[data-pc-tab="site"] #site-list-panel{right:370px!important;width:auto!important}#app[data-pc-tab="site"] #site-list{height:calc(100% - 100px)!important}
   #app[data-pc-tab="favorite"] #map-container{left:auto!important;right:12px!important;width:410px!important;height:310px!important;bottom:auto!important}#app[data-pc-tab="favorite"] #site-list-panel{right:434px!important;width:auto!important}#app[data-pc-tab="favorite"] #site-detail-panel{top:458px!important;width:410px!important;height:auto!important}
-  #app[data-pc-tab="route"] #site-list-panel,#app[data-pc-tab="route"] #map-container,#app[data-pc-tab="route"] #site-detail-panel{display:none!important}#app[data-pc-tab="route"] #mobile-view-route{display:block!important;position:absolute!important;left:calc(var(--side) + 12px)!important;right:12px!important;top:90px!important;bottom:20px!important;overflow:auto!important;background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;box-sizing:border-box}
+  /* STEP16.36: 사용자 요청 — 경로탭을 모바일과 똑같은 중앙 박스가 아니라, 다른 업무탭처럼
+     "좌측 패널 + 중앙 지도" 구조로 바꾼다. #mobile-view-route(경로 만들기 박스)는
+     #site-list-panel과 동일한 폭의 좌측 컬럼으로, #map-container(메인 지도 — 지도/현장 탭과
+     완전히 같은 인스턴스)는 그 오른쪽 나머지 전체 영역을 채운다. #site-detail-panel은 경로
+     탭에서 쓰지 않으므로 계속 숨긴다. */
+  #app[data-pc-tab="route"] #site-list-panel,#app[data-pc-tab="route"] #site-detail-panel{display:none!important}
+  #app[data-pc-tab="route"] #mobile-view-route{display:block!important;position:absolute!important;left:calc(var(--side) + 12px)!important;right:auto!important;top:90px!important;bottom:20px!important;width:340px!important;overflow:auto!important;background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;box-sizing:border-box;z-index:20}
+  #app[data-pc-tab="route"] #map-container{right:12px!important}
   #admin-panel,#upload-panel,#supervision-panel,#site-notes-panel,#app-settings-panel{z-index:60}
-  @media(max-width:1450px){#view-approved{--side:190px}.pc-nav-btn{padding:0 12px}.pc-brand{padding-left:8px}.pc-brand span{font-size:13px}#site-list-panel{width:300px!important}#map-container{left:calc(var(--side) + 324px)!important;right:320px!important}#site-detail-panel{width:300px!important}.pc-global-search{width:520px}}
-  @media(max-width:1200px){#view-approved{--side:176px}.pc-nav-btn{font-size:13px;gap:9px}#site-list-panel{width:280px!important}#map-container{left:calc(var(--side) + 304px)!important;right:292px!important}#site-detail-panel{width:272px!important}}
+  @media(max-width:1450px){#view-approved{--side:190px}.pc-nav-btn{padding:0 12px}.pc-brand{padding-left:8px}.pc-brand span{font-size:13px}#site-list-panel{width:300px!important}#map-container{left:calc(var(--side) + 324px)!important;right:320px!important}#site-detail-panel{width:300px!important}.pc-global-search{width:520px}#app[data-pc-tab="route"] #mobile-view-route{width:300px!important}#app[data-pc-tab="route"] #map-container{right:12px!important}}
+  @media(max-width:1200px){#view-approved{--side:176px}.pc-nav-btn{font-size:13px;gap:9px}#site-list-panel{width:280px!important}#map-container{left:calc(var(--side) + 304px)!important;right:292px!important}#site-detail-panel{width:272px!important}#app[data-pc-tab="route"] #mobile-view-route{width:280px!important}#app[data-pc-tab="route"] #map-container{right:12px!important}}
 }
 
 
@@ -3229,7 +3236,9 @@
   .sv-manager-empty{ padding:20px 4px;text-align:center;color:#61779c;font-size:13px; }
 
   /* 경로 만들기 화면: 중앙 정렬된 단일 컬럼 레이아웃 */
-  #mobile-route-content{ width:100%;max-width:640px;margin:0 auto; }
+  /* STEP16.36: 경로 만들기 박스가 이제 좌측 고정폭 컬럼(#mobile-view-route) 안에 들어가므로
+     내부 콘텐츠는 그 폭을 그대로 채운다(이전의 640px 중앙 정렬 컬럼 스타일은 제거). */
+  #mobile-route-content{ width:100%; }
   .route-start-card{
     background:#fff;border:1px solid #e1eaf6;border-radius:10px;
     box-shadow:0 1px 3px rgba(15,23,42,0.05);padding:16px;margin-bottom:14px;
