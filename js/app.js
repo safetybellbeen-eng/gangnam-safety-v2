@@ -548,7 +548,13 @@ function activatePcTab(tab) {
     // 원래 자리로 되돌려 지도 탭 필터 줄이 비어 보이지 않게 한다.
     restorePcSiteFiltersToRow();
   }
-  if ((tab === 'map' || tab === 'route') && state.map && typeof state.map.relayout === 'function') {
+  // STEP16.37: 경로 탭은 위 activateMobileTab(tab) 안에서 이미 relayout()+setCenter() 후
+  // renderMobileRouteView()가 setBounds()까지 호출해 지도를 올바른 위치/줌으로 맞춰둔다.
+  // 그 뒤에 여기서 relayout()을 한 번 더(다음 프레임에) 걸면 setBounds 직후의 지도를
+  // 다시 흔들어 "지도가 나왔다 안 나왔다" 하는 깜빡임의 원인이 되므로, 이 지연 relayout은
+  // 지도 탭에만 적용한다(경로 탭은 적용하지 않음 — 지도 탭은 setBounds를 호출하지 않아
+  // 이 보정이 여전히 필요하다).
+  if (tab === 'map' && state.map && typeof state.map.relayout === 'function') {
     requestAnimationFrame(() => state.map.relayout());
   }
 }
