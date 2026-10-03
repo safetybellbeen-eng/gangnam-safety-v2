@@ -916,7 +916,7 @@ export function clearRouteSelectionOnMainMap() {
   routeSelectionMarkers = [];
 }
 
-export function renderRouteSelectionOnMainMap(currentLocation, orderedSites, onMarkerClick) {
+export function renderRouteSelectionOnMainMap(currentLocation, orderedSites, onMarkerClick, showLabels) {
   if (!state.map) return;
   clearRouteSelectionOnMainMap();
 
@@ -952,6 +952,24 @@ export function renderRouteSelectionOnMainMap(currentLocation, orderedSites, onM
     }
     marker.setMap(state.map);
     routeSelectionMarkers.push(marker);
+
+    // 사용자 요청: "지도에 현장명 표시" 토글이 켜져 있을 때만 번호 핀 위에 이름 라벨을 얹는다.
+    // CustomOverlay도 Marker와 동일하게 setMap()을 가지고 있어 routeSelectionMarkers 배열에
+    // 함께 넣어두면 clearRouteSelectionOnMainMap()이 그대로 지워준다(별도 정리 로직 불필요).
+    if (showLabels) {
+      const labelEl = document.createElement('div');
+      labelEl.className = 'route-marker-label';
+      labelEl.textContent = site.site_name || site.company_name || '';
+      const labelOverlay = new kakao.maps.CustomOverlay({
+        position,
+        content: labelEl,
+        yAnchor: 2.2,
+        zIndex: 501
+      });
+      labelOverlay.setMap(state.map);
+      routeSelectionMarkers.push(labelOverlay);
+    }
+
     bounds.extend(position);
     hasPoint = true;
   });
