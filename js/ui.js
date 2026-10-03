@@ -2,7 +2,7 @@
 // XSS 방지: DB 값(site_name/company_name/address 등)은 innerHTML 문자열 조립에 쓰지 않고
 // 전부 textContent 또는 createElement 기반 DOM 생성으로만 넣는다.
 import { state } from './state.js';
-import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight, refreshFavoriteMarker, initRouteMap, relayoutRouteMap, renderRouteMarkers, panToRouteSite, searchPlacesKeyword, showAddressSearchPin, clearAddressSearchPin, assignDongToSites } from './map.js';
+import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight, refreshFavoriteMarker, initRouteMap, relayoutRouteMap, renderRouteMarkers, panToRouteSite, searchPlacesKeyword, showAddressSearchPin, clearAddressSearchPin, assignDongToSites, renderHqMarkerOnRouteMap, renderRouteSelectionOnMainMap, clearRouteSelectionOnMainMap } from './map.js';
 import { getFilteredSortedSites, getDongOptions, loadActiveSites } from './sites.js';
 import { isFavorite, toggleFavorite, loadFavorites, addFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote, loadNotes } from './notes.js';
@@ -2284,6 +2284,7 @@ async function setupRouteMiniMap(mapContainerId, orderedSites) {
     await initRouteMap(mapContainerId, center);
     relayoutRouteMap(mapContainerId);
     renderRouteMarkers(mapContainerId, state.currentLocation, orderedSites);
+    renderHqMarkerOnRouteMap(mapContainerId); // 사용자 요청: 경로 탭 지도에도 지청(서울강남지청) 핀 표시.
   } catch (e) {
     console.error('경로 지도 초기화 실패:', e);
   }
@@ -2543,6 +2544,14 @@ export function renderMobileRouteView(containerId) {
       renderMobileRouteView(containerId);
     });
     container.appendChild(clearBtn);
+  }
+
+  // STEP16.36(PC 전용): "경로 만들기" 화면을 다시 그릴 때마다(현장 추가/삭제/순서변경/출발지 변경)
+  // 메인 지도 위 번호 핀도 함께 갱신해, 현장을 고를 때마다 지도에 실시간으로 핀이 찍히는 걸
+  // 볼 수 있게 한다. 모바일은 이 화면을 작은 박스로만 쓰고 메인 지도(#map-container)를 전혀
+  // 보여주지 않으므로, isMobileViewport()로 모바일을 완전히 제외해 모바일 동작/화면은 그대로 둔다.
+  if (!isMobileViewport()) {
+    renderRouteSelectionOnMainMap(state.currentLocation, selectedSites, (siteId) => selectSite(siteId));
   }
 }
 
