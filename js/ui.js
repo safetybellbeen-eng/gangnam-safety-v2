@@ -2627,6 +2627,7 @@ export function openRouteDetailPanel() {
   if (!panel) return;
   routeDetailViewSiteIds = [...state.routePlanSiteIds];
   panel.style.display = 'block';
+  panel.classList.add('is-open');
   renderRouteDetailPanel('route-detail-panel');
 }
 
@@ -2726,7 +2727,7 @@ export async function renderRouteDetailPanel(containerId) {
   container.innerHTML = '';
 
   const { header, backBtn } = buildSettingsSubHeader('경로 상세');
-  backBtn.addEventListener('click', () => { container.style.display = 'none'; });
+  backBtn.addEventListener('click', () => { container.style.display = 'none'; container.classList.remove('is-open'); });
   container.appendChild(header);
 
   // STEP16.18: 다른 경로로 이 패널이 직접 열린 경우(예: 새로고침 복원)를 대비한 안전장치.
