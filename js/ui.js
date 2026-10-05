@@ -227,6 +227,13 @@ async function handleFavoriteToggle(siteId, triggerBtn) {
     heroFavBtn.classList.toggle('is-favorite', nowFavorite);
     heroFavBtn.setAttribute('aria-label', nowFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가');
   }
+
+  // STEP16.45(즐겨찾기 탭): 이 탭은 getFilteredSortedSites()가 즐겨찾기만 걸러 보여주므로,
+  // 별표를 해제하면 표 행뿐 아니라 우측 미니맵 핀도 함께 사라져야 한다 — renderSiteList()가
+  // marker 재렌더 + renderPcSiteTable() 재렌더를 함께 해주는 기존 패턴을 그대로 재사용한다.
+  if (document.getElementById('app')?.dataset.pcTab === 'favorite') {
+    renderSiteList('site-list');
+  }
 }
 
 // 상세 패널에 개인 메모 섹션(제목/textarea/저장/삭제)을 추가한다.
@@ -1310,8 +1317,10 @@ export function renderPcSiteTable() {
   // (현재 보이지도 않는) 현장 탭 표 쪽으로 옮겨버려 — 지도탭에서 아무 현장이나 클릭하는 순간
   // 필터 칩 줄이 통째로 사라지는 현상(탭을 다시 전환해야만 복구됨)이 발생했다. 현장 탭이 실제
   // 활성 탭일 때만 표를 그리고 필터를 옮기도록 막는다.
+  // STEP16.45: 즐겨찾기 탭도 이 표를 그대로 재사용한다(사용자 시안 요청) — getFilteredSortedSites()가
+  // state.mobileActiveTab==='favorite'일 때 이미 즐겨찾기만 돌려주므로 별도 필터링은 필요 없다.
   const activeTab = document.getElementById('app')?.dataset.pcTab;
-  if (!body || !panel || isMobileViewport() || activeTab !== 'site') return;
+  if (!body || !panel || isMobileViewport() || (activeTab !== 'site' && activeTab !== 'favorite')) return;
 
   const rows = getFilteredSortedSites();
   const pageCount = Math.max(1, Math.ceil(rows.length / pcSiteTablePageSize));

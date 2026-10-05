@@ -540,7 +540,8 @@ function activatePcTab(tab) {
 
   // 기존 모바일 탭 전환 함수가 가진 필터/즐겨찾기/경로 렌더 로직을 그대로 재사용한다.
   activateMobileTab(tab);
-  if (tab === 'site') {
+  // STEP16.45: 즐겨찾기 탭도 "현장" 탭과 같은 표(검색/필터/정렬/페이지네이션)를 재사용한다.
+  if (tab === 'site' || tab === 'favorite') {
     renderPcSiteTable();
   } else {
     // 버그 수정(2026-10): 현장 탭에서 실제 필터 <details>를 #pc-site-table-filters로
@@ -643,6 +644,14 @@ function bindPcWorkspace() {
   const pcFavoriteFilter = document.getElementById('pc-favorite-filter-btn');
   if (pcFavoriteFilter) {
     pcFavoriteFilter.addEventListener('click', () => activatePcTab('favorite'));
+  }
+
+  // STEP16.45(즐겨찾기 탭 시안): 미니맵 위 "지도에서 보기" — 지도 탭으로 전환한다. state.favoriteOnly는
+  // 건드리지 않으므로(사용자가 지도 탭의 즐겨찾기 필터를 따로 켜둔 상태였다면 그대로 유지) 즐겨찾기
+  // 탭에서 보던 핀들을 지도 탭에서도 계속 즐겨찾기만 볼지는 기존 필터 토글(⭐)로 사용자가 정한다.
+  const pcFavoriteMapViewBtn = document.getElementById('pc-favorite-map-view-btn');
+  if (pcFavoriteMapViewBtn) {
+    pcFavoriteMapViewBtn.addEventListener('click', () => activatePcTab('map'));
   }
 
   const pcSiteSearch = document.getElementById('pc-site-table-search-input');

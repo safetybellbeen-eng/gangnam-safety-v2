@@ -829,24 +829,47 @@ export function relayoutRouteMap(containerId) {
   entry.map.relayout();
 }
 
-// STEP16.43: 메인 지도(state.map)에서는 "relayout() 호출 후 반드시 setCenter/setBounds로
-// 중심을 다시 잡아줘야 타일이 흰 화면으로 남지 않는다"(STEP16.37/39, Kakao 공식 가이드와도
-// 일치)는 패턴을 쓰는데, 경로 미니맵에는 이 보정이 빠져 있었다. "새로고침" 버튼에서 쓴다.
+// STEP16.44: STEP16.43에서 "relayout() 후 setCenter(현재와 같은 좌표)"로 고쳤지만 실기기에서
+// 여전히 "새로고침"/"지도 초기화" 둘 다 안 먹힌다는 보고가 있었다. 실제 Kakao Maps SDK는
+// setCenter()에 "지도가 이미 갖고 있는 것과 같은(또는 사실상 같은) 좌표"를 주면 내부적으로
+// 변경이 없다고 보고 다시 그리기(repaint)를 생략하는 것으로 보인다 — 그래서 자기 자신의
+// getCenter()를 그대로 되돌려주거나(새로고침), 지도가 이미 GANGNAM_CENTER 근처였던 경우
+// (초기화) 모두 "아무 효과 없음"으로 보였다. 반대로 실제로 다른 좌표로 panTo()한 "현재 위치"
+// 버튼만 확실히 동작했다는 것이 단서 — 좌표가 "달라져야" Kakao가 다시 그린다.
+// 해결책: relayout() 직후 좌표를 아주 조금 옮겼다가(nudge) 바로 원래 좌표로 되돌린다. 이러면
+// 목표 좌표가 항상 현재 좌표와 달라서 Kakao가 반드시 내부 상태를 다시 계산·리페인트한다
+// (한국 Kakao Maps 개발자 커뮤니티에 알려진 relayout 이후 빈 화면 보정 우회법과 동일).
+function forceRepaint(map, targetLatLng) {
+  const nudged = new kakao.maps.LatLng(targetLatLng.getLat() + 0.0001, targetLatLng.getLng() + 0.0001);
+  map.setCenter(nudged);
+  map.setCenter(targetLatLng);
+}
+
+// "새로고침": 지도가 간헐적으로 빈 화면(흰 타일)인 경우를 위한 수동 복구. 마커는 그대로 두고
+// relayout() + (현재 중심으로) 강제 리페인트만 한다.
 export function refreshRouteMap(containerId) {
   const entry = routeMaps.get(containerId);
   if (!entry) return;
-  entry.map.relayout();
-  entry.map.setCenter(entry.map.getCenter());
+  try {
+    entry.map.relayout();
+    forceRepaint(entry.map, entry.map.getCenter());
+  } catch (e) {
+    console.error('경로 미니맵 새로고침 실패:', e);
+  }
 }
 
 // "지도 초기화": 마커 bounds 계산(좌표가 전부 없는 경우 등)과 무관하게 항상 강남구 기본
-// 중심/배율로 복귀할 수 있는 하드 리셋. relayout()도 함께 걸어 빈 화면 상태에서도 쓸 수 있다.
+// 중심/배율로 복귀할 수 있는 하드 리셋. relayout() + 강제 리페인트도 함께 건다.
 export function resetRouteMapView(containerId) {
   const entry = routeMaps.get(containerId);
   if (!entry) return;
-  entry.map.relayout();
-  entry.map.setLevel(DEFAULT_LEVEL);
-  entry.map.setCenter(new kakao.maps.LatLng(GANGNAM_CENTER.lat, GANGNAM_CENTER.lng));
+  try {
+    entry.map.relayout();
+    entry.map.setLevel(DEFAULT_LEVEL);
+    forceRepaint(entry.map, new kakao.maps.LatLng(GANGNAM_CENTER.lat, GANGNAM_CENTER.lng));
+  } catch (e) {
+    console.error('경로 미니맵 초기화 실패:', e);
+  }
 }
 
 export function clearRouteMarkers(containerId) {
@@ -878,7 +901,12 @@ export function centerRouteMapOnLocation(containerId, lat, lng) {
   const entry = routeMaps.get(containerId);
   if (!entry) return;
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-  entry.map.panTo(new kakao.maps.LatLng(lat, lng));
+  try {
+    entry.map.relayout();
+    entry.map.panTo(new kakao.maps.LatLng(lat, lng));
+  } catch (e) {
+    console.error('경로 미니맵 현재 위치 이동 실패:', e);
+  }
 }
 
 // currentLocation({lat,lng}|null)과 orderedSites(방문 순서대로 정렬된, 좌표가 유효한 사업장 배열)로
@@ -928,7 +956,11 @@ export function renderRouteMarkers(containerId, currentLocation, orderedSites, o
   });
 
   if (hasPoint) {
-    entry.map.setBounds(bounds, 40, 40, 40, 40);
+    try {
+      entry.map.setBounds(bounds, 40, 40, 40, 40);
+    } catch (e) {
+      console.error('경로 미니맵 범위(setBounds) 설정 실패:', e);
+    }
   }
 }
 
