@@ -92,6 +92,45 @@ function buildKakaoDirectionsUrl(name, lat, lng) {
   return `https://map.kakao.com/link/to/${safeName},${lat},${lng}`;
 }
 
+// 사용자 요청(경로 상세 "목록 복사"): 순서·현장명·주소를 텍스트로 클립보드에 복사한다.
+// 최신 Clipboard API를 우선 쓰고, 사용할 수 없는 환경(권한 거부/비보안 컨텍스트 등)이면
+// 숨겨진 textarea + execCommand('copy')로 대체한다. 버튼 텍스트를 잠깐 "복사됨"으로 바꿔
+// 성공 여부를 알려준다(별도 toast 컴포넌트를 새로 만들지 않음).
+function copyRouteListToClipboard(btn, selectedSites) {
+  const lines = selectedSites.map((site, index) => `${index + 1}. ${site.site_name || site.company_name || '-'} - ${displayValue(site.address)}`);
+  const text = lines.join('\n');
+
+  function showCopied(ok) {
+    if (!btn) return;
+    const original = btn.textContent;
+    btn.textContent = ok ? '복사됨' : '복사 실패';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  }
+
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    navigator.clipboard.writeText(text).then(() => showCopied(true)).catch(() => fallbackCopy(text, showCopied));
+  } else {
+    fallbackCopy(text, showCopied);
+  }
+}
+
+function fallbackCopy(text, onDone) {
+  try {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    onDone(ok);
+  } catch (e) {
+    onDone(false);
+  }
+}
+
 function isValidSiteCoord(site) {
   const rawLat = site.lat;
   const rawLng = site.lng;
@@ -105,6 +144,35 @@ function isValidSiteCoord(site) {
     lat >= -90 && lat <= 90 &&
     lng >= -180 && lng <= 180
   );
+}
+
+// 사용자 요청(경로 탭 "총 이동거리"): 실제 도로 경로 API 없이도 바로 계산 가능한 직선거리
+// (Haversine 공식)만 쓴다 — 추정 소요시간은 속도 가정이 들어간 가짜 데이터가 되므로 넣지 않는다.
+function haversineDistanceKm(lat1, lng1, lat2, lng2) {
+  const R = 6371; // 지구 평균 반지름(km)
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// 출발지 -> 현장1 -> 현장2 -> ... 순서대로 직선거리를 더한 합계(km). 좌표가 없는 현장은
+// 건너뛴다(그 구간만 계산에서 빠짐 — 전체를 포기하지 않음). 합산할 구간이 하나도 없으면 null.
+function computeRouteTotalDistanceKm(currentLocation, orderedSites) {
+  const points = [];
+  if (currentLocation && Number.isFinite(currentLocation.lat) && Number.isFinite(currentLocation.lng)) {
+    points.push({ lat: currentLocation.lat, lng: currentLocation.lng });
+  }
+  (orderedSites || []).forEach((site) => {
+    if (isValidSiteCoord(site)) points.push({ lat: Number(site.lat), lng: Number(site.lng) });
+  });
+  if (points.length < 2) return null;
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    total += haversineDistanceKm(points[i - 1].lat, points[i - 1].lng, points[i].lat, points[i].lng);
+  }
+  return total;
 }
 
 // 사용자 요청(경로 탭 "+ 현장 검색" 정확도 필터): renderDetail()의 QUALITY_BADGE_MAP과 동일한
@@ -2076,6 +2144,7 @@ function saveRoutePlanState() {
     currentLocation: state.currentLocation,
     currentLocationAddress: state.currentLocationAddress,
     routeStartMode: state.routeStartMode,
+    visitedIds: Array.from(routeVisitedSiteIds),
   };
   try { localStorage.setItem(key, JSON.stringify(payload)); } catch (e) { /* 저장 불가 환경은 조용히 무시 */ }
 }
@@ -2100,6 +2169,9 @@ export function restoreRoutePlanFromStorage() {
     if (saved.routeStartMode === 'gps' || saved.routeStartMode === 'manual') {
       state.routeStartMode = saved.routeStartMode;
     }
+    if (Array.isArray(saved.visitedIds)) {
+      routeVisitedSiteIds = new Set(saved.visitedIds.filter(id => typeof id === 'string' || typeof id === 'number'));
+    }
   } catch (e) {
     // 저장된 값이 손상된 경우 조용히 무시하고 기본(빈) 상태로 시작한다.
   }
@@ -2108,16 +2180,36 @@ export function restoreRoutePlanFromStorage() {
 // "경로 만들기"/"방문 순서" 화면에서 공용으로 쓰는 선택 현장 카드(번호+이름/주소+드래그
 // 손잡이+삭제). showWarnOnly가 아니라 항상 좌표 없는 현장에는 안내문을 보여준다(§31 —
 // 좌표 없는 현장은 지도에는 못 그리지만 목록/순서에서는 빠지지 않는다).
-function buildRouteSiteCard(site, index, onDelete) {
+function buildRouteSiteCard(site, index, onDelete, onToggleVisited) {
   const card = document.createElement('div');
   card.className = 'route-site-card';
   card.dataset.dragId = String(site.id);
+  if (routeVisitedSiteIds.has(site.id)) card.classList.add('route-site-card--visited');
 
   const handle = document.createElement('span');
   handle.className = 'route-drag-handle';
   handle.setAttribute('aria-label', '순서 변경');
   handle.textContent = '☰';
   card.appendChild(handle);
+
+  // 사용자 요청(PC 전용): "오늘 방문 완료" 표시만 하는 가벼운 체크(날짜별 이력 저장 아님).
+  // CSS가 기본 display:none이고 PC(min-width:769px)에서만 보이게 하므로(css/desktop.css
+  // 참고) 모바일 화면/동작에는 영향이 없다.
+  const visitedLabel = document.createElement('label');
+  visitedLabel.className = 'route-site-visited-toggle';
+  visitedLabel.title = '오늘 방문 완료';
+  const visitedCheckbox = document.createElement('input');
+  visitedCheckbox.type = 'checkbox';
+  visitedCheckbox.checked = routeVisitedSiteIds.has(site.id);
+  visitedCheckbox.addEventListener('click', (e) => e.stopPropagation());
+  visitedCheckbox.addEventListener('change', () => {
+    if (visitedCheckbox.checked) routeVisitedSiteIds.add(site.id);
+    else routeVisitedSiteIds.delete(site.id);
+    card.classList.toggle('route-site-card--visited', visitedCheckbox.checked);
+    if (typeof onToggleVisited === 'function') onToggleVisited();
+  });
+  visitedLabel.appendChild(visitedCheckbox);
+  card.appendChild(visitedLabel);
 
   const numberBadge = document.createElement('span');
   numberBadge.className = 'route-site-number';
@@ -2196,6 +2288,19 @@ function openSitePickerSheet(onConfirm) {
   searchRow.appendChild(qualitySelect);
   sheet.appendChild(searchRow);
 
+  // 사용자 요청(PC 전용): 즐겨찾기 현장만 먼저 보고 고를 수 있게 하는 토글. 이미 있는
+  // favorites.js의 isFavorite()만 그대로 재사용하고 새 데이터는 만들지 않는다. CSS가 기본
+  // display:none이고 PC에서만 보이게 하므로 모바일 화면/동작에는 영향이 없다.
+  const favoriteOnlyRow = document.createElement('label');
+  favoriteOnlyRow.className = 'route-picker-favorite-only';
+  const favoriteOnlyCheckbox = document.createElement('input');
+  favoriteOnlyCheckbox.type = 'checkbox';
+  favoriteOnlyRow.appendChild(favoriteOnlyCheckbox);
+  const favoriteOnlyText = document.createElement('span');
+  favoriteOnlyText.textContent = '즐겨찾기만';
+  favoriteOnlyRow.appendChild(favoriteOnlyText);
+  sheet.appendChild(favoriteOnlyRow);
+
   const listWrap = document.createElement('div');
   listWrap.className = 'route-picker-list';
   sheet.appendChild(listWrap);
@@ -2221,6 +2326,7 @@ function openSitePickerSheet(onConfirm) {
         if (!matches) return false;
       }
       if (qualityFilter !== 'all' && siteQualityGroup(s) !== qualityFilter) return false;
+      if (favoriteOnlyCheckbox.checked && !isFavorite(s.id)) return false;
       return true;
     });
     // STEP16.16: 즐겨찾기 현장을 목록 맨 위로 정렬한다. 같은 그룹(즐겨찾기/일반) 안에서는
@@ -2284,6 +2390,7 @@ function openSitePickerSheet(onConfirm) {
   updateConfirmLabel();
   searchInput.addEventListener('input', () => renderOptions(searchInput.value));
   qualitySelect.addEventListener('change', () => renderOptions(searchInput.value));
+  favoriteOnlyCheckbox.addEventListener('change', () => renderOptions(searchInput.value));
 
   confirmBtn.addEventListener('click', () => {
     onConfirm(Array.from(draftSelected));
@@ -2460,6 +2567,32 @@ export function renderMobileRouteView(containerId) {
 
   const selectedSites = getRoutePlanSites();
 
+  // 사용자 요청(PC 전용, 화면이 좁을 때 지도를 더 넓게): 좌측 패널 접기/펼치기 버튼. CSS가
+  // 기본 display:none이고 PC의 1200px 이하 구간에서만 보이게 하므로(css/desktop.css) 모바일
+  // 화면/동작에는 영향이 없다. 접힌 동안에도 지도 위 핀/HQ 마커는 그대로 유지되고, 펼 때
+  // relayout()+재배치로 지도만 다시 맞춘다(선택/출발지 등 다른 상태는 건드리지 않음).
+  const collapseBtn = document.createElement('button');
+  collapseBtn.type = 'button';
+  collapseBtn.className = 'route-panel-collapse-btn';
+  collapseBtn.setAttribute('aria-label', routePanelCollapsed ? '패널 펼치기' : '패널 접기');
+  collapseBtn.textContent = routePanelCollapsed ? '›' : '‹';
+  collapseBtn.addEventListener('click', () => {
+    routePanelCollapsed = !routePanelCollapsed;
+    const appEl = document.getElementById('app');
+    if (appEl) {
+      if (routePanelCollapsed) appEl.setAttribute('data-route-collapsed', 'true');
+      else appEl.removeAttribute('data-route-collapsed');
+    }
+    renderMobileRouteView(containerId);
+    if (!isMobileViewport() && state.map && typeof state.map.relayout === 'function') {
+      requestAnimationFrame(() => {
+        state.map.relayout();
+        renderRouteSelectionOnMainMap(state.currentLocation, getRoutePlanSites(), (siteId) => selectSite(siteId), routeShowMarkerLabels);
+      });
+    }
+  });
+  container.appendChild(collapseBtn);
+
   // 출발지
   const startCard = document.createElement('div');
   startCard.className = 'route-start-card';
@@ -2553,8 +2686,9 @@ export function renderMobileRouteView(containerId) {
     selectedSites.forEach((site, index) => {
       listEl.appendChild(buildRouteSiteCard(site, index, () => {
         state.routePlanSiteIds = state.routePlanSiteIds.filter(id => id !== site.id);
+        routeVisitedSiteIds.delete(site.id);
         renderMobileRouteView(containerId);
-      }));
+      }, () => saveRoutePlanState()));
     });
     container.appendChild(listEl);
 
@@ -2562,6 +2696,17 @@ export function renderMobileRouteView(containerId) {
       state.routePlanSiteIds = mapDragOrderToIds(newOrderIds, selectedSites);
       renderMobileRouteView(containerId);
     });
+  }
+
+  // 사용자 요청(PC 전용): "총 이동거리 약 N km" — 직선거리(Haversine) 합산만 쓰고, 실제 도로
+  // 경로 API 없이 추정 소요시간 같은 가짜 데이터는 만들지 않는다. CSS가 기본 display:none이고
+  // PC에서만 보이게 하므로 모바일 화면에는 영향이 없다.
+  const totalDistanceKm = computeRouteTotalDistanceKm(state.currentLocation, selectedSites);
+  if (totalDistanceKm !== null) {
+    const distanceEl = document.createElement('p');
+    distanceEl.className = 'route-total-distance';
+    distanceEl.textContent = `총 이동거리 약 ${totalDistanceKm.toFixed(1)}km (직선거리 기준)`;
+    container.appendChild(distanceEl);
   }
 
   // 경로 보기(선택 현장과 출발지가 모두 있어야 활성화).
@@ -2684,6 +2829,16 @@ let routeDetailViewSiteIds = null;
 // 않고(가짜 영속성 필요 없음), 이 모듈 변수에만 보관한다. 모바일은 이 값을 전혀 쓰지 않는다
 // (렌더 쪽 isMobileViewport() 가드가 이미 모바일에서는 메인 지도 자체를 건드리지 않음).
 let routeShowMarkerLabels = false;
+
+// 사용자 요청(경로 카드 "방문 완료" 체크): 서버/DB 변경 없이 이 기기에만 저장하는 가벼운
+// 표시 상태다(날짜별 방문 이력 관리가 아니라 "오늘 다니면서 체크"하는 용도). restoreRoutePlanFromStorage/
+// saveRoutePlanState가 다른 경로 상태와 함께 저장·복원한다. 모바일은 CSS로 체크박스 자체가
+// 보이지 않으므로(아래 .route-site-visited-toggle) 값은 존재해도 켜고 끌 UI가 없다.
+let routeVisitedSiteIds = new Set();
+
+// 사용자 요청(PC 전용, 좁은 화면에서 좌측 패널 접기): 새로고침 시 펼친 상태로 돌아가도 무방한
+// 가벼운 화면 상태라 저장하지 않는다.
+let routePanelCollapsed = false;
 
 function sitesFromIds(ids) {
   return ids.map(id => state.sites.find(s => s.id === id)).filter(Boolean);
@@ -2812,10 +2967,32 @@ export async function renderRouteDetailPanel(containerId) {
     return;
   }
 
+  // 사용자 요청(PC 전용): 순서·현장명·주소를 텍스트로 클립보드에 복사(카톡/메모장에 바로
+  // 붙여넣기용). CSS가 기본 display:none이고 PC에서만 보이게 하므로 모바일에는 영향이 없다.
+  const copyBtn = document.createElement('button');
+  copyBtn.type = 'button';
+  copyBtn.className = 'route-copy-list-btn';
+  copyBtn.textContent = '목록 복사';
+  copyBtn.addEventListener('click', () => copyRouteListToClipboard(copyBtn, selectedSites));
+  header.appendChild(copyBtn);
+
+  // STEP16.40(PC 전용): 안내문과 "총 이동거리"를 한 그리드 영역("note")에 같이 담기 위해
+  // 하나의 래퍼로 묶는다(두 요소 모두 grid-area:note를 직접 쓰면 같은 칸에서 겹쳐 보인다).
+  const noteWrap = document.createElement('div');
+  noteWrap.className = 'route-detail-note-wrap';
   const noteEl = document.createElement('p');
   noteEl.className = 'route-order-note';
-  noteEl.textContent = '실제 도로 경로와 이동 거리·소요 시간은 제공되지 않습니다. 현장별로 카카오맵 길찾기를 이용해주세요.';
-  container.appendChild(noteEl);
+  noteEl.textContent = '실제 도로 경로와 소요 시간은 제공되지 않습니다(총 이동거리는 직선거리 기준 참고값). 현장별로 카카오맵 길찾기를 이용해주세요.';
+  noteWrap.appendChild(noteEl);
+
+  const totalDistanceKm = computeRouteTotalDistanceKm(state.currentLocation, selectedSites);
+  if (totalDistanceKm !== null) {
+    const distanceEl = document.createElement('p');
+    distanceEl.className = 'route-total-distance';
+    distanceEl.textContent = `총 이동거리 약 ${totalDistanceKm.toFixed(1)}km (직선거리 기준)`;
+    noteWrap.appendChild(distanceEl);
+  }
+  container.appendChild(noteWrap);
 
   const mapWrap = document.createElement('div');
   mapWrap.id = 'route-detail-map';
