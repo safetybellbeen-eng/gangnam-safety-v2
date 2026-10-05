@@ -829,6 +829,26 @@ export function relayoutRouteMap(containerId) {
   entry.map.relayout();
 }
 
+// STEP16.43: 메인 지도(state.map)에서는 "relayout() 호출 후 반드시 setCenter/setBounds로
+// 중심을 다시 잡아줘야 타일이 흰 화면으로 남지 않는다"(STEP16.37/39, Kakao 공식 가이드와도
+// 일치)는 패턴을 쓰는데, 경로 미니맵에는 이 보정이 빠져 있었다. "새로고침" 버튼에서 쓴다.
+export function refreshRouteMap(containerId) {
+  const entry = routeMaps.get(containerId);
+  if (!entry) return;
+  entry.map.relayout();
+  entry.map.setCenter(entry.map.getCenter());
+}
+
+// "지도 초기화": 마커 bounds 계산(좌표가 전부 없는 경우 등)과 무관하게 항상 강남구 기본
+// 중심/배율로 복귀할 수 있는 하드 리셋. relayout()도 함께 걸어 빈 화면 상태에서도 쓸 수 있다.
+export function resetRouteMapView(containerId) {
+  const entry = routeMaps.get(containerId);
+  if (!entry) return;
+  entry.map.relayout();
+  entry.map.setLevel(DEFAULT_LEVEL);
+  entry.map.setCenter(new kakao.maps.LatLng(GANGNAM_CENTER.lat, GANGNAM_CENTER.lng));
+}
+
 export function clearRouteMarkers(containerId) {
   const entry = routeMaps.get(containerId);
   if (!entry) return;

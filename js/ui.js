@@ -2,7 +2,7 @@
 // XSS 방지: DB 값(site_name/company_name/address 등)은 innerHTML 문자열 조립에 쓰지 않고
 // 전부 textContent 또는 createElement 기반 DOM 생성으로만 넣는다.
 import { state } from './state.js';
-import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight, refreshFavoriteMarker, initRouteMap, relayoutRouteMap, renderRouteMarkers, panToRouteSite, searchPlacesKeyword, showAddressSearchPin, clearAddressSearchPin, assignDongToSites, renderHqMarkerOnRouteMap, renderRouteSelectionOnMainMap, clearRouteSelectionOnMainMap, destroyRouteMap, centerRouteMapOnLocation } from './map.js';
+import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight, refreshFavoriteMarker, initRouteMap, relayoutRouteMap, renderRouteMarkers, panToRouteSite, searchPlacesKeyword, showAddressSearchPin, clearAddressSearchPin, assignDongToSites, renderHqMarkerOnRouteMap, renderRouteSelectionOnMainMap, clearRouteSelectionOnMainMap, destroyRouteMap, centerRouteMapOnLocation, refreshRouteMap, resetRouteMapView } from './map.js';
 import { getFilteredSortedSites, getDongOptions, loadActiveSites } from './sites.js';
 import { isFavorite, toggleFavorite, loadFavorites, addFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote, loadNotes } from './notes.js';
@@ -2424,6 +2424,14 @@ async function setupRouteMiniMap(mapContainerId, orderedSites) {
     relayoutRouteMap(mapContainerId);
     renderRouteMarkers(mapContainerId, state.currentLocation, orderedSites);
     renderHqMarkerOnRouteMap(mapContainerId); // 사용자 요청: 경로 탭 지도에도 지청(서울강남지청) 핀 표시.
+    // STEP16.43: 패널이 화면에 보이게 되는 것(.is-open 클래스 추가)과 같은 틱에 지도를
+    // 만들면, 레이아웃이 실제로 자리잡기 전 크기 기준으로 타일이 그려져 "지도가 안나와/
+    // 경로표시도 안나와" 상태로 남을 수 있다(메인 지도의 STEP16.37/39와 동일한 증상) —
+    // 다음 애니메이션 프레임에 relayout + 마커 재배치를 한 번 더 걸어 보정한다.
+    requestAnimationFrame(() => {
+      relayoutRouteMap(mapContainerId);
+      renderRouteMarkers(mapContainerId, state.currentLocation, orderedSites);
+    });
   } catch (e) {
     console.error('경로 지도 초기화 실패:', e);
   }
@@ -3017,7 +3025,14 @@ export async function renderRouteDetailPanel(containerId) {
   miniLocBtn.innerHTML = '⌖ <span>현재 위치</span>';
   miniLocBtn.addEventListener('click', async () => {
     if (state.currentLocation && Number.isFinite(state.currentLocation.lat) && Number.isFinite(state.currentLocation.lng)) {
+      // STEP16.43: 미니맵이 빈 화면(흰 타일)으로 남아있을 수도 있으므로, 이동 전에 먼저
+      // relayout + 중심 재설정으로 한 번 보정한다(아래 미니 새로고침과 동일 패턴).
+      refreshRouteMap('route-detail-map');
       centerRouteMapOnLocation('route-detail-map', state.currentLocation.lat, state.currentLocation.lng);
+      requestAnimationFrame(() => {
+        refreshRouteMap('route-detail-map');
+        centerRouteMapOnLocation('route-detail-map', state.currentLocation.lat, state.currentLocation.lng);
+      });
       return;
     }
     if (state.locationRequestInFlight) return;
@@ -3032,12 +3047,22 @@ export async function renderRouteDetailPanel(containerId) {
   });
   miniToolbar.appendChild(miniLocBtn);
 
+  // STEP16.43: "지도 초기화"/"새로고침" 둘 다, 메인 지도에서 이미 검증된 "relayout() 호출 후
+  // 반드시 setCenter/setBounds로 중심을 다시 잡아야 타일이 흰 화면으로 남지 않는다"는
+  // 패턴(STEP16.37/39)을 그대로 따른다 — 동기 1회 + 다음 애니메이션 프레임에 1회 더.
+  // "지도 초기화"는 마커 bounds 계산과 무관하게 항상 강남구 기본 중심/배율로 복귀하는
+  // 하드 리셋(resetRouteMapView)까지 먼저 건 뒤, 유효 좌표가 있으면 다시 bounds로 맞춘다.
   const miniResetBtn = document.createElement('button');
   miniResetBtn.type = 'button';
   miniResetBtn.className = 'route-detail-map-btn';
   miniResetBtn.innerHTML = '↻ <span>지도 초기화</span>';
   miniResetBtn.addEventListener('click', () => {
+    resetRouteMapView('route-detail-map');
     renderRouteMarkers('route-detail-map', state.currentLocation, selectedSites);
+    requestAnimationFrame(() => {
+      relayoutRouteMap('route-detail-map');
+      renderRouteMarkers('route-detail-map', state.currentLocation, selectedSites);
+    });
   });
   miniToolbar.appendChild(miniResetBtn);
 
@@ -3046,8 +3071,12 @@ export async function renderRouteDetailPanel(containerId) {
   miniRefreshBtn.className = 'route-detail-map-btn';
   miniRefreshBtn.innerHTML = '⟳ <span>새로고침</span>';
   miniRefreshBtn.addEventListener('click', () => {
-    relayoutRouteMap('route-detail-map');
+    refreshRouteMap('route-detail-map');
     renderRouteMarkers('route-detail-map', state.currentLocation, selectedSites);
+    requestAnimationFrame(() => {
+      refreshRouteMap('route-detail-map');
+      renderRouteMarkers('route-detail-map', state.currentLocation, selectedSites);
+    });
   });
   miniToolbar.appendChild(miniRefreshBtn);
 
