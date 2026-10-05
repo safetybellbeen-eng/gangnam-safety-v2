@@ -605,18 +605,20 @@
         <div class="pc-nav-sep pc-admin-sep"><span class="pc-nav-sep-label">관리자</span></div>
         <button class="pc-nav-btn pc-admin-only" data-pc-action="admin"><svg class="pc-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0M17 11v6M14 14h6"/></svg><span>회원관리</span></button>
         <button class="pc-nav-btn pc-admin-only" data-pc-action="upload"><svg class="pc-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v6c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 11v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg><span>사업장 관리</span></button>
-        <!-- 사용자 요청(2026-10): 모바일(PWA)로도 사용할 수 있다는 걸 알리기 위해 "사업장 관리"
-             메뉴 바로 아래에 모바일 접속용 QR코드를 넣는다. 문구는 짧게 "모바일 QR코드"만
-             보여주고, 이미지를 누르면 화면 중앙에 크게 확대해 보여주는 팝업이 뜬다
-             (#pc-qr-modal, js/app.js bindPcQrModal 참고). -->
+      </nav>
+      <div class="pc-nav-bottom">
+        <!-- 사용자 요청(2026-10): 모바일(PWA)로도 사용할 수 있다는 걸 알리기 위한 모바일 접속용
+             QR코드. 원래 "사업장 관리" 메뉴 아래(스크롤되는 .pc-nav 목록 안)에 있었으나, 사용자
+             요청으로 사이드바 제일 하단, "설정" 버튼 바로 위로 옮긴다(.pc-nav-bottom은 항상
+             사이드바 맨 아래에 고정되는 영역). 문구는 짧게 "모바일 QR코드"만 보여주고, 이미지를
+             누르면 화면 중앙에 크게 확대해 보여주는 팝업이 뜬다(#pc-qr-modal, js/app.js
+             bindPcQrModal 참고 — 이동 자체는 DOM 위치만 바뀐 것이라 그 로직은 그대로 동작한다). -->
         <div class="pc-mobile-qr-card">
           <button type="button" id="pc-mobile-qr-trigger" class="pc-mobile-qr-trigger" aria-label="QR코드 크게 보기">
             <img src="assets/icons/mobile-qr.png" alt="모바일 접속 QR코드" class="pc-mobile-qr-img">
           </button>
           <p class="pc-mobile-qr-text">모바일 QR코드</p>
         </div>
-      </nav>
-      <div class="pc-nav-bottom">
         <button class="pc-nav-btn" data-pc-action="settings"><svg class="pc-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1A7 7 0 0 0 15 6l-.3-2.6h-4L10.4 6A7 7 0 0 0 8.8 7L6.4 6l-2 3.4 2 1.5a7 7 0 0 0 0 2L4.4 14.5l2 3.4 2.4-1A7 7 0 0 0 10.4 18l.3 2.6h4L15 18a7 7 0 0 0 1.6-1l2.4 1 2-3.4-2-1.5a7 7 0 0 0 .1-1Z"/></svg><span>설정</span></button>
         <button class="pc-nav-btn" data-pc-action="logout"><svg class="pc-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4M9 12h9"/></svg><span>로그아웃</span></button>
       </div>
@@ -916,6 +918,11 @@
       <div id="pc-map-toolbar" aria-label="지도 도구">
         <button type="button" id="pc-map-current-location">⌖ <span>현재 위치</span></button>
         <button type="button" id="pc-map-reset">↻ <span>지도 초기화</span></button>
+        <!-- 사용자 요청(PC 전용): 지도가 간헐적으로 빈 화면(흰 타일)으로 남는 경우를 위한
+             수동 새로고침. "지도 초기화"(위치/줌만 되돌림)와 달리 relayout()을 다시 걸어
+             타일을 강제로 다시 그린다. 모바일에는 .pc-map-refresh-btn이 상단 기본 숨김
+             목록(css/desktop.css)에 있어 영향이 없다. -->
+        <button type="button" id="pc-map-refresh" class="pc-map-refresh-btn">⟳ <span>새로고침</span></button>
       </div>
       <!-- STEP15-E.1-2: 정확도 범례. #map-container 내부에 넣지만 Kakao Map은 이 컨테이너에
            자신의 지도/컨트롤 div를 추가만 할 뿐 기존 자식을 지우지 않으므로 안전하다(Kakao 자체
