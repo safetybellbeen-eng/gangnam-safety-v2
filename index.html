@@ -941,6 +941,11 @@
         <p class="pc-map-empty-state-title">표시할 현장이 없습니다</p>
         <p class="pc-map-empty-state-desc">검색어나 필터 조건을 확인해 보세요.</p>
       </div>
+      <!-- STEP16.45(즐겨찾기 탭 시안): 미니맵 위에 "즐겨찾기 현장" 범례 배지와 "지도에서 보기"
+           버튼. 기본 숨김(.pc-favorite-map-badge/.pc-favorite-map-view-btn, css/desktop.css 상단
+           top-level 목록)이고 즐겨찾기 탭에서만 보이므로 모바일/다른 탭에는 영향이 없다. -->
+      <div id="pc-favorite-map-badge" class="pc-favorite-map-badge">★ 즐겨찾기 현장</div>
+      <button type="button" id="pc-favorite-map-view-btn" class="pc-favorite-map-view-btn">⛶ <span>지도에서 보기</span></button>
     </div>
     <!-- PC STEP3: 현장 탭 전용 테이블. 모바일에서는 desktop.css 기본값으로 숨김. -->
     <section id="pc-site-table-panel" aria-label="현장 목록">
