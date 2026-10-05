@@ -1145,7 +1145,7 @@
 
 /* ===== PC 로그인 이후 업무화면 (2026-10) ===== */
 #pc-sidebar,#pc-app-header,#pc-page-heading{display:none}
-.pc-site-quality,.pc-site-row-meta,.site-detail-label-icon,.site-amount-filter-custom,.pc-site-accident-flag,.pc-map-empty-state,.pc-site-quality-row,.route-picker-quality-filter,.route-label-toggle,.route-site-visited-toggle,.route-total-distance,.route-copy-list-btn,.route-picker-favorite-only,.route-panel-collapse-btn,.pc-map-refresh-btn,.route-detail-map-toolbar{display:none}
+.pc-site-quality,.pc-site-row-meta,.site-detail-label-icon,.site-amount-filter-custom,.pc-site-accident-flag,.pc-map-empty-state,.pc-site-quality-row,.route-picker-quality-filter,.route-label-toggle,.route-site-visited-toggle,.route-total-distance,.route-copy-list-btn,.route-picker-favorite-only,.route-panel-collapse-btn,.pc-map-refresh-btn,.route-detail-map-toolbar,.pc-favorite-map-badge,.pc-favorite-map-view-btn{display:none}
 @media (min-width:769px){
   #view-approved{--side:220px;--head:70px;--ink:#08265f;--blue:#0b63f6;--line:#d9e5f5;--soft:#f5f9ff;position:fixed!important;inset:0!important;overflow:hidden;background:#f8fbff;color:var(--ink);font-family:Arial,'Noto Sans KR',sans-serif}
   #view-approved>h1,#view-approved>#approved-role-badge,#view-approved>#btn-current-location,#view-approved>#location-message,#view-approved>#btn-admin-panel,#view-approved>#btn-upload-panel,#view-approved>#btn-supervision-panel,#view-approved>#logout-approved,#view-approved>#mobile-app-header,#view-approved>#mobile-bottom-nav,#view-approved>#favorite-subtabs{display:none!important}
@@ -1163,7 +1163,20 @@
   #mobile-map-legend{display:flex!important;position:absolute!important;left:12px!important;bottom:12px!important;z-index:20!important;background:#fff!important;border:1px solid var(--line)!important;border-radius:8px!important;padding:9px 12px!important;gap:14px!important}
   #mobile-view-route{display:none!important}
   #app[data-pc-tab="site"] #map-container{display:none!important}#app[data-pc-tab="site"] #site-list-panel{right:370px!important;width:auto!important}#app[data-pc-tab="site"] #site-list{height:calc(100% - 100px)!important}
-  #app[data-pc-tab="favorite"] #map-container{left:auto!important;right:12px!important;width:410px!important;height:310px!important;bottom:auto!important}#app[data-pc-tab="favorite"] #site-list-panel{right:434px!important;width:auto!important}#app[data-pc-tab="favorite"] #site-detail-panel{top:458px!important;width:410px!important;height:auto!important}
+  #app[data-pc-tab="favorite"] #map-container{left:auto!important;right:12px!important;width:410px!important;height:310px!important;bottom:auto!important}#app[data-pc-tab="favorite"] #site-list-panel{display:none!important}#app[data-pc-tab="favorite"] #site-detail-panel{top:458px!important;width:410px!important;height:auto!important}
+  /* STEP16.45(즐겨찾기 탭): 사용자 시안대로, 카드 목록(#site-list-panel) 대신 현장 탭에서 이미
+     만들어둔 표(#pc-site-table-panel — 검색/필터/정렬/페이지네이션 전부 포함)를 그대로 재사용한다.
+     getFilteredSortedSites()가 state.mobileActiveTab==='favorite'일 때 이미 즐겨찾기만 걸러주므로
+     (js/sites.js) 별도 필터링 코드 없이 js/ui.js renderPcSiteTable()의 탭 가드만 풀어주면 된다.
+     오른쪽 지도(410px)+상세카드 칼럼은 바로 위 기존 규칙을 그대로 쓴다. */
+  #app[data-pc-tab="favorite"] #pc-site-table-panel{display:flex!important;position:absolute!important;left:calc(var(--side) + 12px)!important;right:434px!important;top:90px!important;bottom:20px!important;width:auto!important;max-width:none!important;height:auto!important;margin:0!important;padding:0!important;flex-direction:column!important;box-sizing:border-box!important;border:1px solid #d6e2f3!important;border-radius:10px!important;background:#fff!important;overflow:hidden!important;z-index:20!important}
+  #app[data-pc-tab="favorite"] #site-detail-panel:empty{display:none!important}
+  #app[data-pc-tab="favorite"] #mobile-map-legend{display:flex!important}
+  @media (max-width:1450px){#app[data-pc-tab="favorite"] #pc-site-table-panel{right:434px!important}}
+  @media (max-width:1200px){#app[data-pc-tab="favorite"] #pc-site-table-panel{right:434px!important}#pc-site-table th:nth-child(6),#pc-site-table td:nth-child(6){display:none}}
+  #app[data-pc-tab="favorite"] .pc-favorite-map-badge{display:flex!important;align-items:center;gap:5px;position:absolute;left:12px;bottom:12px;z-index:25;background:#fff;border:1px solid #f0d27a;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:750;color:#9a6b06;box-shadow:0 2px 8px rgba(18,58,111,.08)}
+  #app[data-pc-tab="favorite"] .pc-favorite-map-view-btn{display:inline-flex!important;align-items:center;gap:5px;position:absolute;right:12px;top:12px;z-index:25;height:32px;padding:0 12px;border:1px solid #c3d4ea;border-radius:7px;background:#fff;color:#113e78;font-size:11px;font-weight:750;box-shadow:0 2px 8px rgba(16,52,94,.12);cursor:pointer}
+  #app[data-pc-tab="favorite"] .pc-favorite-map-view-btn:hover{border-color:#8fb6f2;background:#f7faff}
   /* STEP16.36: 사용자 요청 — 경로탭을 모바일과 똑같은 중앙 박스가 아니라, 다른 업무탭처럼
      "좌측 패널 + 중앙 지도" 구조로 바꾼다. #mobile-view-route(경로 만들기 박스)는
      #site-list-panel과 동일한 폭의 좌측 컬럼으로, #map-container(메인 지도 — 지도/현장 탭과
