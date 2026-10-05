@@ -2,7 +2,7 @@
 // XSS 방지: DB 값(site_name/company_name/address 등)은 innerHTML 문자열 조립에 쓰지 않고
 // 전부 textContent 또는 createElement 기반 DOM 생성으로만 넣는다.
 import { state } from './state.js';
-import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight, refreshFavoriteMarker, initRouteMap, relayoutRouteMap, renderRouteMarkers, panToRouteSite, searchPlacesKeyword, showAddressSearchPin, clearAddressSearchPin, assignDongToSites, renderHqMarkerOnRouteMap, renderRouteSelectionOnMainMap, clearRouteSelectionOnMainMap } from './map.js';
+import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight, refreshFavoriteMarker, initRouteMap, relayoutRouteMap, renderRouteMarkers, panToRouteSite, searchPlacesKeyword, showAddressSearchPin, clearAddressSearchPin, assignDongToSites, renderHqMarkerOnRouteMap, renderRouteSelectionOnMainMap, clearRouteSelectionOnMainMap, destroyRouteMap, centerRouteMapOnLocation } from './map.js';
 import { getFilteredSortedSites, getDongOptions, loadActiveSites } from './sites.js';
 import { isFavorite, toggleFavorite, loadFavorites, addFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote, loadNotes } from './notes.js';
@@ -2946,6 +2946,10 @@ export async function renderRouteDetailPanel(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
   saveRoutePlanState();
+  // STEP16.42: 아래 container.innerHTML = ''이 #route-detail-map div 자체도 지우고 매번 새로
+  // 만든다. routeMaps 레지스트리가 예전(지워진) div를 가리키는 지도 인스턴스를 그대로 재사용하면
+  // 새 div에는 아무것도 그려지지 않는다("지도가 안나와" 버그) — 미리 지운다.
+  destroyRouteMap('route-detail-map');
   container.innerHTML = '';
 
   const { header, backBtn } = buildSettingsSubHeader('경로 상세');
@@ -2997,6 +3001,57 @@ export async function renderRouteDetailPanel(containerId) {
   const mapWrap = document.createElement('div');
   mapWrap.id = 'route-detail-map';
   mapWrap.className = 'route-mini-map';
+
+  // 사용자 요청(PC 전용): 이 미니맵은 메인 지도(state.map)와 완전히 분리된 별도
+  // kakao.maps.Map 인스턴스(routeMaps 레지스트리)라서 메인 지도 쪽 #pc-map-toolbar(현재
+  // 위치/지도 초기화/새로고침)가 전혀 영향을 주지 못한다 — 그래서 이 미니맵 전용으로
+  // 동일한 세 가지 컨트롤을 따로 둔다. CSS 상단 top-level 기본 숨김(.route-detail-map-toolbar)에
+  // 있어 모바일에는 영향이 없다(Kakao Map은 컨테이너에 자신의 지도 div를 추가만 할 뿐
+  // 기존 자식(이 툴바)을 지우지 않으므로 안전 — #pc-map-toolbar와 동일한 패턴).
+  const miniToolbar = document.createElement('div');
+  miniToolbar.className = 'route-detail-map-toolbar';
+
+  const miniLocBtn = document.createElement('button');
+  miniLocBtn.type = 'button';
+  miniLocBtn.className = 'route-detail-map-btn';
+  miniLocBtn.innerHTML = '⌖ <span>현재 위치</span>';
+  miniLocBtn.addEventListener('click', async () => {
+    if (state.currentLocation && Number.isFinite(state.currentLocation.lat) && Number.isFinite(state.currentLocation.lng)) {
+      centerRouteMapOnLocation('route-detail-map', state.currentLocation.lat, state.currentLocation.lng);
+      return;
+    }
+    if (state.locationRequestInFlight) return;
+    state.locationRequestInFlight = true;
+    const result = await requestCurrentLocation();
+    state.locationRequestInFlight = false;
+    if (result.ok) {
+      state.routeStartMode = 'gps';
+      state.currentLocationAddress = null;
+      renderRouteDetailPanel(containerId);
+    }
+  });
+  miniToolbar.appendChild(miniLocBtn);
+
+  const miniResetBtn = document.createElement('button');
+  miniResetBtn.type = 'button';
+  miniResetBtn.className = 'route-detail-map-btn';
+  miniResetBtn.innerHTML = '↻ <span>지도 초기화</span>';
+  miniResetBtn.addEventListener('click', () => {
+    renderRouteMarkers('route-detail-map', state.currentLocation, selectedSites);
+  });
+  miniToolbar.appendChild(miniResetBtn);
+
+  const miniRefreshBtn = document.createElement('button');
+  miniRefreshBtn.type = 'button';
+  miniRefreshBtn.className = 'route-detail-map-btn';
+  miniRefreshBtn.innerHTML = '⟳ <span>새로고침</span>';
+  miniRefreshBtn.addEventListener('click', () => {
+    relayoutRouteMap('route-detail-map');
+    renderRouteMarkers('route-detail-map', state.currentLocation, selectedSites);
+  });
+  miniToolbar.appendChild(miniRefreshBtn);
+
+  mapWrap.appendChild(miniToolbar);
   container.appendChild(mapWrap);
 
   const timeline = document.createElement('div');

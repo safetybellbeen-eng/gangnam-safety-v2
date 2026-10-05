@@ -836,6 +836,31 @@ export function clearRouteMarkers(containerId) {
   entry.markers = [];
 }
 
+// STEP16.42: renderMobileRouteView()/renderRouteDetailPanel()은 매번 container.innerHTML = ''로
+// 지도를 담는 div(#route-order-map/#route-detail-map)까지 통째로 지우고 새로 만든다. 그런데
+// routeMaps 레지스트리는 containerId 문자열 키로 kakao.maps.Map 인스턴스를 재사용하므로,
+// initRouteMap()이 이미 DOM에서 떨어져나간(detached) 예전 div를 가리키는 지도 객체를 그대로
+// 돌려주게 되어 relayout()/setBounds()를 호출해도 화면의 새 div에는 아무것도 그려지지 않는다
+// ("지도가 안나와" 버그의 실제 원인). 컨테이너를 다시 만들기 전에 이 함수로 레지스트리 엔트리를
+// 지워서, 다음 initRouteMap() 호출이 새 DOM 노드를 기준으로 지도를 처음부터 다시 만들게 한다.
+export function destroyRouteMap(containerId) {
+  const entry = routeMaps.get(containerId);
+  if (!entry) return;
+  entry.markers.forEach(marker => marker.setMap(null));
+  if (entry.hqMarker) entry.hqMarker.setMap(null);
+  if (entry.hqLabel) entry.hqLabel.setMap(null);
+  routeMaps.delete(containerId);
+}
+
+// STEP16.42(PC 전용): "경로 상세" 미니맵 전용 "현재 위치" 버튼 — 마커/범위는 그대로 두고
+// 지도만 해당 좌표로 이동한다. 메인 지도(state.map)와는 별개의 routeMaps 엔트리를 대상으로 한다.
+export function centerRouteMapOnLocation(containerId, lat, lng) {
+  const entry = routeMaps.get(containerId);
+  if (!entry) return;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+  entry.map.panTo(new kakao.maps.LatLng(lat, lng));
+}
+
 // currentLocation({lat,lng}|null)과 orderedSites(방문 순서대로 정렬된, 좌표가 유효한 사업장 배열)로
 // 번호 마커를 그린다. 기존 마커는 모두 지운 뒤 새로 그린다. 경로선(polyline)은 그리지 않는다
 // (승인된 축소 범위 — 실제 도로 경로 geometry가 없으므로 가짜 직선/곡선을 긋지 않는다).
