@@ -618,6 +618,28 @@ function bindPcWorkspace() {
     });
   }
 
+  // 사용자 요청: "지도 초기화"(위치/줌만 되돌림)와 별개로, 지도가 간헐적으로 빈 화면(흰 타일)
+  // 그대로 남는 경우를 수동으로 고칠 수 있는 새로고침. relayout()을 다시 걸어 타일을 강제로
+  // 다시 그리고, 경로 탭이면 renderMobileRouteView()로 핀/범위(setBounds)까지 다시 맞춘다
+  // (STEP16.39와 동일한 "relayout 후 항상 올바른 위치로 재보정" 순서 — 위치가 흔들리지 않음).
+  const pcMapRefresh = document.getElementById('pc-map-refresh');
+  if (pcMapRefresh) {
+    pcMapRefresh.addEventListener('click', () => {
+      if (!state.map || typeof state.map.relayout !== 'function') return;
+      state.map.relayout();
+      state.map.setCenter(state.map.getCenter());
+      if (state.mobileActiveTab === 'route') {
+        renderMobileRouteView('mobile-route-content');
+      }
+      requestAnimationFrame(() => {
+        state.map.relayout();
+        if (state.mobileActiveTab === 'route') {
+          renderMobileRouteView('mobile-route-content');
+        }
+      });
+    });
+  }
+
   const pcFavoriteFilter = document.getElementById('pc-favorite-filter-btn');
   if (pcFavoriteFilter) {
     pcFavoriteFilter.addEventListener('click', () => activatePcTab('favorite'));
