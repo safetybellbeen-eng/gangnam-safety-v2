@@ -1145,7 +1145,7 @@
 
 /* ===== PC 로그인 이후 업무화면 (2026-10) ===== */
 #pc-sidebar,#pc-app-header,#pc-page-heading{display:none}
-.pc-site-quality,.pc-site-row-meta,.site-detail-label-icon,.site-amount-filter-custom,.pc-site-accident-flag,.pc-map-empty-state,.pc-site-quality-row,.route-picker-quality-filter,.route-label-toggle,.route-site-visited-toggle,.route-total-distance,.route-copy-list-btn,.route-picker-favorite-only,.route-panel-collapse-btn{display:none}
+.pc-site-quality,.pc-site-row-meta,.site-detail-label-icon,.site-amount-filter-custom,.pc-site-accident-flag,.pc-map-empty-state,.pc-site-quality-row,.route-picker-quality-filter,.route-label-toggle,.route-site-visited-toggle,.route-total-distance,.route-copy-list-btn,.route-picker-favorite-only,.route-panel-collapse-btn,.pc-map-refresh-btn{display:none}
 @media (min-width:769px){
   #view-approved{--side:220px;--head:70px;--ink:#08265f;--blue:#0b63f6;--line:#d9e5f5;--soft:#f5f9ff;position:fixed!important;inset:0!important;overflow:hidden;background:#f8fbff;color:var(--ink);font-family:Arial,'Noto Sans KR',sans-serif}
   #view-approved>h1,#view-approved>#approved-role-badge,#view-approved>#btn-current-location,#view-approved>#location-message,#view-approved>#btn-admin-panel,#view-approved>#btn-upload-panel,#view-approved>#btn-supervision-panel,#view-approved>#logout-approved,#view-approved>#mobile-app-header,#view-approved>#mobile-bottom-nav,#view-approved>#favorite-subtabs{display:none!important}
@@ -1257,10 +1257,14 @@
 
   #app[data-pc-tab="map"] #map-container{left:calc(var(--side) + 370px)!important;right:370px!important;top:90px!important;bottom:20px!important;border-radius:10px!important;border:1px solid var(--pc-border)!important;background:#eef5fb!important}
   #pc-map-toolbar{display:none}
-  #app[data-pc-tab="map"] #pc-map-toolbar{display:flex;position:absolute;left:12px;top:12px;z-index:25;gap:7px;pointer-events:auto}
+  /* STEP16.41: 사용자 요청 — 경로 탭도 지도 탭과 똑같은 지도 도구(현재 위치/초기화/새로고침)
+     + 범례를 쓴다(같은 #map-container 인스턴스를 그대로 보여주므로 공유 DOM도 그대로 재사용). */
+  #app[data-pc-tab="map"] #pc-map-toolbar,#app[data-pc-tab="route"] #pc-map-toolbar{display:flex;position:absolute;left:12px;top:12px;z-index:25;gap:7px;pointer-events:auto}
   #pc-map-toolbar button{height:38px;padding:0 13px;border:1px solid #d1deef;border-radius:7px;background:#fff;color:#173c76;font-size:12px;font-weight:750;box-shadow:0 2px 8px rgba(18,58,111,.08);cursor:pointer}
   #pc-map-toolbar button:hover{border-color:#83adf1;background:#f7faff}
-  #app[data-pc-tab="map"] #mobile-map-legend{left:12px!important;bottom:12px!important;padding:8px 12px!important;border-radius:7px!important;font-size:11px!important;box-shadow:0 2px 8px rgba(18,58,111,.08)!important}
+  /* "새로고침" 버튼(PC 전용 — 상단 top-level display:none을 여기서 다시 보이게 함). */
+  #pc-map-toolbar .pc-map-refresh-btn{display:inline-flex!important;align-items:center;gap:4px}
+  #app[data-pc-tab="map"] #mobile-map-legend,#app[data-pc-tab="route"] #mobile-map-legend{left:12px!important;bottom:12px!important;padding:8px 12px!important;border-radius:7px!important;font-size:11px!important;box-shadow:0 2px 8px rgba(18,58,111,.08)!important}
 
   #app[data-pc-tab="map"] #site-detail-panel{right:12px!important;top:90px!important;bottom:20px!important;width:350px!important;padding:18px!important;border:1px solid var(--pc-border)!important;border-radius:10px!important;box-shadow:none!important;background:#fff!important}
   #app[data-pc-tab="map"] #site-detail-panel .site-detail-close-x{display:block!important;position:absolute!important;right:12px!important;top:8px!important;border:0!important;background:transparent!important;color:#173467!important;font-size:24px!important;cursor:pointer!important}
@@ -2083,12 +2087,12 @@
   }
 
   /* Map controls */
-  #app[data-pc-tab="map"] #pc-map-toolbar{
+  #app[data-pc-tab="map"] #pc-map-toolbar,#app[data-pc-tab="route"] #pc-map-toolbar{
     top:10px!important;
     left:10px!important;
     gap:6px!important;
   }
-  #app[data-pc-tab="map"] #pc-map-toolbar button{
+  #app[data-pc-tab="map"] #pc-map-toolbar button,#app[data-pc-tab="route"] #pc-map-toolbar button{
     height:36px!important;
     padding:0 12px!important;
     border:1px solid #cbd9eb!important;
@@ -2545,12 +2549,14 @@
   }
 
   /* ===== Map controls ===== */
-  #app[data-pc-tab="map"] #pc-map-toolbar{
+  /* STEP16.41: 경로 탭도 같은 #map-container를 그대로 보여주므로(지도 탭과 동일 인스턴스),
+     지도 도구/범례를 지도 탭과 완전히 동일하게 통일한다(사용자 요청). */
+  #app[data-pc-tab="map"] #pc-map-toolbar,#app[data-pc-tab="route"] #pc-map-toolbar{
     top:10px!important;left:10px!important;gap:7px!important;
   }
   /* 사용자 디자인 의견 반영(2026-10): 지도 위에 떠 있는 툴바 버튼이 지도 색상에 따라 묻힐 수
      있다는 피드백 — 배경을 완전 불투명으로 바꾸고 그림자를 더 또렷하게 준다. */
-  #app[data-pc-tab="map"] #pc-map-toolbar button{
+  #app[data-pc-tab="map"] #pc-map-toolbar button,#app[data-pc-tab="route"] #pc-map-toolbar button{
     height:40px!important;
     padding:0 14px!important;
     border:1px solid #c3d4ea!important;
@@ -2562,13 +2568,13 @@
     box-shadow:0 3px 10px rgba(16,52,94,.16)!important;
     transition:border-color .12s ease,box-shadow .12s ease,transform .12s ease!important;
   }
-  #app[data-pc-tab="map"] #pc-map-toolbar button:hover{
+  #app[data-pc-tab="map"] #pc-map-toolbar button:hover,#app[data-pc-tab="route"] #pc-map-toolbar button:hover{
     border-color:#8fb6f2!important;
     box-shadow:0 5px 14px rgba(16,52,94,.22)!important;
     transform:translateY(-1px)!important;
   }
-  #app[data-pc-tab="map"] #pc-map-toolbar button:active{transform:translateY(0)!important}
-  #app[data-pc-tab="map"] #mobile-map-legend{
+  #app[data-pc-tab="map"] #pc-map-toolbar button:active,#app[data-pc-tab="route"] #pc-map-toolbar button:active{transform:translateY(0)!important}
+  #app[data-pc-tab="map"] #mobile-map-legend,#app[data-pc-tab="route"] #mobile-map-legend{
     left:12px!important;bottom:12px!important;
     padding:10px 14px!important;
     border:1px solid #c9d8ec!important;
@@ -2579,16 +2585,16 @@
   /* 범례 색상 점(.mobile-map-legend-dot*)은 mobile.css에서 모바일 media query 안에만
      정의되어 있어 PC 폭에서는 크기가 0이 되어 보이지 않았다. 같은 --gnmap-* 색상 변수를
      그대로 재사용해 PC 전용으로 동일하게 그려준다(의미/색 변경 없음). */
-  #app[data-pc-tab="map"] #mobile-map-legend .mobile-map-legend-dot{
+  #app[data-pc-tab="map"] #mobile-map-legend .mobile-map-legend-dot,#app[data-pc-tab="route"] #mobile-map-legend .mobile-map-legend-dot{
     display:inline-block!important;
     width:9px!important;
     height:9px!important;
     border-radius:50%!important;
     flex-shrink:0!important;
   }
-  #app[data-pc-tab="map"] #mobile-map-legend .mobile-map-legend-dot-exact{background:var(--gnmap-green)!important}
-  #app[data-pc-tab="map"] #mobile-map-legend .mobile-map-legend-dot-estimated{background:var(--gnmap-amber)!important}
-  #app[data-pc-tab="map"] #mobile-map-legend .mobile-map-legend-dot-review{background:var(--gnmap-red)!important}
+  #app[data-pc-tab="map"] #mobile-map-legend .mobile-map-legend-dot-exact,#app[data-pc-tab="route"] #mobile-map-legend .mobile-map-legend-dot-exact{background:var(--gnmap-green)!important}
+  #app[data-pc-tab="map"] #mobile-map-legend .mobile-map-legend-dot-estimated,#app[data-pc-tab="route"] #mobile-map-legend .mobile-map-legend-dot-estimated{background:var(--gnmap-amber)!important}
+  #app[data-pc-tab="map"] #mobile-map-legend .mobile-map-legend-dot-review,#app[data-pc-tab="route"] #mobile-map-legend .mobile-map-legend-dot-review{background:var(--gnmap-red)!important}
 
   /* ===== Detail panel: use only existing data/functions ===== */
   #app[data-pc-tab="map"] #site-detail-panel .site-detail-close-x{
