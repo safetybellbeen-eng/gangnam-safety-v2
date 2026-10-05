@@ -1145,7 +1145,7 @@
 
 /* ===== PC 로그인 이후 업무화면 (2026-10) ===== */
 #pc-sidebar,#pc-app-header,#pc-page-heading{display:none}
-.pc-site-quality,.pc-site-row-meta,.site-detail-label-icon,.site-amount-filter-custom,.pc-site-accident-flag,.pc-map-empty-state,.pc-site-quality-row,.route-picker-quality-filter,.route-label-toggle,.route-site-visited-toggle,.route-total-distance,.route-copy-list-btn,.route-picker-favorite-only,.route-panel-collapse-btn,.pc-map-refresh-btn{display:none}
+.pc-site-quality,.pc-site-row-meta,.site-detail-label-icon,.site-amount-filter-custom,.pc-site-accident-flag,.pc-map-empty-state,.pc-site-quality-row,.route-picker-quality-filter,.route-label-toggle,.route-site-visited-toggle,.route-total-distance,.route-copy-list-btn,.route-picker-favorite-only,.route-panel-collapse-btn,.pc-map-refresh-btn,.route-detail-map-toolbar{display:none}
 @media (min-width:769px){
   #view-approved{--side:220px;--head:70px;--ink:#08265f;--blue:#0b63f6;--line:#d9e5f5;--soft:#f5f9ff;position:fixed!important;inset:0!important;overflow:hidden;background:#f8fbff;color:var(--ink);font-family:Arial,'Noto Sans KR',sans-serif}
   #view-approved>h1,#view-approved>#approved-role-badge,#view-approved>#btn-current-location,#view-approved>#location-message,#view-approved>#btn-admin-panel,#view-approved>#btn-upload-panel,#view-approved>#btn-supervision-panel,#view-approved>#logout-approved,#view-approved>#mobile-app-header,#view-approved>#mobile-bottom-nav,#view-approved>#favorite-subtabs{display:none!important}
@@ -3450,7 +3450,21 @@
   }
   #app[data-pc-tab="route"] #route-detail-panel .route-mini-map{
     grid-area:map;width:100%;height:100%;min-height:320px;border-radius:8px;
-    overflow:hidden;background:#f6f9fd;border:1px solid #e1eaf6;
+    overflow:hidden;background:#f6f9fd;border:1px solid #e1eaf6;position:relative;
+  }
+  /* STEP16.42(PC 전용): 이 미니맵은 메인 지도(state.map/#pc-map-toolbar)와 완전히 분리된
+     별도 kakao.maps.Map 인스턴스(routeMaps 레지스트리)라서 메인 지도 툴바가 전혀 영향을 주지
+     못한다 — 그래서 미니맵 전용 현재위치/지도초기화/새로고침 컨트롤을 따로 둔다. 상단
+     top-level 기본 숨김(.route-detail-map-toolbar)에 있어 모바일에는 영향이 없다. */
+  #app[data-pc-tab="route"] #route-detail-panel .route-detail-map-toolbar{
+    display:flex!important;position:absolute;left:10px;top:10px;z-index:25;gap:6px;pointer-events:auto;
+  }
+  #app[data-pc-tab="route"] #route-detail-panel .route-detail-map-toolbar .route-detail-map-btn{
+    height:30px;padding:0 10px;border:1px solid #c3d4ea;border-radius:7px;background:#fff;color:#113e78;
+    font-size:11px;font-weight:750;box-shadow:0 2px 8px rgba(16,52,94,.14);cursor:pointer;
+  }
+  #app[data-pc-tab="route"] #route-detail-panel .route-detail-map-toolbar .route-detail-map-btn:hover{
+    border-color:#8fb6f2;background:#f7faff;
   }
   #app[data-pc-tab="route"] #route-detail-panel .route-timeline{
     grid-area:timeline;overflow-y:auto;padding-right:4px;
