@@ -1145,7 +1145,7 @@
 
 /* ===== PC 로그인 이후 업무화면 (2026-10) ===== */
 #pc-sidebar,#pc-app-header,#pc-page-heading{display:none}
-.pc-site-quality,.pc-site-row-meta,.site-detail-label-icon,.site-amount-filter-custom,.pc-site-accident-flag,.pc-map-empty-state,.pc-site-quality-row,.route-picker-quality-filter,.route-label-toggle{display:none}
+.pc-site-quality,.pc-site-row-meta,.site-detail-label-icon,.site-amount-filter-custom,.pc-site-accident-flag,.pc-map-empty-state,.pc-site-quality-row,.route-picker-quality-filter,.route-label-toggle,.route-site-visited-toggle,.route-total-distance,.route-copy-list-btn,.route-picker-favorite-only,.route-panel-collapse-btn{display:none}
 @media (min-width:769px){
   #view-approved{--side:220px;--head:70px;--ink:#08265f;--blue:#0b63f6;--line:#d9e5f5;--soft:#f5f9ff;position:fixed!important;inset:0!important;overflow:hidden;background:#f8fbff;color:var(--ink);font-family:Arial,'Noto Sans KR',sans-serif}
   #view-approved>h1,#view-approved>#approved-role-badge,#view-approved>#btn-current-location,#view-approved>#location-message,#view-approved>#btn-admin-panel,#view-approved>#btn-upload-panel,#view-approved>#btn-supervision-panel,#view-approved>#logout-approved,#view-approved>#mobile-app-header,#view-approved>#mobile-bottom-nav,#view-approved>#favorite-subtabs{display:none!important}
@@ -1180,7 +1180,17 @@
   #app[data-pc-tab="route"][data-detail-open="true"] #map-container{right:370px!important}
   #admin-panel,#upload-panel,#supervision-panel,#site-notes-panel,#app-settings-panel{z-index:60}
   @media(max-width:1450px){#view-approved{--side:190px}.pc-nav-btn{padding:0 12px}.pc-brand{padding-left:8px}.pc-brand span{font-size:13px}#site-list-panel{width:300px!important}#map-container{left:calc(var(--side) + 324px)!important;right:320px!important}#site-detail-panel{width:300px!important}.pc-global-search{width:520px}#app[data-pc-tab="route"] #mobile-view-route{width:300px!important}#app[data-pc-tab="route"] #map-container{right:12px!important}#app[data-pc-tab="route"][data-detail-open="true"] #map-container{right:320px!important}}
-  @media(max-width:1200px){#view-approved{--side:176px}.pc-nav-btn{font-size:13px;gap:9px}#site-list-panel{width:280px!important}#map-container{left:calc(var(--side) + 304px)!important;right:292px!important}#site-detail-panel{width:272px!important}#app[data-pc-tab="route"] #mobile-view-route{width:280px!important}#app[data-pc-tab="route"] #map-container{right:12px!important}#app[data-pc-tab="route"][data-detail-open="true"] #map-container{right:292px!important}}
+  @media(max-width:1200px){#view-approved{--side:176px}.pc-nav-btn{font-size:13px;gap:9px}#site-list-panel{width:280px!important}#map-container{left:calc(var(--side) + 304px)!important;right:292px!important}#site-detail-panel{width:272px!important}#app[data-pc-tab="route"] #mobile-view-route{width:280px!important}#app[data-pc-tab="route"] #map-container{right:12px!important}#app[data-pc-tab="route"][data-detail-open="true"] #map-container{right:292px!important}
+    /* STEP16.40: 사용자 요청 — 화면이 좁을 때(1200px 이하) 경로 좌측 패널을 접어 지도를 더
+       넓게 쓸 수 있게 한다. 버튼 자체는 top-level(§ .route-panel-collapse-btn 기본 display:none)
+       에서 숨겨두고, 이 좁은 PC 구간에서만 보이게 한다(접힘 여부와 무관하게 항상 노출 —
+       다시 펼 수 있어야 하므로). */
+    .route-panel-collapse-btn{display:flex!important;align-items:center;justify-content:center;width:26px;height:26px;border:1px solid #cddbf0;border-radius:6px;background:#fff;color:#173467;font-size:14px;line-height:1;cursor:pointer;margin-bottom:10px}
+    .route-panel-collapse-btn:hover{background:#f3f8ff}
+    #app[data-pc-tab="route"][data-route-collapsed="true"] #mobile-view-route{width:40px!important;padding:10px 6px!important;overflow:hidden!important}
+    #app[data-pc-tab="route"][data-route-collapsed="true"] #mobile-route-content>*:not(.route-panel-collapse-btn){display:none!important}
+    #app[data-pc-tab="route"][data-route-collapsed="true"] #map-container{left:calc(var(--side) + 64px)!important}
+  }
 }
 
 
@@ -3280,10 +3290,21 @@
     border-radius:8px;padding:12px;
   }
   .route-site-card.route-card-dragging{ box-shadow:0 4px 12px rgba(15,23,42,0.12);background:#f3f8ff; }
+  /* STEP16.40: "오늘 방문 완료" 체크 시 카드를 옅게 표시(날짜별 이력 아님, 이 기기에서만
+     보이는 가벼운 체크). */
+  .route-site-card--visited{ background:#f6f9fd;border-color:#e4ecf7; }
+  .route-site-card--visited .route-site-name,.route-site-card--visited .route-site-addr{ color:#9aa9c2; }
   .route-drag-handle{
     flex-shrink:0;display:flex;align-items:center;justify-content:center;width:24px;height:24px;
     color:#8fa2c2;font-size:15px;cursor:grab;
   }
+  /* STEP16.40: "방문 완료" 체크박스(PC 전용 — 상단 top-level display:none을 여기서 다시
+     보이게 함). 드래그 손잡이 바로 뒤, 순번 배지 앞에 배치한다. */
+  .route-site-visited-toggle{
+    display:flex!important;align-items:center;justify-content:center;flex-shrink:0;width:18px;
+    height:36px;cursor:pointer;
+  }
+  .route-site-visited-toggle input[type="checkbox"]{ width:16px;height:16px;cursor:pointer; }
   .route-site-number{
     flex-shrink:0;display:flex;align-items:center;justify-content:center;width:20px;height:20px;
     border-radius:50%;background:#173467;color:#fff;font-size:11px;font-weight:800;margin-top:2px;
@@ -3305,6 +3326,12 @@
   .route-cta-btn:hover{ background:#0a56d6; }
   .route-cta-btn:disabled{ background:#e4ecf7;color:#8fa2c2;cursor:not-allowed; }
   .route-cta-hint{ text-align:center;font-size:11px;color:#61779c;margin-top:8px; }
+  /* STEP16.40: "총 이동거리" 요약(PC 전용 — 상단 top-level display:none을 여기서 다시
+     보이게 함). 직선거리 합산값이라는 것을 바로 알 수 있게 작은 글씨로 둔다. */
+  .route-total-distance{
+    display:block!important;text-align:center;font-size:11.5px;color:#61779c;
+    background:#f6f9fd;border-radius:6px;padding:7px 8px;margin:0 0 10px;
+  }
   .route-clear-all-btn{
     width:100%;min-height:38px;border:none;border-radius:8px;background:#f3f8ff;
     color:#c0392b;font-size:12px;font-weight:650;margin-top:8px;cursor:pointer;
@@ -3342,6 +3369,13 @@
     display:block!important;flex-shrink:0;min-height:38px;padding:0 10px;border:1px solid #cddbf0;
     border-radius:6px;background:#fff;color:#173467;font-size:12px;cursor:pointer;
   }
+  /* STEP16.40: "즐겨찾기만" 토글(PC 전용 — 상단 top-level display:none을 여기서 다시
+     보이게 함). 정확도 필터 바로 아래, 현장 목록 위에 배치한다. */
+  .route-picker-favorite-only{
+    display:flex!important;align-items:center;gap:7px;margin:0 0 10px;
+    font-size:12px;color:#61779c;cursor:pointer;user-select:none;
+  }
+  .route-picker-favorite-only input[type="checkbox"]{ width:15px;height:15px;cursor:pointer; }
   .route-addr-search-row{ display:flex;gap:8px;align-items:center; }
   .route-addr-search-row .sv-manager-sheet-search{ flex:1;min-width:0;margin-bottom:0; }
   .route-addr-search-btn{
@@ -3392,6 +3426,18 @@
   #app[data-pc-tab="route"] #route-detail-panel .sv-mobile-subheader-title{
     font-size:16px;font-weight:800;color:#173467;
   }
+  /* STEP16.40: "목록 복사" 버튼(PC 전용 — 상단 top-level display:none을 여기서 다시
+     보이게 함). 헤더 맨 오른쪽에 붙인다. */
+  #app[data-pc-tab="route"] #route-detail-panel .route-copy-list-btn{
+    display:inline-flex!important;margin-left:auto;min-height:30px;padding:0 12px;border:1px solid #cddbf0;
+    border-radius:6px;background:#fff;color:#173467;font-size:12px;font-weight:650;cursor:pointer;
+  }
+  #app[data-pc-tab="route"] #route-detail-panel .route-copy-list-btn:hover{ background:#f3f8ff; }
+  #app[data-pc-tab="route"] #route-detail-panel .route-detail-note-wrap{
+    grid-area:note;display:flex;flex-direction:column;gap:6px;
+  }
+  #app[data-pc-tab="route"] #route-detail-panel .route-detail-note-wrap .route-order-note{ margin:0; }
+  #app[data-pc-tab="route"] #route-detail-panel .route-total-distance{ margin:0; }
   #app[data-pc-tab="route"] #route-detail-panel .route-order-note{
     grid-area:note;font-size:12px;color:#61779c;background:#f6f9fd;border-radius:6px;
     padding:8px 12px;margin:0 0 4px;line-height:1.5;
