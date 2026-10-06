@@ -2742,23 +2742,8 @@ export function renderMobileRouteView(containerId) {
   labelToggleRow.appendChild(labelToggleText);
   container.appendChild(labelToggleRow);
 
-  // 사용자 요청(PC 전용): 관할 전체 사업장 핀이 너무 많아 복잡하므로, 경로탭에서는 기본적으로
-  // 일반 사업장 핀을 숨기고 체크해야만 보이게 한다. CSS가 기본 display:none이고 PC에서만
-  // 보이게 하므로(css/desktop.css 참고) 모바일 화면에는 아무 변화가 없다.
-  const showAllPinsRow = document.createElement('label');
-  showAllPinsRow.className = 'route-show-all-pins-toggle';
-  const showAllPinsCheckbox = document.createElement('input');
-  showAllPinsCheckbox.type = 'checkbox';
-  showAllPinsCheckbox.checked = routeShowAllSitePins;
-  showAllPinsCheckbox.addEventListener('change', () => {
-    routeShowAllSitePins = showAllPinsCheckbox.checked;
-    applyRouteSitePinsVisibility();
-  });
-  showAllPinsRow.appendChild(showAllPinsCheckbox);
-  const showAllPinsText = document.createElement('span');
-  showAllPinsText.textContent = '지도에 전체 현장 핀 표시';
-  showAllPinsRow.appendChild(showAllPinsText);
-  container.appendChild(showAllPinsRow);
+  // 사용자 요청(2026-10): "지도에 전체 현장 핀 표시" 체크 옵션은 삭제 — 경로탭에서는 일반 사업장 핀을
+  // 항상 숨기고(routeShowAllSitePins=false 고정) 경로 번호 핀만 보여준다.
 
   // 선택 현장 목록(드래그로 순서 변경, 개별 삭제)
   if (selectedSites.length > 0) {
@@ -2916,7 +2901,7 @@ let routeShowMarkerLabels = false;
 // "꺼짐"(일반 사업장 핀 숨김)이고 체크해야만 보이게 한다. 탭을 오가도 유지되는 단순 화면
 // 표시 설정이라 DB/localStorage에는 저장하지 않는다. 모바일은 이 값을 전혀 쓰지 않는다
 // (모바일은 경로 탭에서 메인 지도 자체를 보여주지 않음).
-let routeShowAllSitePins = false;
+const routeShowAllSitePins = false; // 체크 옵션 삭제됨 — 항상 숨김
 
 // 사용자 요청(경로 카드 "방문 완료" 체크): 서버/DB 변경 없이 이 기기에만 저장하는 가벼운
 // 표시 상태다(날짜별 방문 이력 관리가 아니라 "오늘 다니면서 체크"하는 용도). restoreRoutePlanFromStorage/
