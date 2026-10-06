@@ -210,7 +210,7 @@ function resetFilters() {
 
 function filteredUsers() {
   const q = AD.q.trim().toLowerCase();
-  const rows = (state.adminUsers || []).filter((u) => {
+  const rows = (Array.isArray(state.adminUsers) ? state.adminUsers : []).filter((u) => {
     if (AD.status !== 'all' && u.status !== AD.status) return false;
     if (AD.role !== 'all' && u.role !== AD.role) return false;
     if (AD.dormant && !isDormant(u)) return false;
@@ -355,7 +355,7 @@ async function runAction(u, action) {
   // 서버가 최종 진실이므로 값을 추정하지 않고 다시 조회한다.
   await loadUsers();
   AD.checked.delete(u.id);
-  if (!(state.adminUsers || []).some(x => x.id === AD.selectedId)) AD.selectedId = null;
+  if (!(Array.isArray(state.adminUsers) ? state.adminUsers : []).some(x => x.id === AD.selectedId)) AD.selectedId = null;
   paint();
   if (undoable) showUndo('처리되었습니다.', () => undoStatuses([{ id: u.id, prev: prevStatus }]));
 }
@@ -432,7 +432,7 @@ function paint() {
     return;
   }
 
-  const all = state.adminUsers || [];
+  const all = Array.isArray(state.adminUsers) ? state.adminUsers : [];
   const count = (st) => all.filter(u => u.status === st).length;
 
   const grid = el('div', 'pc-ad-grid');

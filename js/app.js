@@ -1,5 +1,6 @@
 // app.js — STEP 3B. 인증 흐름 최소 테스트 UI 연결.
 // 지도/사업장 등 실제 기능은 이후 STEP에서 추가한다 (CLAUDE.md 12절: 대규모 UI 금지).
+import { CONFIG } from './config.js';
 import { state } from './state.js';
 import { sb } from './api.js';
 import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, verifySignupCode, checkIdExists, checkLoginLock, translateAuthError } from './auth.js';
@@ -7,7 +8,7 @@ import { initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites, rend
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
-import { renderSiteList, renderPcSiteTable, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, redrawRouteSelectionOnMainMap, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView, renderHeaderUploadDate, setSiteSearchMode, renderSiteNotesPanel, renderAppSettingsPanel, restorePcSiteFiltersToRow, updateDongFilterLabel } from './ui.js';
+import { renderSiteList, renderPcSiteTable, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, redrawRouteSelectionOnMainMap, renderAccountInfoPanel, renderPasswordChangePanel, renderNotificationSettingsPanel, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView, renderHeaderUploadDate, setSiteSearchMode, renderSiteNotesPanel, renderAppSettingsPanel, restorePcSiteFiltersToRow, updateDongFilterLabel } from './ui.js';
 import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
 
 const VIEWS = [
@@ -670,6 +671,67 @@ function bindPcWorkspace() {
       requestAnimationFrame(() => { repaintMainMap(false); redraw(); });
     });
   }
+
+  // PC 헤더 우측: 알림(종) → 감독일정관리, 사용자 영역 → 내 정보/비밀번호 변경/알림 설정/앱 설정/버전/로그아웃 메뉴.
+  // (모바일 "더보기" 탭과 같은 기능을 PC에서도 쓸 수 있게 한다. 같은 렌더 함수를 그대로 재사용.)
+  const pcBell = document.querySelector('.pc-bell');
+  if (pcBell) pcBell.addEventListener('click', (e) => { e.stopPropagation(); activatePcTab('supervision'); });
+
+  const pcUserArea = document.querySelector('.pc-user-area');
+  const closePcUserMenu = () => { document.getElementById('pc-user-menu')?.remove(); };
+  const openPcPanel = (panelId, renderFn) => {
+    closePcUserMenu();
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    panel.style.display = 'block';
+    renderFn(panelId);
+  };
+  if (pcUserArea) {
+    pcUserArea.addEventListener('click', (e) => {
+      if (e.target.closest('.pc-bell')) return;
+      e.stopPropagation();
+      if (document.getElementById('pc-user-menu')) { closePcUserMenu(); return; }
+      const menu = document.createElement('div');
+      menu.id = 'pc-user-menu';
+      const head = document.createElement('div');
+      head.className = 'pc-user-menu-head';
+      const nm = document.createElement('strong');
+      nm.textContent = (state.profile && state.profile.name) || '-';
+      head.appendChild(nm);
+      head.appendChild(document.createTextNode((state.profile && state.profile.email) || ''));
+      menu.appendChild(head);
+      const sep = () => { const d = document.createElement('div'); d.className = 'pc-user-menu-sep'; menu.appendChild(d); };
+      const item = (label, fn, cls) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.textContent = label; if (cls) b.className = cls;
+        b.addEventListener('click', fn);
+        menu.appendChild(b);
+      };
+      sep();
+      item('내 정보 관리', () => openPcPanel('account-info-panel', renderAccountInfoPanel));
+      item('비밀번호 변경', () => openPcPanel('password-change-panel', renderPasswordChangePanel));
+      item('알림 설정', () => openPcPanel('notification-settings-panel', renderNotificationSettingsPanel));
+      item('앱 설정', () => openPcPanel('app-settings-panel', renderAppSettingsPanel));
+      sep();
+      const ver = document.createElement('div');
+      ver.className = 'pc-user-menu-row';
+      ver.innerHTML = '<span>버전 정보</span><span></span>';
+      ver.lastChild.textContent = CONFIG.APP_VERSION || '-';
+      menu.appendChild(ver);
+      item('로그아웃', () => { closePcUserMenu(); document.getElementById('logout-approved')?.click(); }, 'is-danger');
+      document.body.appendChild(menu);
+    });
+  }
+  document.addEventListener('click', (e) => { if (!e.target.closest('#pc-user-menu')) document.getElementById('pc-user-menu')?.remove(); });
+  // 모달로 뜬 설정 패널은 바깥(어두운 배경)을 누르거나 Esc로도 닫는다.
+  const PC_MODAL_PANELS = ['account-info-panel', 'password-change-panel', 'notification-settings-panel', 'app-settings-panel'];
+  const closePcModalPanels = () => PC_MODAL_PANELS.forEach(id => { const p = document.getElementById(id); if (p) p.style.display = 'none'; });
+  document.addEventListener('mousedown', (e) => {
+    if (window.innerWidth < 769) return;
+    const open = PC_MODAL_PANELS.some(id => document.getElementById(id)?.style.display === 'block');
+    if (open && !e.target.closest(PC_MODAL_PANELS.map(id => '#' + id).join(',')) && !e.target.closest('#pc-user-menu') && !e.target.closest('.admin-sheet-overlay')) closePcModalPanels();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && window.innerWidth >= 769) { closePcModalPanels(); document.getElementById('pc-user-menu')?.remove(); } });
 
   const pcFavoriteFilter = document.getElementById('pc-favorite-filter-btn');
   if (pcFavoriteFilter) {
