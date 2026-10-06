@@ -4627,4 +4627,8 @@
   #site-detail-panel .pc-detail-note-btn:hover{background:#f1f6ff}
 
   #site-detail-panel .pc-detail-note-btn{height:28px!important;min-height:0!important;width:auto!important;padding:0 10px!important;font-size:12px!important;line-height:1!important;border-radius:6px!important}
+
+  /* 상세 메모 버튼: 지도/현장/즐겨찾기 탭 모두 동일한 모양 */
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-section-title .pc-detail-note-btn,#app[data-pc-tab="site"] #site-detail-panel .site-detail-section-title .pc-detail-note-btn,#app[data-pc-tab="favorite"] #site-detail-panel .site-detail-section-title .pc-detail-note-btn{height:28px!important;min-height:0!important;width:auto!important;padding:0 10px!important;margin:0!important;font-size:12px!important;font-weight:750!important;line-height:1!important;border:1px solid #0b63f6!important;border-radius:6px!important;background:#fff!important;color:#0b63f6!important;box-shadow:none!important}
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-section-title .pc-detail-note-btn:hover,#app[data-pc-tab="site"] #site-detail-panel .site-detail-section-title .pc-detail-note-btn:hover,#app[data-pc-tab="favorite"] #site-detail-panel .site-detail-section-title .pc-detail-note-btn:hover{background:#f1f6ff!important}
 }
