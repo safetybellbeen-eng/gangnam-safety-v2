@@ -1145,7 +1145,7 @@
 
 /* ===== PC 로그인 이후 업무화면 (2026-10) ===== */
 #pc-sidebar,#pc-app-header,#pc-page-heading{display:none}
-.pc-site-quality,.pc-site-row-meta,.site-detail-label-icon,.site-amount-filter-custom,.pc-site-accident-flag,.pc-map-empty-state,.pc-site-quality-row,.route-picker-quality-filter,.route-label-toggle,.route-site-visited-toggle,.route-total-distance,.route-copy-list-btn,.route-picker-favorite-only,.route-panel-collapse-btn,.pc-map-refresh-btn,.route-detail-map-toolbar,.pc-favorite-map-badge,.pc-favorite-map-view-btn{display:none}
+.pc-site-quality,.pc-site-row-meta,.site-detail-label-icon,.site-amount-filter-custom,.pc-site-accident-flag,.pc-map-empty-state,.pc-site-quality-row,.route-picker-quality-filter,.route-label-toggle,.route-site-visited-toggle,.route-total-distance,.route-copy-list-btn,.route-picker-favorite-only,.route-panel-collapse-btn,.pc-map-refresh-btn,.route-detail-map-toolbar,.pc-favorite-map-badge,.pc-favorite-map-view-btn,.route-show-all-pins-toggle{display:none}
 @media (min-width:769px){
   #view-approved{--side:220px;--head:70px;--ink:#08265f;--blue:#0b63f6;--line:#d9e5f5;--soft:#f5f9ff;position:fixed!important;inset:0!important;overflow:hidden;background:#f8fbff;color:var(--ink);font-family:Arial,'Noto Sans KR',sans-serif}
   #view-approved>h1,#view-approved>#approved-role-badge,#view-approved>#btn-current-location,#view-approved>#location-message,#view-approved>#btn-admin-panel,#view-approved>#btn-upload-panel,#view-approved>#btn-supervision-panel,#view-approved>#logout-approved,#view-approved>#mobile-app-header,#view-approved>#mobile-bottom-nav,#view-approved>#favorite-subtabs{display:none!important}
@@ -1177,6 +1177,11 @@
   #app[data-pc-tab="favorite"] .pc-favorite-map-badge{display:flex!important;align-items:center;gap:5px;position:absolute;left:12px;bottom:12px;z-index:25;background:#fff;border:1px solid #f0d27a;border-radius:7px;padding:6px 11px;font-size:11px;font-weight:750;color:#9a6b06;box-shadow:0 2px 8px rgba(18,58,111,.08)}
   #app[data-pc-tab="favorite"] .pc-favorite-map-view-btn{display:inline-flex!important;align-items:center;gap:5px;position:absolute;right:12px;top:12px;z-index:25;height:32px;padding:0 12px;border:1px solid #c3d4ea;border-radius:7px;background:#fff;color:#113e78;font-size:11px;font-weight:750;box-shadow:0 2px 8px rgba(16,52,94,.12);cursor:pointer}
   #app[data-pc-tab="favorite"] .pc-favorite-map-view-btn:hover{border-color:#8fb6f2;background:#f7faff}
+  /* STEP16.47(즐겨찾기 탭 UI 정밀 수정): 관할/공사금액/점검/산재표 등 필터 칩과 검색창은
+     js/sites.js getFilteredSortedSites()가 즐겨찾기 탭일 때 아예 무시하므로(즐겨찾기 현장만
+     보여줌) 눌러도 아무 효과가 없다 — 꾸미지 않고 아예 숨겨서 혼란을 없앤다. */
+  #app[data-pc-tab="favorite"] .pc-site-table-toolbar{display:none!important}
+  #app[data-pc-tab="favorite"] #pc-site-table-filters{display:none!important}
   /* STEP16.36: 사용자 요청 — 경로탭을 모바일과 똑같은 중앙 박스가 아니라, 다른 업무탭처럼
      "좌측 패널 + 중앙 지도" 구조로 바꾼다. #mobile-view-route(경로 만들기 박스)는
      #site-list-panel과 동일한 폭의 좌측 컬럼으로, #map-container(메인 지도 — 지도/현장 탭과
@@ -1574,6 +1579,133 @@
   }
   #app[data-pc-tab="map"] #site-detail-panel .site-detail-note-actions .site-detail-btn-danger:hover,
   #app[data-pc-tab="site"] #site-detail-panel .site-detail-note-actions .site-detail-btn-danger:hover{
+    background:#fdecee!important;border-color:#e99aa5!important;
+  }
+
+
+  /* STEP16.47(즐겨찾기 탭): 즐겨찾기 탭도 같은 #site-detail-panel을 재사용하므로,
+     위 현장탭용 상세패널 콘텐츠 스타일을 동일하게 적용한다(패널 위치/크기는 건드리지
+     않음 — 즐겨찾기 탭 전용 레이아웃 규칙이 이미 따로 있다). */
+  /* 현장 탭 상세패널 — 지도 탭의 디자인 언어를 그대로 재사용 */
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-close-x{
+    display:block!important;position:absolute!important;right:12px!important;top:8px!important;
+    border:0!important;background:transparent!important;color:#173467!important;font-size:24px!important;cursor:pointer!important
+  }
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-close-text{display:none!important}
+  /* 사용자 의견 반영(2026-10): 상단에 떠 있던 색 구분 없는 "정확" 배지는 지도 탭과 동일하게
+     숨기고, 산재표 하단의 "위치 정확도" 행(.pc-site-quality-row, js/ui.js renderDetail 공용
+     생성)으로 통일한다. 이 공용 행은 .site-detail-row 클래스도 함께 갖고 있어 아래
+     .site-detail-row 규칙(display:flex!important)에 의해 라벨/값 레이아웃만 상속해
+     "위치 정확도: 정확" 형태의 민짜 텍스트로 노출되고 있었다 — 지도 탭과 같은 점(●)+색
+     텍스트 스타일을 명시적으로 적용해 통일한다. */
+  #app[data-pc-tab="favorite"] #site-detail-panel > .site-detail-quality-badge{display:none!important}
+  #app[data-pc-tab="favorite"] #site-detail-panel .pc-site-quality-value{
+    display:inline-flex!important;
+    align-items:center!important;
+    gap:6px!important;
+    padding:0!important;
+    background:transparent!important;
+    border-radius:0!important;
+    font-size:12px!important;
+    font-weight:800!important;
+    white-space:nowrap!important;
+  }
+  #app[data-pc-tab="favorite"] #site-detail-panel .pc-site-quality-value::before{
+    content:'';
+    display:inline-block;
+    flex:none;
+    width:7px;height:7px;
+    border-radius:50%;
+    background:currentColor;
+  }
+  #app[data-pc-tab="favorite"] #site-detail-panel .pc-site-quality-value.site-detail-quality-exact{color:#1f8b53!important}
+  #app[data-pc-tab="favorite"] #site-detail-panel .pc-site-quality-value.site-detail-quality-estimated{color:#b4740a!important}
+  #app[data-pc-tab="favorite"] #site-detail-panel .pc-site-quality-value.site-detail-quality-review{color:#d6324a!important}
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-hero{padding:8px 0 14px!important;border-bottom:1px solid #e4ecf7!important}
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-row{
+    display:flex!important;gap:10px!important;align-items:flex-start!important;justify-content:flex-start!important;
+    margin:0!important;padding:8px 0!important;border-bottom:1px solid #edf2f8!important
+  }
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-row-name{padding-top:0!important;border-bottom:0!important}
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-label-name{display:none!important}
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-value-name{font-size:20px!important;font-weight:900!important;letter-spacing:-.035em!important;color:#08265f!important;line-height:1.25!important}
+  /* 사용자 의견 반영(2026-10, 현장탭): 지도탭과 동일한 "디테일" 수준으로 맞춘다 —
+     라벨 좌측에 아이콘을 보이고(공용 buildDetailLabel()이 항상 만들어두지만 기본은
+     전역 숨김), 값은 라벨과 양끝 정렬한다. 모바일은 이 media query 밖이라 기존
+     라벨만 있는 레이아웃 그대로 유지된다. */
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-row:not(.site-detail-row-name){
+    justify-content:space-between!important;
+  }
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-label{
+    flex:0 0 auto!important;
+    display:inline-flex!important;
+    align-items:center!important;
+    gap:5px!important;
+    color:#7284a4!important;
+    font-size:12px!important;
+    line-height:1.5!important;
+  }
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-label-icon{
+    display:inline-flex!important;
+    flex:none!important;
+    width:14px!important;
+    height:14px!important;
+    color:#8b9fc2!important;
+  }
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-label-icon svg{width:100%!important;height:100%!important}
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-value{
+    flex:0 1 auto!important;min-width:0!important;color:#173467!important;font-size:12px!important;
+    font-weight:700!important;line-height:1.5!important;overflow-wrap:anywhere!important;text-align:right!important;
+  }
+  /* 사용자 의견 반영(2026-10, 현장탭): 메타 영역(공사금액/공사기간/지도점검/산재표/위치
+     정확도)을 지도탭처럼 연한 파란 박스 배경 대신 흰 배경+줄 구분선 스타일로 통일한다. */
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-meta{
+    display:block!important;margin:12px 0 0!important;padding:4px 12px!important;
+    border-radius:8px!important;background:#f7f9fc!important;
+  }
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-meta .site-detail-row{padding:9px 0!important;border-bottom:1px solid #e7edf5!important}
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-meta .site-detail-row:last-child{border-bottom:0!important}
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-section-title{margin:16px 0 8px!important;padding:9px 10px!important;border-left:3px solid #0b67f5!important;background:#f7faff!important;color:#173467!important;font-size:13px!important;font-weight:800!important}
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-note-textarea{width:100%!important;min-height:92px!important;box-sizing:border-box!important;border:1px solid #d6e2f3!important;border-radius:7px!important;padding:10px!important;font-size:12px!important;resize:vertical!important}
+  /* 사용자 의견 반영(2026-10, 현장탭): 즐겨찾기/경로에 추가/길찾기 3개 버튼을 지도탭과
+     동일하게 한 줄 3열로 배치한다(기존엔 2열+1행 wrap으로 "경로에 추가"만 혼자 떨어졌다). */
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-actions{
+    display:grid!important;grid-template-columns:1fr 1fr 1fr!important;gap:8px!important;margin-top:13px!important;
+  }
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-action-btn,
+  #app[data-pc-tab="favorite"] #site-detail-panel button:not(.site-detail-close-x){
+    order:3!important;min-height:44px!important;padding:0 2px!important;border:1px solid #d7e2f0!important;
+    border-radius:8px!important;background:#fff!important;color:#1c3a63!important;font-size:12.5px!important;
+    font-weight:750!important;line-height:1.25!important;white-space:normal!important;word-break:keep-all!important;cursor:pointer!important;
+  }
+  #app[data-pc-tab="favorite"] #site-detail-panel button:not(.site-detail-close-x):hover{background:#f3f8ff;border-color:#8bb1e9}
+  #app[data-pc-tab="favorite"] #site-detail-panel #site-detail-favorite-btn{display:block!important;order:1!important}
+  #app[data-pc-tab="favorite"] #site-detail-panel .pc-route-add-btn{order:2!important;background:#fff!important;border-color:#d7e2f0!important;color:#1c3a63!important;box-shadow:none!important}
+  #app[data-pc-tab="favorite"] #site-detail-panel .pc-route-add-btn.is-added{background:#eaf1fd!important;border-color:#0867ee!important;color:#0867ee!important}
+  /* 버그 수정(2026-10, 정밀검토): 지도탭과 동일한 원인 — 위 공용 .site-detail-label 규칙이
+     이 블록보다 앞에 있어 사업장명 라벨이 다시 보이던 문제. 가장 마지막에 둬서 숨김을 보장한다. */
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-label-name{display:none!important}
+
+  /* 버그 수정(2026-10, 정밀검토): "개인 메모" 저장/삭제 버튼에 현장탭 전용 스타일이 없어
+     위 즐겨찾기/길찾기/경로추가용 공용 규칙(button:not(.site-detail-close-x), 3열 그리드용
+     44px 버튼)을 그대로 물려받아 레이아웃 없이 어정쩡하게 보이던 문제 — 지도탭과 동일하게
+     2열 그리드 전용 스타일을 추가한다. 동일 specificity+!important인 위 공용 버튼 규칙보다
+     나중에 와야 이긴다(소스 순서). */
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-note-actions{
+    display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;margin-top:8px!important;flex:none!important;
+  }
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-note-actions button{
+    order:0!important;min-height:38px!important;padding:0!important;border:1px solid #cbd9ec!important;
+    border-radius:8px!important;background:#fff!important;color:#075fcf!important;font-size:12px!important;font-weight:800!important;
+  }
+  /* 사용자 요청(2026-10): 메모 삭제는 되돌릴 수 없는 동작이라 "저장"과 똑같은 파란색이면
+     실수로 누르기 쉽다는 의견 — 삭제 버튼만 빨간 계열로 구분한다(지도탭/현장탭 공통 적용). */
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-note-actions .site-detail-btn-danger,
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-note-actions .site-detail-btn-danger{
+    border-color:#f3c0c7!important;color:#d6324a!important;background:#fff!important;
+  }
+  #app[data-pc-tab="map"] #site-detail-panel .site-detail-note-actions .site-detail-btn-danger:hover,
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-note-actions .site-detail-btn-danger:hover{
     background:#fdecee!important;border-color:#e99aa5!important;
   }
 
@@ -3054,6 +3186,25 @@
     min-height:120px!important;
   }
 
+  /* STEP16.47(즐겨찾기 탭): 위 세로 flex 레이아웃(메모 textarea가 남는 공간을 차지)도
+     즐겨찾기 탭의 #site-detail-panel에 동일하게 적용한다(위치/너비는 건드리지 않음). */
+  #app[data-pc-tab="favorite"] #site-detail-panel{
+    display:flex!important;
+    flex-direction:column!important;
+  }
+  #app[data-pc-tab="favorite"] #site-detail-panel > .site-detail-hero,
+  #app[data-pc-tab="favorite"] #site-detail-panel > .site-detail-meta,
+  #app[data-pc-tab="favorite"] #site-detail-panel > .pc-site-quality-row,
+  #app[data-pc-tab="favorite"] #site-detail-panel > .site-detail-actions,
+  #app[data-pc-tab="favorite"] #site-detail-panel > .site-detail-section-title,
+  #app[data-pc-tab="favorite"] #site-detail-panel > .site-detail-note-actions{
+    flex:none!important;
+  }
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-note-textarea{
+    flex:1 1 120px!important;
+    min-height:120px!important;
+  }
+
   /* ============================================================
      사용자 요청(2026-10): UI 정밀검토 후속 개선 4건.
 
@@ -3092,6 +3243,19 @@
   }
   #app[data-pc-tab="site"] #site-detail-panel .pc-site-quality-row,
   #app[data-pc-tab="map"] #site-detail-panel .pc-site-quality-row{
+    margin:0!important;
+    padding:9px 12px!important;
+    background:#f7f9fc!important;
+    border-top:1px solid #e7edf5!important;
+    border-bottom:0!important;
+    border-radius:0 0 8px 8px!important;
+  }
+
+  /* STEP16.47(즐겨찾기 탭): 위 "위치 정확도 + 메타박스 병합" 스타일도 즐겨찾기 탭에 동일 적용. */
+  #app[data-pc-tab="favorite"] #site-detail-panel .site-detail-meta{
+    border-radius:8px 8px 0 0!important;
+  }
+  #app[data-pc-tab="favorite"] #site-detail-panel .pc-site-quality-row{
     margin:0!important;
     padding:9px 12px!important;
     background:#f7f9fc!important;
@@ -3364,6 +3528,14 @@
     font-size:12px;color:#61779c;cursor:pointer;user-select:none;
   }
   .route-label-toggle input[type="checkbox"]{ width:15px;height:15px;cursor:pointer; }
+
+  /* 사용자 요청: 경로탭에서 전체 현장 핀(일반 사업장 클러스터 핀)을 기본으로는 숨기고,
+     체크해야 보이게 하는 옵션. 위 .route-label-toggle과 동일한 스타일(PC 전용). */
+  .route-show-all-pins-toggle{
+    display:flex!important;align-items:center;gap:8px;margin:-2px 0 14px;
+    font-size:12px;color:#61779c;cursor:pointer;user-select:none;
+  }
+  .route-show-all-pins-toggle input[type="checkbox"]{ width:15px;height:15px;cursor:pointer; }
 
   /* 방문 현장 선택 / 주소 검색 시트(공용 route-picker-*) */
   .route-picker-list{ max-height:50vh;overflow-y:auto; }
