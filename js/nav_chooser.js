@@ -18,6 +18,15 @@ function naverQuery(name, lat, lng) {
   return `dlat=${lat}&dlng=${lng}&dname=${encodeURIComponent(name || '목적지')}&appname=${appName()}`;
 }
 
+// 주소 앞/뒤의 우편번호 제거 — 예: "(06292) 서울 강남구 …", "[06292] 서울…", "06292 서울…", "135-080 서울…"
+// 네이버 지도 검색은 우편번호가 붙으면 결과를 못 찾는다.
+export function stripPostalCode(addr) {
+  let t = String(addr || '').trim();
+  t = t.replace(/^[\(\[\{]?\s*\d{3}-?\d{2,3}(?![\d가-힣])\s*[\)\]\}]?[\s,]*/, '');
+  t = t.replace(/[\s,]*[\(\[\{]\s*\d{3}-?\d{2,3}(?![\d가-힣])\s*[\)\]\}]\s*$/, '');
+  return t.replace(/\s{2,}/g, ' ').trim();
+}
+
 function openNaver(name, lat, lng, address) {
   const ua = navigator.userAgent || '';
   const isAndroid = /Android/i.test(ua);
@@ -35,7 +44,7 @@ function openNaver(name, lat, lng, address) {
     return;
   }
   // PC: 네이버 지도 웹에서 해당 위치(주소 또는 이름)를 검색해 보여준다.
-  window.open(`https://map.naver.com/p/search/${encodeURIComponent(address || name || '')}`, '_blank', 'noopener,noreferrer');
+  window.open(`https://map.naver.com/p/search/${encodeURIComponent(stripPostalCode(address) || name || '')}`, '_blank', 'noopener,noreferrer');
 }
 
 let root = null;
