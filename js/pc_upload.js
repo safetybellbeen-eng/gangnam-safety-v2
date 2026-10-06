@@ -36,7 +36,7 @@ const TEMPLATE_ROWS = [
 ];
 
 const PU = {
-  tab: 'upload',          // 'upload' | 'history' | 'detail'
+  tab: 'upload',          // 'upload' | 'history'
   hist: [],
   histLoaded: false,
   histLoading: false,
@@ -44,7 +44,6 @@ const PU = {
   page: 1,
   size: 10,
   checked: new Set(),
-  detailId: null,
   vfilter: 'all',         // 검증 결과 필터: all | error | warn
   busy: '',               // '' | 'parsing' | 'preview' | 'import'
   dragOver: false,
@@ -223,7 +222,7 @@ function paint() {
   root.appendChild(titleBlock);
 
   const tabs = el('div', 'pc-up-tabs');
-  [['upload', '엑셀 업로드'], ['history', '업로드 이력'], ['detail', '업로드 상세']].forEach(([key, label]) => {
+  [['upload', '엑셀 업로드'], ['history', '업로드 이력']].forEach(([key, label]) => {
     const b = el('button', 'pc-up-tab' + (PU.tab === key ? ' active' : ''), label);
     b.type = 'button';
     b.addEventListener('click', () => { if (PU.tab !== key) { PU.tab = key; paint(); } });
@@ -242,11 +241,8 @@ function paint() {
     grid.appendChild(left);
     grid.appendChild(right);
     root.appendChild(grid);
-    root.appendChild(buildHistoryCard({ compact: true }));
-  } else if (PU.tab === 'history') {
-    root.appendChild(buildHistoryCard({ compact: false }));
   } else {
-    root.appendChild(buildDetailTab());
+    root.appendChild(buildHistoryCard({ compact: false }));
   }
 }
 
@@ -411,7 +407,7 @@ function buildAnalyzedCard(pick, input) {
   const actions = el('div', 'pc-up-actions');
   const detailBtn = el('button', 'pc-up-ghost', '검증 결과 보기');
   detailBtn.type = 'button';
-  detailBtn.addEventListener('click', () => { PU.tab = 'detail'; paint(); });
+  detailBtn.addEventListener('click', openValidationModal);
   const adv = el('button', 'pc-up-link', '고급 복구 도구(기존 화면)');
   adv.type = 'button';
   adv.title = '결과없음 CSV, 후보 검색 등 기존 PC 업로드 화면을 엽니다(파일을 다시 선택해야 합니다).';
@@ -508,39 +504,11 @@ function buildGuideBox() {
   title.appendChild(ic);
   title.appendChild(el('strong', '', '업로드 안내'));
   head.appendChild(title);
-  const dl = el('button', 'pc-up-dl');
-  dl.type = 'button';
-  dl.appendChild(icon('download', 18));
-  dl.appendChild(document.createTextNode('엑셀 양식 다운로드'));
-  dl.addEventListener('click', downloadTemplate);
-  head.appendChild(dl);
   box.appendChild(head);
   const ul = el('ul', 'pc-up-bullets');
   ['지정된 엑셀 양식에 맞게 작성한 이후 업로드해주세요.', '중복된 사업장 데이터(사업개시번호 기준)는 자동으로 업데이트됩니다.', '업로드 후 데이터 처리에는 일정 시간이 소요될 수 있습니다.'].forEach(t => ul.appendChild(el('li', '', t)));
   box.appendChild(ul);
   return box;
-}
-
-function downloadTemplate() {
-  if (typeof XLSX === 'undefined') { showToast('엑셀 라이브러리를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.', 'error'); return; }
-  try {
-    const headers = [...TEMPLATE_HEADERS, ...TEMPLATE_OPTIONAL];
-    const rows = TEMPLATE_ROWS.map(r => [...r, '', '']);
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-    // 식별번호는 앞자리 0 손실을 막기 위해 문자열 셀로 둔다.
-    const idCols = ['산재관리번호', '사업개시번호', '사업자등록번호', '법인등록번호'].map(h => headers.indexOf(h));
-    rows.forEach((r, i) => idCols.forEach(c => {
-      const ref = XLSX.utils.encode_cell({ r: i + 1, c });
-      if (ws[ref]) { ws[ref].t = 's'; ws[ref].v = String(ws[ref].v ?? ''); }
-    }));
-    ws['!cols'] = headers.map(h => ({ wch: Math.max(12, h.length * 2 + 2) }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '사업장');
-    XLSX.writeFile(wb, '사업장_업로드_양식.xlsx');
-  } catch (e) {
-    console.error('양식 다운로드 실패:', e);
-    showToast('양식 파일을 만들지 못했습니다.', 'error');
-  }
 }
 
 // ---- 우측: 양식 미리보기 / 유의사항 ----
@@ -572,7 +540,7 @@ function buildPreviewCard() {
   table.appendChild(tbody);
   wrap.appendChild(table);
   card.appendChild(wrap);
-  card.appendChild(el('p', 'pc-up-sheet-note', `※ 예시 데이터입니다. 선택 열: ${TEMPLATE_OPTIONAL.join(', ')} (양식 다운로드 파일에 포함)`));
+  card.appendChild(el('p', 'pc-up-sheet-note', `※ 예시 데이터입니다. 선택 열: ${TEMPLATE_OPTIONAL.join(', ')}`));
   return card;
 }
 
@@ -717,9 +685,8 @@ function buildHistoryCard({ compact }) {
 }
 
 function openDetail(id) {
-  PU.detailId = id;
-  PU.tab = 'detail';
-  paint();
+  const h = PU.hist.find(x => x.id === id);
+  if (h) openHistoryModal(h);
 }
 
 function openRowMenu(anchor, h) {
@@ -772,80 +739,83 @@ function exportChecked() {
   ]);
 }
 
-// ---- 업로드 상세 탭 ----
-function buildDetailTab() {
-  const wrap = el('div', 'pc-up-detail');
+// ---- 상세 팝업 (업로드 이력 / 검증 결과) ----
+function modalShell(title) {
+  const wrap = el('div', 'pc-modal-body');
+  const head = el('div', 'pc-modal-head');
+  head.appendChild(el('h3', '', title));
+  const x = el('button', 'pc-modal-close');
+  x.type = 'button';
+  x.setAttribute('aria-label', '닫기');
+  x.textContent = '×';
+  head.appendChild(x);
+  wrap.appendChild(head);
+  const m = openModal(wrap, {});
+  wrap.closest('.pc-modal').classList.add('is-wide');
+  x.addEventListener('click', m.close);
+  return { wrap, close: m.close };
+}
 
-  // (1) 선택한 업로드 이력
-  const card = el('div', 'pc-up-card');
-  card.appendChild(el('h3', 'pc-up-card-title', '업로드 이력 상세'));
-  const h = PU.hist.find(x => x.id === PU.detailId);
-  if (!h) {
-    card.appendChild(el('p', 'pc-up-detail-empty', '업로드 이력에서 “상세보기”를 선택하면 해당 업로드의 처리 내용을 확인할 수 있습니다.'));
-    const go = el('button', 'pc-up-ghost', '업로드 이력 보기');
-    go.type = 'button';
-    go.addEventListener('click', () => { PU.tab = 'history'; paint(); });
-    card.appendChild(go);
-  } else {
-    const st = statusOf(h);
-    const grid = el('div', 'pc-up-kv');
-    const rows = [
-      ['파일명', h.file_name || '-'],
-      ['업로드일시', fmtDT(h.uploaded_at)],
-      ['업로드자', h.uploaded_by_name || '-'],
-      ['엑셀 양식', FORM_SHORT[h.source_form] || h.source_form || '-'],
-      ['전체 건수', `${fmtNum(h.total_rows)}건`],
-      ['확정 건수', `${fmtNum(h.confirmed_rows)}건`],
-      ['확인필요 건수', `${fmtNum(h.review_rows)}건`],
-    ];
-    rows.forEach(([k, v]) => {
-      const row = el('div', 'pc-up-kv-row');
-      row.appendChild(el('span', 'pc-up-kv-k', k));
-      row.appendChild(el('strong', 'pc-up-kv-v', v));
-      grid.appendChild(row);
-    });
-    const srow = el('div', 'pc-up-kv-row');
-    srow.appendChild(el('span', 'pc-up-kv-k', '처리 결과'));
-    const sv = el('span', 'pc-up-kv-v');
-    sv.appendChild(el('span', 'pc-up-badge ' + st.cls, st.label));
-    sv.appendChild(el('strong', 'pc-up-td-result ' + st.resCls, st.result));
-    srow.appendChild(sv);
-    grid.appendChild(srow);
-    card.appendChild(grid);
-    card.appendChild(el('p', 'pc-up-sheet-note', '※ 확인필요 건수는 좌표를 확정하지 못해 위치 확인이 필요한 사업장 수입니다.'));
-  }
-  wrap.appendChild(card);
+function openHistoryModal(h) {
+  const { wrap, close } = modalShell('업로드 상세');
+  const st = statusOf(h);
+  const grid = el('div', 'pc-up-kv');
+  [
+    ['파일명', h.file_name || '-'],
+    ['업로드일시', fmtDT(h.uploaded_at)],
+    ['업로드자', h.uploaded_by_name || '-'],
+    ['엑셀 양식', FORM_SHORT[h.source_form] || h.source_form || '-'],
+    ['전체 건수', `${fmtNum(h.total_rows)}건`],
+    ['확정 건수', `${fmtNum(h.confirmed_rows)}건`],
+    ['확인필요 건수', `${fmtNum(h.review_rows)}건`],
+  ].forEach(([k, v]) => {
+    const row = el('div', 'pc-up-kv-row');
+    row.appendChild(el('span', 'pc-up-kv-k', k));
+    row.appendChild(el('strong', 'pc-up-kv-v', v));
+    grid.appendChild(row);
+  });
+  const srow = el('div', 'pc-up-kv-row');
+  srow.appendChild(el('span', 'pc-up-kv-k', '처리 결과'));
+  const sv = el('span', 'pc-up-kv-v');
+  sv.appendChild(el('span', 'pc-up-badge ' + st.cls, st.label));
+  sv.appendChild(el('strong', 'pc-up-td-result ' + st.resCls, st.result));
+  srow.appendChild(sv);
+  grid.appendChild(srow);
+  wrap.appendChild(grid);
+  wrap.appendChild(el('p', 'pc-up-sheet-note', '※ 확인필요 건수는 좌표를 확정하지 못해 위치 확인이 필요한 사업장 수입니다.'));
+  const actions = el('div', 'pc-modal-actions');
+  const ok = el('button', 'pc-sv-primary-btn', '확인');
+  ok.type = 'button';
+  ok.addEventListener('click', close);
+  actions.appendChild(ok);
+  wrap.appendChild(actions);
+}
 
-  // (2) 현재 파일 검증 결과
-  const vcard = el('div', 'pc-up-card');
-  vcard.appendChild(el('h3', 'pc-up-card-title', '현재 선택한 파일의 검증 결과'));
+function openValidationModal() {
+  const { wrap, close } = modalShell('검증 결과');
   const rowsAll = state.uploadParsedRows || [];
-  if (!state.uploadFileName || (!rowsAll.length && state.uploadDetectedForm)) {
-    vcard.appendChild(el('p', 'pc-up-detail-empty', '“엑셀 업로드” 탭에서 파일을 선택하면 행별 검증 결과(오류·경고)를 여기에서 확인할 수 있습니다.'));
-    wrap.appendChild(vcard);
-    return wrap;
-  }
-  vcard.appendChild(el('p', 'pc-up-detail-file', `${state.uploadFileName}${state.uploadDetectedForm ? ' · ' + FORM_SHORT[state.uploadDetectedForm] : ''}`));
-  if (!state.uploadDetectedForm) {
-    vcard.appendChild(el('p', 'pc-up-error', '인식할 수 없는 양식입니다.'));
-    wrap.appendChild(vcard);
-    return wrap;
-  }
+  wrap.appendChild(el('p', 'pc-up-detail-file', `${state.uploadFileName || ''}${state.uploadDetectedForm ? ' · ' + FORM_SHORT[state.uploadDetectedForm] : ''}`));
   const problems = rowsAll.filter(r => r._validation !== 'VALID');
   const errCount = problems.filter(r => r._validation === 'ERROR').length;
   const warnCount = problems.length - errCount;
-  const chips = el('div', 'pc-up-chips');
-  [['all', `문제 전체 ${problems.length}`], ['error', `오류 ${errCount}`], ['warn', `경고 ${warnCount}`]].forEach(([k, label]) => {
-    const b = el('button', 'pc-up-chip' + (PU.vfilter === k ? ' active' : ''), label);
-    b.type = 'button';
-    b.addEventListener('click', () => { PU.vfilter = k; paint(); });
-    chips.appendChild(b);
-  });
-  vcard.appendChild(chips);
-  const shown = problems.filter(r => PU.vfilter === 'all' || (PU.vfilter === 'error' ? r._validation === 'ERROR' : r._validation === 'WARNING'));
-  if (shown.length === 0) {
-    vcard.appendChild(el('p', 'pc-up-detail-empty', problems.length === 0 ? '모든 행이 정상입니다.' : '해당 항목이 없습니다.'));
-  } else {
+  const body = el('div');
+  let filter = 'all';
+  const draw = () => {
+    body.innerHTML = '';
+    const chips = el('div', 'pc-up-chips');
+    [['all', `문제 전체 ${problems.length}`], ['error', `오류 ${errCount}`], ['warn', `경고 ${warnCount}`]].forEach(([k, label]) => {
+      const b = el('button', 'pc-up-chip' + (filter === k ? ' active' : ''), label);
+      b.type = 'button';
+      b.addEventListener('click', () => { filter = k; draw(); });
+      chips.appendChild(b);
+    });
+    body.appendChild(chips);
+    const shown = problems.filter(r => filter === 'all' || (filter === 'error' ? r._validation === 'ERROR' : r._validation === 'WARNING'));
+    if (!shown.length) {
+      body.appendChild(el('p', 'pc-up-detail-empty', problems.length === 0 ? '모든 행이 정상입니다.' : '해당 항목이 없습니다.'));
+      return;
+    }
+    const reason = (r) => [...(r._errors || []), ...(r._warnings || [])].join(', ');
     const tw = el('div', 'pc-up-tablewrap is-scroll');
     const t = el('table', 'pc-up-table is-validate');
     const th = el('thead'); const hr = el('tr');
@@ -858,19 +828,25 @@ function buildDetailTab() {
       tr.appendChild(el('td', 'pc-up-td-file', r.site_name || r.company_name || '-'));
       tr.appendChild(el('td', '', r.business_start_no || '-'));
       const k = el('td'); k.appendChild(el('span', 'pc-up-badge ' + (r._validation === 'ERROR' ? 'is-err' : 'is-warn'), r._validation === 'ERROR' ? '오류' : '경고')); tr.appendChild(k);
-      tr.appendChild(el('td', 'pc-up-td-reason', [...(r._errors || []), ...(r._warnings || [])].join(', ')));
+      tr.appendChild(el('td', 'pc-up-td-reason', reason(r)));
       tb.appendChild(tr);
     });
-    t.appendChild(tb); tw.appendChild(t); vcard.appendChild(tw);
-    if (shown.length > 300) vcard.appendChild(el('p', 'pc-up-sheet-note', `※ 처음 300건만 표시합니다. (전체 ${fmtNum(shown.length)}건)`));
+    t.appendChild(tb); tw.appendChild(t); body.appendChild(tw);
+    if (shown.length > 300) body.appendChild(el('p', 'pc-up-sheet-note', `※ 처음 300건만 표시합니다. (전체 ${fmtNum(shown.length)}건)`));
     const csv = el('button', 'pc-up-link', '검증 결과 CSV 저장');
     csv.type = 'button';
     csv.addEventListener('click', () => downloadCsv('검증결과.csv', [
       ['엑셀 행', '사업장명', '사업개시번호', '구분', '사유'],
-      ...shown.map(r => [(r._rowIndex ?? 0) + 2, r.site_name || r.company_name || '', r.business_start_no || '', r._validation === 'ERROR' ? '오류' : '경고', [...(r._errors || []), ...(r._warnings || [])].join(', ')]),
+      ...shown.map(r => [(r._rowIndex ?? 0) + 2, r.site_name || r.company_name || '', r.business_start_no || '', r._validation === 'ERROR' ? '오류' : '경고', reason(r)]),
     ]));
-    vcard.appendChild(csv);
-  }
-  wrap.appendChild(vcard);
-  return wrap;
+    body.appendChild(csv);
+  };
+  draw();
+  wrap.appendChild(body);
+  const actions = el('div', 'pc-modal-actions');
+  const ok = el('button', 'pc-sv-primary-btn', '닫기');
+  ok.type = 'button';
+  ok.addEventListener('click', close);
+  actions.appendChild(ok);
+  wrap.appendChild(actions);
 }
