@@ -9,6 +9,7 @@ import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
 import { renderSiteList, renderPcSiteTable, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView, renderHeaderUploadDate, setSiteSearchMode, renderSiteNotesPanel, renderAppSettingsPanel, restorePcSiteFiltersToRow, updateDongFilterLabel } from './ui.js';
 import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
+import { renderPcSupervisionPage, renderPcNotesPage } from './pc_pages.js';
 
 const VIEWS = [
   'view-login', 'view-signup', 'view-signup-done',
@@ -254,6 +255,7 @@ function routeByProfile() {
 
   switch (profile.status) {
     case 'approved':
+      if (profile.name && document.getElementById('pc-user-name')) document.getElementById('pc-user-name').textContent = `${profile.name} 감독관`;
       document.getElementById('approved-role-badge').textContent =
         isAdmin() ? '관리자 계정입니다.' : '';
       // 관리자에게만 회원 관리 버튼을 보여준다. UI 숨김은 편의 목적일 뿐,
@@ -520,6 +522,14 @@ function bindDetailPanelSwipeToClose() {
   panel.addEventListener('pointercancel', endDrag);
 }
 
+function showPcPageError(tab, err) {
+  console.error('[PC 페이지 렌더 오류]', tab, err);
+  const root = document.getElementById(tab === 'supervision' ? 'pc-supervision-page' : 'pc-notes-page');
+  if (root && !root.children.length) {
+    root.innerHTML = '<div style="padding:40px;color:#c62828;font-size:15px">화면을 불러오지 못했습니다. 새로고침(Ctrl+F5) 후에도 반복되면 F12 콘솔의 오류를 알려주세요.<br><small>' + String(err && err.message || err).replace(/</g, '&lt;') + '</small></div>';
+  }
+}
+
 function activatePcTab(tab) {
   if (window.matchMedia('(max-width: 768px)').matches) return;
   const appEl = document.getElementById('app');
@@ -536,6 +546,8 @@ function activatePcTab(tab) {
     map: ['지도', '강남구 사업장을 지도에서 확인하고 현장 정보를 조회할 수 있습니다.', '<path d="M3 6.5 8 4l8 2.5L21 4v13.5L16 20l-8-2.5L3 20V6.5Z"/><path d="M8 4v13.5M16 6.5V20"/>'],
     site: ['현장', '강남구 사업장 목록을 조회하고, 상세 정보를 확인할 수 있습니다.', '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 9h6M9 13h6M9 17h4"/>'],
     route: ['경로', '선택한 현장의 방문 순서를 확인하고 경로를 관리할 수 있습니다.', '<circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h2a3 3 0 0 0 3-3V9a3 3 0 0 1 3-3"/>'],
+    supervision: ['감독일정관리', '감독 일정을 한눈에 확인하고 관리할 수 있습니다.', '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/>'],
+    notes: ['현장 메모', '현장별 메모를 작성하고 관리할 수 있습니다.', '<path d="M6 3h9l3 3v15H6V3Z"/><path d="M14 3v4h4M9 11h6M9 15h6"/>'],
     favorite: ['즐겨찾기', '자주 방문하는 현장을 즐겨찾기로 등록하여 빠르게 확인할 수 있습니다.', '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z"/>']
   };
   const [title, desc, iconPath] = meta[tab] || meta.map;
@@ -551,6 +563,13 @@ function activatePcTab(tab) {
   // STEP16.45: 즐겨찾기 탭도 "현장" 탭과 같은 표(검색/필터/정렬/페이지네이션)를 재사용한다.
   if (tab === 'site' || tab === 'favorite') {
     renderPcSiteTable();
+  } else if (tab === 'supervision' || tab === 'notes') {
+    restorePcSiteFiltersToRow();
+    try {
+      Promise.resolve(tab === 'supervision' ? renderPcSupervisionPage() : renderPcNotesPage()).catch((err) => showPcPageError(tab, err));
+    } catch (err) {
+      showPcPageError(tab, err);
+    }
   } else {
     // 버그 수정(2026-10): 현장 탭에서 실제 필터 <details>를 #pc-site-table-filters로
     // 옮겨 썼다면(movePcSiteFiltersIntoTable), 지도 탭으로 돌아올 때 #site-filter-row의
