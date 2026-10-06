@@ -4655,3 +4655,6 @@
 .pc-qr-tip{margin-top:18px;padding:12px 14px;background:#f3f6fb;border-radius:10px;font-size:12px;color:#7b889c;line-height:1.5}
 .pc-qr-modal-box{height:auto;min-height:500px;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",Pretendard,"Noto Sans KR","Segoe UI",sans-serif}
 .pc-qr-modal-box button{font-family:inherit}
+/* 모바일/TWA: PC 전용 목록 헤더("현장 전체 N개 ☆")가 스타일 없이 노출되던 문제 — 기본 숨김.
+   PC(≥769px)에서는 위 @media 블록의 #app[data-pc-tab="map"] 규칙이 다시 보이게 한다. */
+#pc-site-list-head{display:none}
