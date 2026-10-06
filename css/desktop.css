@@ -4658,3 +4658,6 @@
 /* 모바일/TWA: PC 전용 목록 헤더("현장 전체 N개 ☆")가 스타일 없이 노출되던 문제 — 기본 숨김.
    PC(≥769px)에서는 위 @media 블록의 #app[data-pc-tab="map"] 규칙이 다시 보이게 한다. */
 #pc-site-list-head{display:none}
+/* 모바일/TWA: PC 전용 지도 도구 모음(현재 위치/지도 초기화)이 스타일 없이 노출되던 문제 — 기본 숨김.
+   PC(≥769px)는 @media 안의 #app[data-pc-tab="map|route"] 규칙이 다시 보이게 한다. */
+#pc-map-toolbar{display:none}
