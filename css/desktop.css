@@ -4174,4 +4174,15 @@
   .pc-ad-undo-btn{height:32px;padding:0 14px;border:1px solid rgba(255,255,255,.5);border-radius:5px;background:transparent;color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer}.pc-ad-undo-btn:hover{background:rgba(255,255,255,.14)}
   .pc-modal.is-wide{width:min(860px,100%)}
   .pc-modal.is-wide .pc-up-tablewrap.is-scroll{max-height:380px}
+  .pc-up-rec-open{margin-top:8px}
+  .pc-up-ghost.is-small{height:30px;padding:0 10px;font-size:13px}
+  .pc-up-rec{display:flex;flex-direction:column;gap:10px}
+  .pc-up-rec-sum{margin:0;font-size:15px;font-weight:700;color:#0b2358}
+  .pc-up-rec-step{padding:10px 14px;border:1px solid #dbe6f5;border-radius:6px;background:#fff}
+  .pc-up-rec-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .pc-up-rec-title{display:flex;align-items:baseline;gap:10px}.pc-up-rec-title strong{font-size:15.5px;color:#0b2358}.pc-up-rec-count{font-size:13px;color:#5c7099}
+  .pc-up-rec-desc{margin:4px 0 0;font-size:13.5px;color:#46608f;line-height:1.5}
+  .pc-up-rec .pc-up-progress:empty{display:none}
+  .pc-up-td-reason{white-space:pre-line!important}
+  .pc-modal.is-wide{max-height:calc(100vh - 40px)}
 }
