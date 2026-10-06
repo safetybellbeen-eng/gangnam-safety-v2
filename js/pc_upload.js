@@ -515,47 +515,11 @@ function buildGuideBox() {
   title.appendChild(ic);
   title.appendChild(el('strong', '', '업로드 안내'));
   head.appendChild(title);
-  const dl = el('button', 'pc-up-dl');
-  dl.type = 'button';
-  dl.appendChild(icon('download', 18));
-  dl.appendChild(document.createTextNode('엑셀 양식 다운로드'));
-  dl.addEventListener('click', downloadTemplate);
-  head.appendChild(dl);
   box.appendChild(head);
   const ul = el('ul', 'pc-up-bullets');
   ['지정된 엑셀 양식에 맞게 작성한 이후 업로드해주세요.', '중복된 사업장 데이터(사업개시번호 기준)는 자동으로 업데이트됩니다.', '업로드 후 데이터 처리에는 일정 시간이 소요될 수 있습니다.'].forEach(t => ul.appendChild(el('li', '', t)));
   box.appendChild(ul);
   return box;
-}
-
-function downloadTemplate() {
-  if (typeof XLSX === 'undefined') { showToast('엑셀 라이브러리를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.', 'error'); return; }
-  try {
-    // excel.js가 인식하는 '양식 2' 열 이름과 동일하다(선택 열 포함). 식별번호는 앞자리 0 손실을 막기 위해 문자열 셀로 둔다.
-    const headers = [...TEMPLATE_HEADERS, ...TEMPLATE_OPTIONAL];
-    const rows = TEMPLATE_ROWS.map(r => [...r, '', '']);
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-    const idCols = ['산재관리번호', '사업개시번호', '사업자등록번호', '법인등록번호'].map(h => headers.indexOf(h));
-    rows.forEach((r, i) => idCols.forEach(c => {
-      const ref = XLSX.utils.encode_cell({ r: i + 1, c });
-      if (ws[ref]) { ws[ref].t = 's'; ws[ref].v = String(ws[ref].v ?? ''); }
-    }));
-    ws['!cols'] = headers.map(h => ({ wch: Math.max(12, h.length * 2 + 2) }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '사업장');
-    const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = '사업장_업로드_양식.xlsx';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(link.href), 1500);
-  } catch (e) {
-    console.error('양식 다운로드 실패:', e);
-    showToast('양식 파일을 만들지 못했습니다.', 'error');
-  }
 }
 
 // ---- 우측: 양식 미리보기 / 유의사항 ----
@@ -587,7 +551,7 @@ function buildPreviewCard() {
   table.appendChild(tbody);
   wrap.appendChild(table);
   card.appendChild(wrap);
-  card.appendChild(el('p', 'pc-up-sheet-note', `※ 예시 데이터입니다. 선택 열: ${TEMPLATE_OPTIONAL.join(', ')} (양식 다운로드 파일에 포함)`));
+  card.appendChild(el('p', 'pc-up-sheet-note', `※ 예시 데이터입니다. 선택 열: ${TEMPLATE_OPTIONAL.join(', ')}`));
   return card;
 }
 
