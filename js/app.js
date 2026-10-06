@@ -2,6 +2,7 @@
 // 지도/사업장 등 실제 기능은 이후 STEP에서 추가한다 (CLAUDE.md 12절: 대규모 UI 금지).
 import { CONFIG } from './config.js';
 import { maybeStartTutorial, startTutorial } from './pc_tutorial.js';
+import { bindPcAddressSearch } from './pc_address_search.js';
 import { state } from './state.js';
 import { sb } from './api.js';
 import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, verifySignupCode, checkIdExists, checkLoginLock, translateAuthError } from './auth.js';
@@ -830,15 +831,8 @@ function bindPcWorkspace() {
     });
   }
 
-  const globalSearch = document.getElementById('pc-global-search-input');
-  const siteSearch = document.getElementById('site-search-input');
-  if (globalSearch && siteSearch) {
-    globalSearch.addEventListener('input', () => {
-      siteSearch.value = globalSearch.value;
-      siteSearch.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    siteSearch.addEventListener('input', () => { globalSearch.value = siteSearch.value; if (pcSiteSearch) pcSiteSearch.value = siteSearch.value; });
-  }
+  // 상단 검색창은 "일반주소 검색" 전용(js/pc_address_search.js) — 사업장 검색창과 값을 공유하지 않는다.
+  bindPcAddressSearch();
 
   bindPcQrModal();
 }

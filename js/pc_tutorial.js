@@ -83,7 +83,9 @@ function buildSteps() {
   const visible = (sel) => { const n = document.querySelector(sel); return !!n && n.getBoundingClientRect().width > 0; };
   const steps = [
     { sel: '.pc-nav-btn[data-pc-tab="map"]', title: '지도 — 핀 색으로 위치 정확도 확인', text: '초록·노랑·빨강 핀은 위치 정확도(정확/중간/낮음)예요. 핀이나 왼쪽 목록을 누르면 오른쪽에 상세 정보가 열려요.' },
-    { sel: '.pc-nav-btn[data-pc-tab="site"]', title: '현장 — 표로 조회하고 지도에서 확인', text: '필터·정렬로 사업장을 찾고, 상세의 “지도보기” 버튼을 누르면 지도에서 바로 위치를 볼 수 있어요.' },
+    { sel: '#site-filter-row', title: '사업장 필터링 — 원하는 현장만 골라 보기', text: '관할(동)·공사금액·점검·산재표 필터를 조합해 대상 사업장만 추려요. 선택한 필터는 지도 핀과 목록·현장 탭 표에 함께 적용되고, “필터 초기화”로 한 번에 되돌릴 수 있어요.' },
+    { sel: '.pc-global-search', title: '일반주소 검색', text: '도로명·지번·건물명을 입력하면 결과가 나와요. 결과를 누르면 지도에 핀이 찍히고, “주소복사”·“길찾기”도 쓸 수 있어요. 사업장 검색은 왼쪽 목록의 검색창에서 해요.', below: true },
+    { sel: '.pc-nav-btn[data-pc-tab="site"]', title: '현장 — 표로 조회하고 지도에서 확인', text: '같은 필터·정렬로 사업장을 표로 찾고, 상세의 “지도보기” 버튼을 누르면 지도에서 바로 위치를 볼 수 있어요.' },
     { sel: '.pc-nav-btn[data-pc-tab="route"]', title: '경로 — 방문 순서 만들기', text: '방문할 현장을 담고 순서를 정하면 지도에 번호 핀으로 표시돼요. 방문 완료도 체크할 수 있어요.' },
     { sel: '.pc-nav-btn[data-pc-tab="favorite"]', title: '즐겨찾기 — 자주 가는 현장만 모아보기', text: '별(☆)을 눌러 등록한 현장만 표와 미니 지도로 확인해요.' },
     { sel: '.pc-nav-btn[data-pc-tab="supervision"]', title: '감독일정관리 — 달력으로 일정 관리', text: '감독 일정을 등록·수정하고 예정/진행/완료 현황을 한눈에 확인해요.' },
@@ -114,7 +116,7 @@ function showWelcome(onStart) {
   const right = el('div', 'tw-right');
   right.appendChild(el('h2', '', '이런 것들을 할 수 있어요'));
   right.appendChild(el('div', 'tw-sub', '왼쪽 메뉴를 하나씩 짚어 가며 설명해 드려요.'));
-  [['●', '지도에서 한눈에', '핀 색으로 위치 정확도를 확인하고, 핀을 누르면 상세 정보가 열려요.'],
+  [['●', '지도에서 한눈에', '핀 색으로 위치 정확도를 확인하고, 관할·공사금액·점검·산재표 필터로 원하는 사업장만 골라 봐요.'],
    ['↗', '경로 · 즐겨찾기', '방문할 현장을 담아 순서를 만들고, 자주 가는 현장은 즐겨찾기로 모아요.'],
    ['✎', '일정 · 메모', '감독일정을 달력으로 관리하고, 현장별 메모를 남겨요.']].forEach(([ic, b, s]) => {
     const f = el('div', 'tw-feat');

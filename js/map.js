@@ -679,6 +679,40 @@ export function searchPlacesKeyword(query) {
   });
 }
 
+// 사용자 요청(PC 상단 "일반주소 검색"): 도로명/지번 주소는 Geocoder.addressSearch, 건물·장소명은
+// Places.keywordSearch로 동시에 검색해 합친다(좌표 중복 제거). JS SDK 공개 키만 사용 — DB 저장 없음.
+export async function searchAddressAndPlaces(query) {
+  const q = (query || '').trim();
+  if (!q || !window.kakao || !kakao.maps.services) return [];
+  const byAddress = new Promise((resolve) => {
+    try {
+      const geocoder = new kakao.maps.services.Geocoder();
+      geocoder.addressSearch(q, (result, status) => {
+        if (status !== kakao.maps.services.Status.OK || !Array.isArray(result)) { resolve([]); return; }
+        resolve(result.map(r => {
+          const road = (r.road_address && r.road_address.address_name) || '';
+          const jibun = (r.address && r.address.address_name) || r.address_name || '';
+          return {
+            name: road || jibun || q,
+            roadAddress: road,
+            address: jibun,
+            lat: Number(r.y),
+            lng: Number(r.x)
+          };
+        }).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng)));
+      });
+    } catch (e) { resolve([]); }
+  });
+  const [addr, places] = await Promise.all([byAddress, searchPlacesKeyword(q)]);
+  const seen = new Set();
+  return [...addr, ...places].filter(r => {
+    const key = `${r.lat.toFixed(5)},${r.lng.toFixed(5)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 // ============================================================
 // STEP16.30-1: 주소/장소 검색 결과를 클릭하면 지도에 임시 핀으로 표시한다(사용자 요청).
 // 등록된 사업장 마커(state.markers/클러스터러)와는 완전히 별개이며, 클러스터러에도 넣지 않고
