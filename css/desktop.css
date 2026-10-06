@@ -4599,4 +4599,9 @@
     background: #1a8f4c;
   }
   #pc-user-menu,#pc-user-menu *{font-family:Arial,'Noto Sans KR','Malgun Gothic',sans-serif}
+
+  /* 현장/즐겨찾기 상세의 "지도보기" 버튼 */
+  #site-detail-panel .pc-site-map-view-btn{background:#fff;color:#0b63f6;border:1px solid #0b63f6}
+  #site-detail-panel .pc-site-map-view-btn:hover:not(:disabled){background:#f1f6ff}
+  #site-detail-panel .pc-site-map-view-btn:disabled{opacity:.45;cursor:not-allowed}
 }
