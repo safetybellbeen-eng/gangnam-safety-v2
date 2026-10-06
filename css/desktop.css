@@ -4661,3 +4661,17 @@
 /* 모바일/TWA: PC 전용 지도 도구 모음(현재 위치/지도 초기화)이 스타일 없이 노출되던 문제 — 기본 숨김.
    PC(≥769px)는 @media 안의 #app[data-pc-tab="map|route"] 규칙이 다시 보이게 한다. */
 #pc-map-toolbar{display:none}
+/* PC 상단 "일반주소 검색" 결과 드롭다운(body 직속, 모바일에서는 열리지 않음). */
+#pc-address-dropdown{position:fixed;z-index:1500;max-height:440px;overflow:auto;background:#fff;border:1px solid #d9e5f5;border-radius:12px;box-shadow:0 14px 40px rgba(8,30,70,.22);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",Pretendard,"Noto Sans KR","Segoe UI",sans-serif}
+#pc-address-dropdown[hidden]{display:none!important}
+.pc-addr-head{padding:10px 16px 8px;font-size:12px;font-weight:700;color:#1f5eff;border-bottom:1px solid #eef3fa}
+.pc-addr-empty{padding:18px 16px;font-size:13px;color:#61779c;line-height:1.5}
+.pc-addr-item{display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f1f5fb;cursor:pointer}
+.pc-addr-item:last-child{border-bottom:0}
+.pc-addr-item:hover{background:#f5f9ff}
+.pc-addr-text{flex:1;min-width:0}
+.pc-addr-name{font-size:14px;font-weight:700;color:#0b2358;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc-addr-addr{margin-top:2px;font-size:12px;color:#61779c;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc-addr-actions{display:flex;gap:6px;flex:none}
+.pc-addr-actions button{height:28px;padding:0 10px;border:1px solid #d1deef;border-radius:7px;background:#fff;color:#36547f;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.pc-addr-actions button.primary{background:#1f5eff;border-color:#1f5eff;color:#fff}
