@@ -164,7 +164,13 @@ const AD = {
   status: 'all',      // 'all' | pending | approved | rejected | disabled
   role: 'all',        // 'all' | user | admin | master
   q: '',
-  sort: 'desc',       // 가입일 정렬
+  sortKey: 'created', // name | email | status | created | login
+  sortDir: 'desc',
+  sortExplicit: false, // 사용자가 열 제목을 눌러 정렬하기 전에는 '전체' 탭에서 승인대기를 맨 위에 둔다
+  dormant: false,     // 장기 미접속(승인완료 + 30일 이상) 필터
+  from: '',           // 가입일 시작(YYYY-MM-DD)
+  to: '',
+  kb: false,          // 키보드로 표를 조작 중인지(다시 그릴 때 포커스 복원)
   page: 1,
   size: 10,
   selectedId: null,
@@ -176,20 +182,69 @@ let adMenuCleanup = null;
 
 function currentUserId() { return state.user && state.user.id; }
 
+const DORMANT_DAYS = 30;
+const STATUS_ORDER = { pending: 0, approved: 1, rejected: 2, disabled: 3 };
+function daysSince(iso) {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return null;
+  return Math.max(0, Math.floor((Date.now() - t) / 86400000));
+}
+// 장기 미접속: 승인완료 회원 중 마지막 접속(없으면 가입일)이 30일 이상 지난 경우.
+function idleDays(u) {
+  if (u.status !== 'approved') return null;
+  return daysSince(u.last_login_at || u.created_at);
+}
+function isDormant(u) { const d = idleDays(u); return d !== null && d >= DORMANT_DAYS; }
+function ymdLocal(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+function filtersActive() {
+  return AD.status !== 'all' || AD.role !== 'all' || !!AD.q.trim() || AD.dormant || !!AD.from || !!AD.to;
+}
+function resetFilters() {
+  AD.status = 'all'; AD.role = 'all'; AD.q = ''; AD.dormant = false; AD.from = ''; AD.to = ''; AD.page = 1;
+}
+
 function filteredUsers() {
   const q = AD.q.trim().toLowerCase();
   const rows = (state.adminUsers || []).filter((u) => {
     if (AD.status !== 'all' && u.status !== AD.status) return false;
     if (AD.role !== 'all' && u.role !== AD.role) return false;
+    if (AD.dormant && !isDormant(u)) return false;
+    if (AD.from || AD.to) {
+      const ymd = u.created_at ? ymdLocal(u.created_at) : '';
+      if (!ymd) return false;
+      if (AD.from && ymd < AD.from) return false;
+      if (AD.to && ymd > AD.to) return false;
+    }
     if (q) {
       const hay = `${u.name || ''} ${u.email || ''}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
   });
+  const val = (u) => {
+    switch (AD.sortKey) {
+      case 'name': return u.name || '';
+      case 'email': return u.email || '';
+      case 'status': return STATUS_ORDER[u.status] ?? 9;
+      case 'login': return u.last_login_at || '';
+      default: return u.created_at || '';
+    }
+  };
+  const dir = AD.sortDir === 'asc' ? 1 : -1;
+  const pendingFirst = AD.status === 'all' && !AD.sortExplicit;
   rows.sort((a, b) => {
-    const r = String(a.created_at || '').localeCompare(String(b.created_at || ''));
-    return AD.sort === 'asc' ? r : -r;
+    if (pendingFirst) {
+      const pa = a.status === 'pending' ? 0 : 1, pb = b.status === 'pending' ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+    }
+    const x = val(a), y = val(b);
+    const r = typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'ko');
+    return r * dir;
   });
   return rows;
 }
@@ -219,6 +274,55 @@ function actionsFor(u) {
   return [];
 }
 
+let undoTimer = null;
+function showUndo(message, onUndo) {
+  const old = document.querySelector('.pc-ad-undo');
+  if (old) old.remove();
+  clearTimeout(undoTimer);
+  const bar = el('div', 'pc-ad-undo');
+  bar.appendChild(el('span', '', message));
+  const b = el('button', 'pc-ad-undo-btn', '되돌리기');
+  b.type = 'button';
+  b.addEventListener('click', async () => {
+    b.disabled = true;
+    clearTimeout(undoTimer);
+    bar.remove();
+    await onUndo();
+  });
+  bar.appendChild(b);
+  document.body.appendChild(bar);
+  undoTimer = setTimeout(() => bar.remove(), 8000);
+}
+
+async function undoStatuses(list) {
+  let fail = 0;
+  for (const { id, prev } of list) {
+    const r = await setUserStatus(id, prev);
+    if (!r.ok) fail++;
+  }
+  showToast(fail ? `${list.length - fail}명 되돌림, ${fail}명 실패` : '이전 상태로 되돌렸습니다.', fail ? undefined : 'success');
+  await loadUsers();
+  const root = document.getElementById('pc-admin-page');
+  if (root && root.children.length) paint();
+}
+
+async function runBulk(label, users, target) {
+  const okc = await confirmModal({ title: label, message: `선택한 회원 ${users.length}명에 대해 "${label}"을(를) 진행하시겠습니까?`, confirmLabel: label });
+  if (!okc) return;
+  const done = [];
+  let fail = 0;
+  for (const u of users) {
+    const prev = u.status;
+    const r = await setUserStatus(u.id, target);
+    if (r.ok) done.push({ id: u.id, prev }); else fail++;
+  }
+  AD.checked = new Set();
+  await loadUsers();
+  paint();
+  if (!done.length) { showToast('처리에 실패했습니다.'); return; }
+  showUndo(fail ? `${done.length}명 처리, ${fail}명 실패` : `${done.length}명을 처리했습니다.`, () => undoStatuses(done));
+}
+
 async function runAction(u, action) {
   const ok = await confirmModal({
     title: action.label,
@@ -230,6 +334,8 @@ async function runAction(u, action) {
   if (!state.adminUserInFlight) state.adminUserInFlight = new Set();
   if (state.adminUserInFlight.has(u.id)) return;
   state.adminUserInFlight.add(u.id);
+  const prevStatus = u.status;
+  let undoable = false;
   try {
     let result;
     if (action.type === 'reset-password') {
@@ -242,7 +348,7 @@ async function runAction(u, action) {
     else if (action.type === 'role') result = await setUserRole(u.id, action.key);
     else result = await setUserStatus(u.id, action.key);
     if (!result.ok) { showToast(result.message || '처리에 실패했습니다.'); return; }
-    showToast('처리되었습니다.', 'success');
+    if (action.type === 'status') undoable = true; else showToast('처리되었습니다.', 'success');
   } finally {
     state.adminUserInFlight.delete(u.id);
   }
@@ -251,6 +357,7 @@ async function runAction(u, action) {
   AD.checked.delete(u.id);
   if (!(state.adminUsers || []).some(x => x.id === AD.selectedId)) AD.selectedId = null;
   paint();
+  if (undoable) showUndo('처리되었습니다.', () => undoStatuses([{ id: u.id, prev: prevStatus }]));
 }
 
 function openRoleModal(u) {
@@ -290,7 +397,7 @@ export async function renderPcAdminPage() {
     root.appendChild(el('p', 'pc-ad-denied', '회원관리는 관리자만 이용할 수 있습니다.'));
     return;
   }
-  AD.status = 'all'; AD.role = 'all'; AD.q = ''; AD.page = 1; AD.checked = new Set();
+  resetFilters(); AD.sortKey = 'created'; AD.sortDir = 'desc'; AD.sortExplicit = false; AD.checked = new Set();
   await loadUsers();
   AD.loadError = !!state.adminLoadError;
   AD.loaded = true;
@@ -339,7 +446,12 @@ function paint() {
     ['approved', 'check', '승인완료', count('approved')],
     ['rejected', 'x', '거절', count('rejected')],
   ].forEach(([key, ic, label, n]) => {
-    const card = el('div', `pc-ad-stat is-${key}`);
+    const card = el('div', `pc-ad-stat is-${key}` + (key === 'pending' && n > 0 ? ' has-alert' : ''));
+    card.classList.add('is-link');
+    card.tabIndex = 0;
+    const goStat = () => { AD.status = key === 'total' ? 'all' : key; AD.page = 1; paint(); };
+    card.addEventListener('click', goStat);
+    card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goStat(); } });
     const iconBox = el('span', 'pc-ad-stat-icon');
     iconBox.appendChild(icon(ic, key === 'total' ? 28 : 26));
     card.appendChild(iconBox);
@@ -392,39 +504,80 @@ function paint() {
   bar.appendChild(sbtn);
   main.appendChild(bar);
 
+  // ---- 빠른 필터: 장기 미접속 / 가입일 기간 / 초기화
+  const frow = el('div', 'pc-ad-filterrow');
+  const dormantCount = all.filter(isDormant).length;
+  const chip = el('button', 'pc-ad-chip' + (AD.dormant ? ' active' : ''), `장기 미접속 ${DORMANT_DAYS}일+ (${dormantCount})`);
+  chip.type = 'button';
+  chip.title = '승인완료 회원 중 마지막 접속(없으면 가입일)이 30일 이상 지난 회원';
+  chip.addEventListener('click', () => { AD.dormant = !AD.dormant; AD.page = 1; paint(); });
+  frow.appendChild(chip);
+  const range = el('div', 'pc-ad-range');
+  range.appendChild(el('span', '', '가입일'));
+  const fromIn = el('input'); fromIn.type = 'date'; fromIn.value = AD.from; fromIn.max = AD.to || '';
+  const toIn = el('input'); toIn.type = 'date'; toIn.value = AD.to; toIn.min = AD.from || '';
+  fromIn.addEventListener('change', () => { AD.from = fromIn.value; AD.page = 1; paint(); });
+  toIn.addEventListener('change', () => { AD.to = toIn.value; AD.page = 1; paint(); });
+  range.appendChild(fromIn);
+  range.appendChild(el('span', '', '~'));
+  range.appendChild(toIn);
+  frow.appendChild(range);
+  if (filtersActive()) {
+    const rst = el('button', 'pc-ad-reset', '필터 초기화');
+    rst.type = 'button';
+    rst.addEventListener('click', () => { resetFilters(); paint(); });
+    frow.appendChild(rst);
+  }
+  main.appendChild(frow);
+
   // ---- 표
   const rows = filteredUsers();
   const pages = Math.max(1, Math.ceil(rows.length / AD.size));
   if (AD.page > pages) AD.page = pages;
   const pageRows = rows.slice((AD.page - 1) * AD.size, AD.page * AD.size);
 
-  const pendingChecked = Array.from(AD.checked).filter(id => {
-    const u = all.find(x => x.id === id);
-    return u && u.status === 'pending' && u.id !== currentUserId();
-  });
-  if (pendingChecked.length > 0) {
+  const checkedUsers = Array.from(AD.checked).map(id => all.find(x => x.id === id)).filter(u => u && u.id !== currentUserId());
+  if (checkedUsers.length > 0) {
     const bulk = el('div', 'pc-ad-bulkbar');
-    bulk.appendChild(el('span', '', `승인대기 ${pendingChecked.length}명 선택됨`));
-    const bb = el('button', 'pc-sv-primary-btn is-small', '일괄 승인');
-    bb.type = 'button';
-    bb.addEventListener('click', async () => {
-      const okc = await confirmModal({ title: '일괄 승인', message: `선택한 승인대기 회원 ${pendingChecked.length}명을 모두 승인하시겠습니까?`, confirmLabel: '일괄 승인' });
-      if (!okc) return;
-      let fail = 0;
-      for (const id of pendingChecked) {
-        const r = await setUserStatus(id, 'approved');
-        if (!r.ok) fail++;
-      }
-      showToast(fail ? `${pendingChecked.length - fail}명 승인, ${fail}명 실패` : `${pendingChecked.length}명을 승인했습니다.`, fail ? undefined : 'success');
-      AD.checked = new Set();
-      await loadUsers();
-      paint();
+    bulk.appendChild(el('span', '', `${checkedUsers.length}명 선택됨`));
+    const groups = [
+      ['일괄 승인', checkedUsers.filter(u => u.status === 'pending'), 'approved', 'pc-sv-primary-btn is-small'],
+      ['일괄 반려', checkedUsers.filter(u => u.status === 'pending'), 'rejected', 'pc-sv-danger-btn is-small'],
+      ['일괄 재승인', checkedUsers.filter(u => u.status === 'rejected' || u.status === 'disabled'), 'approved', 'pc-sv-secondary-btn is-small'],
+      ['일괄 휴면 전환', checkedUsers.filter(u => u.status === 'approved'), 'disabled', 'pc-sv-secondary-btn is-small'],
+    ];
+    groups.forEach(([label, list, target, cls]) => {
+      if (!list.length) return;
+      const bb = el('button', cls, `${label} (${list.length})`);
+      bb.type = 'button';
+      bb.addEventListener('click', () => runBulk(label, list, target));
+      bulk.appendChild(bb);
     });
-    bulk.appendChild(bb);
+    const clr = el('button', 'pc-ad-reset', '선택 해제');
+    clr.type = 'button';
+    clr.addEventListener('click', () => { AD.checked = new Set(); paint(); });
+    bulk.appendChild(clr);
     main.appendChild(bulk);
   }
 
   const wrap = el('div', 'pc-ad-tablewrap');
+  wrap.tabIndex = 0;
+  wrap.setAttribute('aria-label', '회원 목록. 위/아래 방향키로 이동, Enter로 관리 기능으로 이동, Esc로 선택 해제');
+  wrap.addEventListener('keydown', (e) => {
+    if (e.target !== wrap) return;
+    const idx = pageRows.findIndex(x => x.id === AD.selectedId);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (!pageRows.length) return;
+      e.preventDefault();
+      const next = e.key === 'ArrowDown' ? Math.min(pageRows.length - 1, idx + 1) : Math.max(0, idx < 0 ? 0 : idx - 1);
+      AD.selectedId = pageRows[next].id; AD.kb = true; paint();
+    } else if (e.key === 'Enter') {
+      const b = document.querySelector('#pc-admin-page .pc-ad-act-primary, #pc-admin-page .pc-ad-act');
+      if (b) { e.preventDefault(); AD.kb = false; b.focus(); }
+    } else if (e.key === 'Escape') {
+      AD.selectedId = null; AD.kb = true; paint();
+    }
+  });
   const table = el('table', 'pc-ad-table');
   const thead = el('thead');
   const hr = el('tr');
@@ -439,16 +592,27 @@ function paint() {
   });
   thCheck.appendChild(allBox);
   hr.appendChild(thCheck);
-  ['사용자', '계정(이메일)', '상태'].forEach(h => hr.appendChild(el('th', '', h)));
-  const thDate = el('th', 'pc-ad-th-sort');
-  const dateBtn = el('button', 'pc-ad-sort-btn');
-  dateBtn.type = 'button';
-  dateBtn.appendChild(document.createTextNode('가입일'));
-  dateBtn.appendChild(icon(AD.sort === 'asc' ? 'sortUp' : 'sortDown', 14));
-  dateBtn.addEventListener('click', () => { AD.sort = AD.sort === 'asc' ? 'desc' : 'asc'; paint(); });
-  thDate.appendChild(dateBtn);
-  hr.appendChild(thDate);
-  hr.appendChild(el('th', '', '최근접속'));
+  const sortTh = (key, label) => {
+    const th = el('th', 'pc-ad-th-sort');
+    const on = AD.sortKey === key;
+    const btn = el('button', 'pc-ad-sort-btn' + (on ? '' : ' is-idle'));
+    btn.type = 'button';
+    btn.appendChild(document.createTextNode(label));
+    btn.appendChild(icon(on ? (AD.sortDir === 'asc' ? 'sortUp' : 'sortDown') : 'sort', 14));
+    btn.addEventListener('click', () => {
+      if (AD.sortKey === key && AD.sortExplicit) AD.sortDir = AD.sortDir === 'asc' ? 'desc' : 'asc';
+      else { AD.sortKey = key; AD.sortDir = key === 'created' || key === 'login' ? 'desc' : 'asc'; }
+      AD.sortExplicit = true;
+      paint();
+    });
+    th.appendChild(btn);
+    return th;
+  };
+  hr.appendChild(sortTh('name', '사용자'));
+  hr.appendChild(sortTh('email', '계정(이메일)'));
+  hr.appendChild(sortTh('status', '상태'));
+  hr.appendChild(sortTh('created', '가입일'));
+  hr.appendChild(sortTh('login', '최근접속'));
   hr.appendChild(el('th', 'pc-ad-col-act', '관리'));
   thead.appendChild(hr);
   table.appendChild(thead);
@@ -458,12 +622,18 @@ function paint() {
     const tr = el('tr');
     const td = el('td', 'pc-ad-empty');
     td.colSpan = 7;
-    td.textContent = '조건에 맞는 회원이 없습니다.';
+    td.appendChild(el('div', 'pc-ad-empty-msg', filtersActive() ? '조건에 맞는 회원이 없습니다.' : '등록된 회원이 없습니다.'));
+    if (filtersActive()) {
+      const rb = el('button', 'pc-sv-secondary-btn is-small', '필터 초기화');
+      rb.type = 'button';
+      rb.addEventListener('click', () => { resetFilters(); paint(); });
+      td.appendChild(rb);
+    }
     tr.appendChild(td);
     tbody.appendChild(tr);
   }
   pageRows.forEach((u) => {
-    const tr = el('tr', u.id === AD.selectedId ? 'is-selected' : '');
+    const tr = el('tr', (u.id === AD.selectedId ? 'is-selected' : '') + (u.status === 'pending' ? ' is-pending-row' : ''));
     const tdc = el('td', 'pc-ad-col-check');
     const cb = el('input', '');
     cb.type = 'checkbox';
@@ -481,9 +651,15 @@ function paint() {
     const tds = el('td');
     const meta = STATUS_META[u.status] || { label: u.status || '-', cls: '' };
     tds.appendChild(el('span', `pc-ad-badge ${meta.cls}`, meta.label));
+    if (u.status === 'pending') {
+      const w = daysSince(u.created_at);
+      if (w !== null) tds.appendChild(el('span', 'pc-ad-wait' + (w >= 3 ? ' is-late' : ''), w === 0 ? '오늘 가입' : `${w}일째 대기`));
+    }
     tr.appendChild(tds);
     tr.appendChild(el('td', '', fmtDate(u.created_at)));
-    tr.appendChild(el('td', '', fmtDateTime(u.last_login_at)));
+    const tdl = el('td', '', fmtDateTime(u.last_login_at));
+    if (isDormant(u)) tdl.appendChild(el('span', 'pc-ad-stale', `${idleDays(u)}일 미접속`));
+    tr.appendChild(tdl);
     const tda = el('td', 'pc-ad-col-act');
     const dots = el('button', 'pc-ad-dots');
     dots.type = 'button';
@@ -531,6 +707,11 @@ function paint() {
   grid.appendChild(buildDetail(all.find(u => u.id === AD.selectedId) || null));
   root.appendChild(grid);
 
+  root.onmousedown = (e) => { if (!e.target.closest('.pc-ad-tablewrap')) AD.kb = false; };
+  if (AD.kb) {
+    const tw = root.querySelector('.pc-ad-tablewrap');
+    if (tw) { tw.focus({ preventScroll: true }); const sel = tw.querySelector('tr.is-selected'); if (sel) sel.scrollIntoView({ block: 'nearest' }); }
+  }
   if (keepSearchFocus) {
     const ni = root.querySelector('.pc-ad-search-input');
     if (ni) { ni.focus(); try { ni.setSelectionRange(caret, caret); } catch (e) { /* ignore */ } }
