@@ -13,7 +13,10 @@
 import { state } from './state.js';
 import { isAdmin } from './auth.js';
 import { parseExcelFile } from './excel.js';
-import { runGeocodingForParsedRows } from './geocoding.js';
+import {
+  runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, runJusoNormalize,
+  runKakaoJusoRecovery, runRoadApproximateRecovery, buildLotQueries, buildJusoQuery, extractApproximateStructure,
+} from './geocoding.js';
 import { previewImportImpact, importSitesToDatabase, loadUploadHistory } from './import.js';
 import { loadActiveSites } from './sites.js';
 import { assignDongToSites } from './map.js';
@@ -399,6 +402,14 @@ function buildAnalyzedCard(pick, input) {
     const q = { EXACT: 0, ESTIMATED: 0, APPROXIMATE: 0, UNRESOLVED: 0 };
     state.uploadParsedRows.forEach(r => { if (q[r._locationQuality] !== undefined) q[r._locationQuality]++; });
     geo.appendChild(el('p', 'pc-up-hint', `정확 ${fmtNum(q.EXACT)} · 추정 ${fmtNum(q.ESTIMATED)} · 대표위치(확인요망) ${fmtNum(q.APPROXIMATE)} · 확인필요 ${fmtNum(q.UNRESOLVED)}`));
+    const nf = state.uploadParsedRows.filter(r => r._geocodeStatus === 'NOT_FOUND').length;
+    if (q.UNRESOLVED > 0 || nf > 0) {
+      const rb = el('button', 'pc-up-ghost pc-up-rec-open', `위치 확인이 안 된 주소 복구 (미확인 ${fmtNum(q.UNRESOLVED)}건)`);
+      rb.type = 'button';
+      rb.disabled = !!state.uploadImportInProgress;
+      rb.addEventListener('click', openRecoveryModal);
+      geo.appendChild(rb);
+    }
   }
   box.appendChild(geo);
 
@@ -504,11 +515,47 @@ function buildGuideBox() {
   title.appendChild(ic);
   title.appendChild(el('strong', '', '업로드 안내'));
   head.appendChild(title);
+  const dl = el('button', 'pc-up-dl');
+  dl.type = 'button';
+  dl.appendChild(icon('download', 18));
+  dl.appendChild(document.createTextNode('엑셀 양식 다운로드'));
+  dl.addEventListener('click', downloadTemplate);
+  head.appendChild(dl);
   box.appendChild(head);
   const ul = el('ul', 'pc-up-bullets');
   ['지정된 엑셀 양식에 맞게 작성한 이후 업로드해주세요.', '중복된 사업장 데이터(사업개시번호 기준)는 자동으로 업데이트됩니다.', '업로드 후 데이터 처리에는 일정 시간이 소요될 수 있습니다.'].forEach(t => ul.appendChild(el('li', '', t)));
   box.appendChild(ul);
   return box;
+}
+
+function downloadTemplate() {
+  if (typeof XLSX === 'undefined') { showToast('엑셀 라이브러리를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.', 'error'); return; }
+  try {
+    // excel.js가 인식하는 '양식 2' 열 이름과 동일하다(선택 열 포함). 식별번호는 앞자리 0 손실을 막기 위해 문자열 셀로 둔다.
+    const headers = [...TEMPLATE_HEADERS, ...TEMPLATE_OPTIONAL];
+    const rows = TEMPLATE_ROWS.map(r => [...r, '', '']);
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const idCols = ['산재관리번호', '사업개시번호', '사업자등록번호', '법인등록번호'].map(h => headers.indexOf(h));
+    rows.forEach((r, i) => idCols.forEach(c => {
+      const ref = XLSX.utils.encode_cell({ r: i + 1, c });
+      if (ws[ref]) { ws[ref].t = 's'; ws[ref].v = String(ws[ref].v ?? ''); }
+    }));
+    ws['!cols'] = headers.map(h => ({ wch: Math.max(12, h.length * 2 + 2) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '사업장');
+    const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = '사업장_업로드_양식.xlsx';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1500);
+  } catch (e) {
+    console.error('양식 다운로드 실패:', e);
+    showToast('양식 파일을 만들지 못했습니다.', 'error');
+  }
 }
 
 // ---- 우측: 양식 미리보기 / 유의사항 ----
@@ -540,7 +587,7 @@ function buildPreviewCard() {
   table.appendChild(tbody);
   wrap.appendChild(table);
   card.appendChild(wrap);
-  card.appendChild(el('p', 'pc-up-sheet-note', `※ 예시 데이터입니다. 선택 열: ${TEMPLATE_OPTIONAL.join(', ')}`));
+  card.appendChild(el('p', 'pc-up-sheet-note', `※ 예시 데이터입니다. 선택 열: ${TEMPLATE_OPTIONAL.join(', ')} (양식 다운로드 파일에 포함)`));
   return card;
 }
 
@@ -737,6 +784,195 @@ function exportChecked() {
     ['업로드일시', '파일명', '양식', '업로드자', '전체', '확정', '확인필요'],
     ...rows.map(h => [fmtDT(h.uploaded_at), h.file_name, FORM_SHORT[h.source_form] || h.source_form || '', h.uploaded_by_name || '', h.total_rows, h.confirmed_rows, h.review_rows]),
   ]);
+}
+
+// ---- 위치 확인이 안 된 주소 복구 (기존 PC 업로드 화면의 복구 단계를 그대로 이어받는다) ----
+// 순서: 위치 후보 검색(좌표 미반영) → 지번(LOT) 재검색 → 행안부 주소 재검색 → 행안부 주소로 좌표 확정 → 동일 도로 대표 위치.
+// 각 단계는 geocoding.js의 기존 함수를 그대로 호출하며, 결과는 state.uploadParsedRows에 반영된다.
+const GEO_STATUS = { SUCCESS: '좌표 확인됨', NOT_FOUND: '주소 검색결과 없음', ERROR: '좌표 확인 실패', PENDING: '확인 대기' };
+const KW_STATUS = { STRONG_CANDIDATE: '강한 후보 있음', WEAK_CANDIDATE: '약한 후보 있음', NO_CANDIDATE: '후보 없음', ERROR: '검색 오류' };
+const JUSO_STATUS = { MATCHED: '행안부 단일일치', AMBIGUOUS: '행안부 모호(복수일치)', NO_MATCH: '행안부 검증불일치', NOT_FOUND: '행안부 결과 없음', ERROR: '행안부 검색 오류' };
+const REC = { view: 'unresolved' }; // 'unresolved' | 'notfound'
+let recDraw = null;
+
+function recRows() { return state.uploadParsedRows || []; }
+function recUnresolved() { return recRows().filter(r => r._locationQuality === 'UNRESOLVED'); }
+
+function recSteps() {
+  const rows = recUnresolved();
+  const lot = rows.filter(r => buildLotQueries(r).length > 0).length;
+  const juso = rows.filter(r => buildJusoQuery(r) !== null).length;
+  const kjuso = rows.filter(r => r._jusoStatus === 'MATCHED' && r._jusoMatchedCandidate).length;
+  const road = rows.filter(r => extractApproximateStructure(r.address) !== null).length;
+  const sum = (key, fmt) => (state[key] ? fmt(state[key]) : '');
+  return [
+    { id: 'kw', flag: 'keywordSearchInProgress', title: '① 위치 후보 검색', count: rows.filter(r => r.business_start_no).length,
+      desc: '사업장명·주소로 후보 장소를 찾아 보여줍니다. 좌표는 자동으로 반영되지 않습니다.',
+      summary: sum('keywordSearchSummary', s => `후보검색 ${s.done}/${s.total} · 강한후보 ${s.strong} · 약한후보 ${s.weak} · 후보없음 ${s.none} · 오류 ${s.error}`),
+      run: async (cb) => { state.keywordSearchSummary = await runKeywordCandidateSearch((p) => { state.keywordSearchSummary = p; cb(`후보검색 ${p.done}/${p.total} · 강한후보 ${p.strong} · 약한후보 ${p.weak} · 후보없음 ${p.none} · 오류 ${p.error}`); }); } },
+    { id: 'lot', flag: 'lotRecoveryInProgress', title: '② Kakao 지번(LOT) 재검색', count: lot,
+      desc: '원본에 지번이 있는 주소를 지번 기준으로 다시 검색해 좌표를 확정합니다.',
+      summary: sum('lotRecoverySummary', s => `대상 ${s.total}건 · 성공 ${s.success} · 결과없음 ${s.notFound} · 오류 ${s.error}`),
+      run: async (cb) => { state.lotRecoverySummary = await runKakaoLotRecovery((p) => { state.lotRecoverySummary = p; cb(`대상 ${p.total}건 · 성공 ${p.success} · 결과없음 ${p.notFound} · 오류 ${p.error}`); }); } },
+    { id: 'juso', flag: 'jusoNormalizeInProgress', title: '③ 행안부 주소 재검색', count: juso,
+      desc: '도로명+건물번호를 행안부 주소로 검증해 후보를 만듭니다. 좌표는 아직 확정되지 않습니다.',
+      summary: sum('jusoNormalizeSummary', s => `대상 ${s.total} · 단일일치 ${s.matched} · 모호 ${s.ambiguous} · 검증불일치 ${s.noMatch} · 결과없음 ${s.notFound} · 오류 ${s.error}`),
+      run: async (cb) => { state.jusoNormalizeSummary = await runJusoNormalize((p) => { state.jusoNormalizeSummary = p; cb(`대상 ${p.total} · 단일일치 ${p.matched} · 모호 ${p.ambiguous} · 검증불일치 ${p.noMatch} · 결과없음 ${p.notFound} · 오류 ${p.error}`); }); } },
+    { id: 'kjuso', flag: 'kakaoJusoInProgress', title: '④ 행안부 주소로 좌표 확정', count: kjuso,
+      desc: '③에서 정확히 1건 일치한 주소만 대상으로 좌표를 확정합니다. 모호·불일치는 제외됩니다.',
+      summary: sum('kakaoJusoSummary', s => `대상 ${s.total}건 · 좌표복구 ${s.success} · 결과없음 ${s.notFound} · 오류 ${s.error}`),
+      run: async (cb) => { state.kakaoJusoSummary = await runKakaoJusoRecovery((p) => { state.kakaoJusoSummary = p; cb(`대상 ${p.total}건 · 좌표복구 ${p.success} · 결과없음 ${p.notFound} · 오류 ${p.error}`); }); } },
+    { id: 'road', flag: 'roadApproximateInProgress', title: '⑤ 동일 도로 대표 위치 확보', count: road,
+      desc: '위 방법으로도 안 되는 주소에 같은 도로의 대표 위치를 지정합니다. ⚠ 정확한 위치가 아니므로 확인이 필요합니다.',
+      summary: sum('roadApproximateSummary', s => `대상 ${s.total}건 · 대표위치 확보 ${s.success}(⚠ 확인요망) · 결과없음 ${s.notFound} · 오류 ${s.error}`),
+      run: async (cb) => { state.roadApproximateSummary = await runRoadApproximateRecovery((p) => { state.roadApproximateSummary = p; cb(`대상 ${p.total}건 · 대표위치 확보 ${p.success}(⚠ 확인요망) · 결과없음 ${p.notFound} · 오류 ${p.error}`); }); } },
+  ];
+}
+
+function anyRecBusy() {
+  return ['keywordSearchInProgress', 'lotRecoveryInProgress', 'jusoNormalizeInProgress', 'kakaoJusoInProgress', 'roadApproximateInProgress', 'geocodeInProgress', 'uploadImportInProgress'].some(k => state[k]);
+}
+
+async function runRecStep(step) {
+  if (anyRecBusy()) return;
+  state[step.flag] = true;
+  if (recDraw) recDraw();
+  try {
+    await step.run((text) => { const p = document.getElementById('pc-up-rec-sum-' + step.id); if (p) p.textContent = text; });
+  } catch (e) {
+    console.error('위치 복구 단계 실패:', step.id, e);
+    showToast('처리 중 오류가 발생했습니다.', 'error');
+  } finally {
+    state[step.flag] = false;
+    if (recDraw) recDraw();
+    paint();
+  }
+}
+
+async function recSearchOne(row) {
+  if (anyRecBusy()) return;
+  state.keywordSearchInProgress = true;
+  if (recDraw) recDraw();
+  try { await runKeywordCandidateSearch(() => {}, row); }
+  catch (e) { console.error('후보 검색 실패:', e); showToast('후보 검색 중 오류가 발생했습니다.', 'error'); }
+  finally { state.keywordSearchInProgress = false; if (recDraw) recDraw(); }
+}
+
+function geoLabel(r) {
+  const methodLabel = { NORMALIZED: '위치 추정(정제주소)', CORE_ADDRESS: '위치 추정(핵심주소)', KAKAO_LOT: '위치 추정(지번 재검색)', KAKAO_JUSO: '위치 추정(행안부 주소)' };
+  const q = { EXACT: '위치 확인', UNRESOLVED: '위치 확인 필요', APPROXIMATE: '⚠ 위치 확인요망(대표 위치)' };
+  return (r._locationQuality === 'ESTIMATED' && methodLabel[r._geocodeMethod]) || q[r._locationQuality] || GEO_STATUS[r._geocodeStatus] || '-';
+}
+
+function downloadNotFoundCsv() {
+  const rows = recRows().filter(r => r._geocodeStatus === 'NOT_FOUND');
+  downloadCsv('geocode_notfound.csv', [
+    ['business_start_no', 'site_name', 'original_address', 'searched_address', 'lot_queries', 'successful_lot_query', 'geocode_method', 'location_quality', 'lat', 'lng'],
+    ...rows.map(r => [r.business_start_no || '', r.site_name || r.company_name || '', r.address || '', r._geocodeSearchedAddress || '', (r._lotQueries || []).join(' | '), r._lotSuccessfulQuery || '', r._geocodeMethod || '', r._locationQuality || '', r.lat ?? '', r.lng ?? '']),
+  ]);
+}
+function downloadKeywordCsv() {
+  const out = [['business_start_no', 'site_name', 'original_address', 'keyword_query', 'candidate_status', 'candidate_place_name', 'candidate_address', 'candidate_lat', 'candidate_lng']];
+  recUnresolved().forEach(r => {
+    const cands = r._keywordCandidates && r._keywordCandidates.length ? r._keywordCandidates : [null];
+    cands.forEach(c => out.push([r.business_start_no || '', r.site_name || r.company_name || '', r.address || '', r._keywordQuery || '', r._keywordSearchStatus || '', c ? (c.placeName || '') : '', c ? (c.roadAddressName || c.addressName || '') : '', c ? c.lat : '', c ? c.lng : '']));
+  });
+  downloadCsv('keyword_candidates.csv', out);
+}
+
+function openRecoveryModal() {
+  const { wrap, close } = modalShell('위치 확인이 안 된 주소 복구');
+  const body = el('div', 'pc-up-rec');
+  wrap.appendChild(body);
+  const actions = el('div', 'pc-modal-actions');
+  const ok = el('button', 'pc-sv-primary-btn', '닫기');
+  ok.type = 'button';
+  ok.addEventListener('click', close);
+  actions.appendChild(ok);
+  wrap.appendChild(actions);
+
+  const draw = () => {
+    if (!document.body.contains(wrap)) { recDraw = null; return; }
+    body.innerHTML = '';
+    const busy = anyRecBusy();
+    const rows = recRows();
+    const q = { EXACT: 0, ESTIMATED: 0, APPROXIMATE: 0, UNRESOLVED: 0 };
+    rows.forEach(r => { if (q[r._locationQuality] !== undefined) q[r._locationQuality]++; });
+    body.appendChild(el('p', 'pc-up-rec-sum', `정확 ${fmtNum(q.EXACT)} · 추정 ${fmtNum(q.ESTIMATED)} · 대표위치(확인요망) ${fmtNum(q.APPROXIMATE)} · 확인필요 ${fmtNum(q.UNRESOLVED)}`));
+    body.appendChild(el('p', 'pc-up-hint', '위에서부터 순서대로 진행하는 것을 권장합니다. 확인필요로 남은 주소도 저장은 가능하며, 지도에서는 대표 위치로 표시됩니다.'));
+
+    recSteps().forEach(st => {
+      const box = el('div', 'pc-up-rec-step');
+      const head = el('div', 'pc-up-rec-head');
+      const tt = el('div', 'pc-up-rec-title');
+      tt.appendChild(el('strong', '', st.title));
+      tt.appendChild(el('span', 'pc-up-rec-count', `대상 ${fmtNum(st.count)}건`));
+      head.appendChild(tt);
+      const b = el('button', 'pc-up-ghost', state[st.flag] ? '진행 중...' : '실행');
+      b.type = 'button';
+      b.disabled = busy || st.count === 0;
+      b.addEventListener('click', () => runRecStep(st));
+      head.appendChild(b);
+      box.appendChild(head);
+      box.appendChild(el('p', 'pc-up-rec-desc', st.desc));
+      const sm = el('p', 'pc-up-progress', st.summary);
+      sm.id = 'pc-up-rec-sum-' + st.id;
+      box.appendChild(sm);
+      body.appendChild(box);
+    });
+
+    // 목록
+    const nfRows = rows.filter(r => r._geocodeStatus === 'NOT_FOUND');
+    const unRows = recUnresolved();
+    const tabs = el('div', 'pc-up-chips');
+    [['unresolved', `위치 확인 필요 ${unRows.length}`], ['notfound', `주소 검색결과 없음 ${nfRows.length}`]].forEach(([k, label]) => {
+      const c = el('button', 'pc-up-chip' + (REC.view === k ? ' active' : ''), label);
+      c.type = 'button';
+      c.addEventListener('click', () => { REC.view = k; draw(); });
+      tabs.appendChild(c);
+    });
+    const csv1 = el('button', 'pc-up-link', '결과없음 CSV');
+    csv1.type = 'button'; csv1.addEventListener('click', downloadNotFoundCsv);
+    const csv2 = el('button', 'pc-up-link', '후보검색 결과 CSV');
+    csv2.type = 'button'; csv2.addEventListener('click', downloadKeywordCsv);
+    tabs.appendChild(csv1); tabs.appendChild(csv2);
+    body.appendChild(tabs);
+
+    const list = REC.view === 'notfound' ? nfRows : unRows;
+    if (!list.length) { body.appendChild(el('p', 'pc-up-detail-empty', '해당하는 주소가 없습니다.')); return; }
+    const tw = el('div', 'pc-up-tablewrap is-scroll');
+    const t = el('table', 'pc-up-table is-validate');
+    const th = el('thead'); const hr = el('tr');
+    ['사업장명', '식별번호', '원본 주소', '진행 상태', '후보', ''].forEach(x => hr.appendChild(el('th', '', x)));
+    th.appendChild(hr); t.appendChild(th);
+    const tb = el('tbody');
+    list.slice(0, 100).forEach(r => {
+      const tr = el('tr');
+      tr.appendChild(el('td', 'pc-up-td-file', r.site_name || r.company_name || '-'));
+      tr.appendChild(el('td', '', r.business_start_no || '(없음)'));
+      tr.appendChild(el('td', 'pc-up-td-reason', r.address || '-'));
+      const stText = [geoLabel(r), r._keywordSearchStatus && r._keywordSearchStatus !== 'PENDING' ? (KW_STATUS[r._keywordSearchStatus] || r._keywordSearchStatus) : '', r._jusoStatus && r._jusoStatus !== 'PENDING' ? (JUSO_STATUS[r._jusoStatus] || r._jusoStatus) : ''].filter(Boolean).join(' / ');
+      tr.appendChild(el('td', 'pc-up-td-reason', stText));
+      const cand = [
+        ...(r._keywordCandidates || []).map((c, i) => `후보 ${i + 1}: ${c.placeName || '-'} · ${c.roadAddressName || c.addressName || '-'} (${c.candidateStatus === 'MATCH' ? '일치' : '약함'})`),
+        ...(r._jusoCandidates || []).map((c, i) => `행안부 ${i + 1}: ${c.roadAddr || '-'} (지번: ${c.jibunAddr || '-'})`),
+      ];
+      tr.appendChild(el('td', 'pc-up-td-reason', cand.join('\n') || '-'));
+      const ta = el('td');
+      if (r._locationQuality === 'UNRESOLVED' && r.business_start_no) {
+        const fb = el('button', 'pc-up-ghost is-small', '후보 찾기');
+        fb.type = 'button'; fb.disabled = busy;
+        fb.addEventListener('click', () => recSearchOne(r));
+        ta.appendChild(fb);
+      }
+      tr.appendChild(ta);
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb); tw.appendChild(t); body.appendChild(tw);
+    if (list.length > 100) body.appendChild(el('p', 'pc-up-sheet-note', `※ 처음 100건만 표시합니다. (전체 ${fmtNum(list.length)}건, CSV에는 전체가 포함됩니다)`));
+  };
+  recDraw = draw;
+  draw();
 }
 
 // ---- 상세 팝업 (업로드 이력 / 검증 결과) ----
