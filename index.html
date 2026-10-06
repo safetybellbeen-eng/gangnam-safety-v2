@@ -930,6 +930,8 @@ if(p.length)Promise.all(p).then(function(){location.reload();}).catch(function()
              타일을 강제로 다시 그린다. 모바일에는 .pc-map-refresh-btn이 상단 기본 숨김
              목록(css/desktop.css)에 있어 영향이 없다. -->
         <button type="button" id="pc-map-refresh" class="pc-map-refresh-btn">⟳ <span>새로고침</span></button>
+        <!-- PC 전용: 현재 지도(핀)가 어느 업로드 기준인지 표시. 기본 숨김, renderHeaderUploadDate()가 채운다. -->
+        <span id="pc-map-upload-date" role="status"></span>
       </div>
       <!-- STEP15-E.1-2: 정확도 범례. #map-container 내부에 넣지만 Kakao Map은 이 컨테이너에
            자신의 지도/컨트롤 div를 추가만 할 뿐 기존 자식을 지우지 않으므로 안전하다(Kakao 자체
