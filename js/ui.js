@@ -14,6 +14,7 @@ import { loadSupervisions, createSupervision, updateSupervision, deleteSupervisi
 import { isAdmin, isMaster, changePassword } from './auth.js';
 import { requestCurrentLocation } from './location.js';
 import { CONFIG } from './config.js';
+import { openDirections } from './nav_chooser.js';
 
 function displayValue(v) {
   return (v === null || v === undefined || v === '') ? '-' : v;
@@ -1911,8 +1912,7 @@ export function renderDetail(site) {
   directionsBtn.disabled = !hasValidCoord;
   if (hasValidCoord) {
     directionsBtn.addEventListener('click', () => {
-      const url = buildKakaoDirectionsUrl(site.site_name || site.company_name, site.lat, site.lng);
-      window.open(url, '_blank', 'noopener,noreferrer');
+      openDirections(site.site_name || site.company_name, site.lat, site.lng, site.address);
     });
   }
   actions.appendChild(directionsBtn);
@@ -3021,8 +3021,7 @@ function buildRouteTimelineStop(site, index, total, onDelete) {
   directionsBtn.disabled = !hasCoord;
   if (hasCoord) {
     directionsBtn.addEventListener('click', () => {
-      const url = buildKakaoDirectionsUrl(site.site_name || site.company_name, site.lat, site.lng);
-      window.open(url, '_blank', 'noopener,noreferrer');
+      openDirections(site.site_name || site.company_name, site.lat, site.lng, site.address);
     });
   }
   actions.appendChild(directionsBtn);
@@ -4102,8 +4101,7 @@ function renderAddressSearchResults(query) {
       dirBtn.className = 'address-search-result-btn address-search-result-btn-primary';
       dirBtn.textContent = '길찾기';
       dirBtn.addEventListener('click', () => {
-        const url = buildKakaoDirectionsUrl(r.name, r.lat, r.lng);
-        window.open(url, '_blank', 'noopener,noreferrer');
+        openDirections(r.name, r.lat, r.lng, r.roadAddress || r.address);
       });
       actions.appendChild(dirBtn);
 

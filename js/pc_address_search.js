@@ -2,12 +2,9 @@
 // 입력창 아래 목록으로 보여주고, 결과를 누르면 지도에 임시 핀을 찍는다(DB 저장 없음).
 import { searchAddressAndPlaces, showAddressSearchPin, clearAddressSearchPin } from './map.js';
 import { state } from './state.js';
+import { openDirections } from './nav_chooser.js';
 
 let bound = false;
-
-function directionsUrl(name, lat, lng) {
-  return `https://map.kakao.com/link/to/${encodeURIComponent(name || '목적지')},${lat},${lng}`;
-}
 
 async function copyText(text) {
   try {
@@ -93,7 +90,7 @@ export function bindPcAddressSearch() {
       dirBtn.type = 'button';
       dirBtn.className = 'primary';
       dirBtn.textContent = '길찾기';
-      dirBtn.addEventListener('click', () => window.open(directionsUrl(r.name, r.lat, r.lng), '_blank', 'noopener,noreferrer'));
+      dirBtn.addEventListener('click', () => openDirections(r.name, r.lat, r.lng, r.roadAddress || r.address));
       actions.appendChild(copyBtn);
       actions.appendChild(dirBtn);
       item.appendChild(actions);
