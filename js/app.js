@@ -523,7 +523,7 @@ function bindDetailPanelSwipeToClose() {
 
 function showPcPageError(tab, err) {
   console.error('[PC 페이지 렌더 오류]', tab, err);
-  const root = document.getElementById(tab === 'supervision' ? 'pc-supervision-page' : tab === 'admin' ? 'pc-admin-page' : 'pc-notes-page');
+  const root = document.getElementById(tab === 'supervision' ? 'pc-supervision-page' : tab === 'admin' ? 'pc-admin-page' : tab === 'upload' ? 'pc-upload-page' : 'pc-notes-page');
   if (root && !root.children.length) {
     root.innerHTML = '<div style="padding:40px;color:#c62828;font-size:15px">화면을 불러오지 못했습니다. 새로고침(Ctrl+F5) 후에도 반복되면 F12 콘솔의 오류를 알려주세요.<br><small>' + String(err && err.message || err).replace(/</g, '&lt;') + '</small></div>';
   }
@@ -547,6 +547,7 @@ function activatePcTab(tab) {
     route: ['경로', '선택한 현장의 방문 순서를 확인하고 경로를 관리할 수 있습니다.', '<circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h2a3 3 0 0 0 3-3V9a3 3 0 0 1 3-3"/>'],
     supervision: ['감독일정관리', '감독 일정을 한눈에 확인하고 관리할 수 있습니다.', '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/>'],
     notes: ['현장 메모', '현장별 메모를 작성하고 관리할 수 있습니다.', '<path d="M6 3h9l3 3v15H6V3Z"/><path d="M14 3v4h4M9 11h6M9 15h6"/>'],
+    upload: ['사업장 데이터 관리', '엑셀 파일을 업로드하여 사업장 데이터를 등록하고, 업로드 이력을 확인할 수 있습니다.', '<ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v6c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 11v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/>'],
     admin: ['회원관리', '사용자 계정과 승인 상태를 관리합니다.', '<circle cx="9" cy="8" r="3"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0M17 11v6M14 14h6"/>'],
     favorite: ['즐겨찾기', '자주 방문하는 현장을 즐겨찾기로 등록하여 빠르게 확인할 수 있습니다.', '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z"/>']
   };
@@ -563,13 +564,13 @@ function activatePcTab(tab) {
   // STEP16.45: 즐겨찾기 탭도 "현장" 탭과 같은 표(검색/필터/정렬/페이지네이션)를 재사용한다.
   if (tab === 'site' || tab === 'favorite') {
     renderPcSiteTable();
-  } else if (tab === 'supervision' || tab === 'notes' || tab === 'admin') {
+  } else if (tab === 'supervision' || tab === 'notes' || tab === 'admin' || tab === 'upload') {
     restorePcSiteFiltersToRow();
     try {
       // pc_pages.js는 정적 import 대신 필요할 때 불러온다 — 파일이 없거나 오류가 나도 앱 전체가
       // 멈추지 않고 해당 탭에만 오류 문구가 나온다.
-      import(tab === 'admin' ? './pc_admin.js' : './pc_pages.js')
-        .then((m) => (tab === 'supervision' ? m.renderPcSupervisionPage() : tab === 'admin' ? m.renderPcAdminPage() : m.renderPcNotesPage()))
+      import(tab === 'admin' ? './pc_admin.js' : tab === 'upload' ? './pc_upload.js' : './pc_pages.js')
+        .then((m) => (tab === 'supervision' ? m.renderPcSupervisionPage() : tab === 'admin' ? m.renderPcAdminPage() : tab === 'upload' ? m.renderPcUploadPage() : m.renderPcNotesPage()))
         .catch((err) => showPcPageError(tab, err));
     } catch (err) {
       showPcPageError(tab, err);
