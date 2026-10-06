@@ -10,7 +10,7 @@
 // 다른 origin/다른 앱의 캐시는 건드리지 않는다(Cache Storage 자체가 origin별로 격리되어 있고,
 // 여기서도 이름 prefix로 한 번 더 스스로 범위를 제한한다).
 const CACHE_PREFIX = 'gnmap-v2-shell-';
-const CACHE_VERSION = 'v23'; // STEP16.22 배포(index.html/js/ui.js/css/mobile.css 변경) 후에도
+const CACHE_VERSION = 'v24'; // STEP16.22 배포(index.html/js/ui.js/css/mobile.css 변경) 후에도
 // "필터가 작동 안 한다" 재발 — STEP16.22를 올리면서 이 값을 v7 그대로 두고 깜빡해, app shell
 // (index.html/css/mobile.css)이 여전히 STEP16.21 버전으로 캐시된 채 최신 js/ui.js와 섞여 로드된
 // 것이 원인으로 추정된다. 앞으로는 index.html/css/*.css 중 하나라도 바뀌는 배포마다 반드시 이
@@ -95,12 +95,19 @@ self.addEventListener('fetch', (event) => {
   // 그 외 같은 origin의 정적 asset(css/js/manifest/icon 등)은 stale-while-revalidate.
   // 캐시가 있으면 즉시 그걸 응답하면서 동시에 네트워크로 최신본을 받아 캐시를 갱신해 두고,
   // 캐시가 없으면 네트워크 응답을 그대로 쓰면서 캐시에 저장한다.
+  // 수정(2026-10): JS/CSS는 서로 import로 엮여 있어(app.js ↔ ui.js ↔ pc_pages.js) 일부만 옛 캐시를
+  // 쓰면 "export 없음"으로 모듈 로딩이 깨지거나 새 화면이 빈 화면이 된다. 그래서 network-first로
+  // 항상 최신본을 받고, 오프라인일 때만 캐시를 쓴다. 이미지/manifest 등만 stale-while-revalidate.
+  if (/\.(js|css|html)$/.test(url.pathname)) {
+    event.respondWith(networkFirst(request));
+    return;
+  }
   event.respondWith(staleWhileRevalidate(request));
 });
 
 async function networkFirst(request) {
   try {
-    const response = await fetch(request);
+    const response = await fetch(request, request.mode === 'navigate' ? undefined : { cache: 'no-cache' });
     if (response && response.ok) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, response.clone());
