@@ -858,6 +858,15 @@ function bindPcQrModal() {
   const open = () => { modal.hidden = false; };
   const close = () => { modal.hidden = true; };
 
+  // OS 탭(안드로이드/iPhone) 전환: 단계 목록만 보였다/숨겼다 한다.
+  modal.querySelectorAll('.pc-qr-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const os = tab.dataset.qrOs;
+      modal.querySelectorAll('.pc-qr-tab').forEach((t) => t.classList.toggle('active', t === tab));
+      modal.querySelectorAll('[data-qr-panel]').forEach((p) => { p.hidden = p.dataset.qrPanel !== os; });
+    });
+  });
+
   trigger.addEventListener('click', open);
   if (backdrop) backdrop.addEventListener('click', close);
   if (closeBtn) closeBtn.addEventListener('click', close);
