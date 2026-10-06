@@ -781,6 +781,23 @@ export function panToSite(site) {
   state.map.panTo(new kakao.maps.LatLng(lat, lng));
 }
 
+// PC "지도보기": 현장/즐겨찾기 탭에서 지도 탭으로 넘어온 뒤 해당 사업장 핀이 바로 보이도록
+// relayout 후 가까운 배율(3)로 중심을 맞춘다. 좌표가 없으면 false.
+export function focusSiteOnMap(site) {
+  if (!state.map || !site) return false;
+  const c = parseCoord(site);
+  if (!c) return false;
+  try {
+    state.map.relayout();
+    state.map.setLevel(3);
+    forceRepaint(state.map, new kakao.maps.LatLng(c.lat, c.lng));
+    return true;
+  } catch (e) {
+    console.error('현장 위치로 이동 실패:', e);
+    return false;
+  }
+}
+
 // ------------------------------------------------------------
 // STEP16.13(모바일 "경로" 탭 — 방문 순서/경로 상세 전용 미니맵).
 //

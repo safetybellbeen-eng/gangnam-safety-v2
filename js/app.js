@@ -4,7 +4,7 @@ import { CONFIG } from './config.js';
 import { state } from './state.js';
 import { sb } from './api.js';
 import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, verifySignupCode, checkIdExists, checkLoginLock, translateAuthError } from './auth.js';
-import { initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites, renderHqMarker, clearRouteSelectionOnMainMap, repaintMainMap, setForcePinsVisible } from './map.js';
+import { initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites, renderHqMarker, clearRouteSelectionOnMainMap, repaintMainMap, focusSiteOnMap, setForcePinsVisible } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
@@ -732,6 +732,19 @@ function bindPcWorkspace() {
     if (open && !e.target.closest(PC_MODAL_PANELS.map(id => '#' + id).join(',')) && !e.target.closest('#pc-user-menu') && !e.target.closest('.admin-sheet-overlay')) closePcModalPanels();
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && window.innerWidth >= 769) { closePcModalPanels(); document.getElementById('pc-user-menu')?.remove(); } });
+
+  // 현장/즐겨찾기 탭 상세의 "지도보기": 지도 탭으로 전환 → 해당 현장 선택(핀 강조, 상세 표시) → 핀 위치로 확대 이동.
+  document.addEventListener('pc-show-site-on-map', (e) => {
+    const id = e.detail && e.detail.id;
+    const site = state.sites.find(s => s.id === id);
+    if (!site) return;
+    activatePcTab('map');
+    const go = () => {
+      selectSite(id);
+      focusSiteOnMap(site);
+    };
+    requestAnimationFrame(() => { go(); setTimeout(() => focusSiteOnMap(site), 250); });
+  });
 
   const pcFavoriteFilter = document.getElementById('pc-favorite-filter-btn');
   if (pcFavoriteFilter) {

@@ -1983,6 +1983,23 @@ export function renderDetail(site) {
       refreshPcRouteAddBtn();
     });
     actions.appendChild(pcRouteAddBtn);
+
+    // 현장/즐겨찾기 탭의 상세에서만: 지도 탭으로 이동해 이 현장 핀을 바로 보여준다.
+    const pcTabNow = (document.getElementById('app') || {}).dataset ? document.getElementById('app').dataset.pcTab : '';
+    if (pcTabNow === 'site' || pcTabNow === 'favorite') {
+      const mapViewBtn = document.createElement('button');
+      mapViewBtn.type = 'button';
+      mapViewBtn.className = 'site-detail-action-btn pc-site-map-view-btn';
+      mapViewBtn.textContent = '지도보기';
+      if (!hasValidCoord) {
+        mapViewBtn.disabled = true;
+        mapViewBtn.title = '좌표 정보가 없어 지도에 표시되지 않는 사업장입니다.';
+      }
+      mapViewBtn.addEventListener('click', () => {
+        document.dispatchEvent(new CustomEvent('pc-show-site-on-map', { detail: { id: site.id } }));
+      });
+      actions.appendChild(mapViewBtn);
+    }
   }
 
   panel.appendChild(actions);
