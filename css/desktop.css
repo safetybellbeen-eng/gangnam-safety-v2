@@ -4217,4 +4217,9 @@
   .pc-up-rec-step.is-next{border-color:#0b63f6;box-shadow:0 0 0 3px rgba(11,99,246,.12)}.pc-up-rec-step.is-next .pc-up-rec-tag{background:#0b63f6;color:#fff}
   .pc-up-rec-step.is-running{border-color:#f59e0b;background:#fffaf0}.pc-up-rec-step.is-running .pc-up-rec-tag{background:#ffefd6;color:#c26a05}
   .pc-up-rec-step.is-skip{opacity:.6}
+
+  /* 경로 상세 패널이 열려 있는 동안엔 뒤의 메인 지도(+범례/툴바)를 숨긴다. 패널 가장자리 틈으로
+     메인 지도(줌아웃된 경계선 등)가 비쳐 "뒤에 이상한 화면"으로 보이던 문제 방지. */
+  #app[data-pc-tab="route"]:has(#route-detail-panel.is-open) #map-container,
+  #app[data-pc-tab="route"]:has(#route-detail-panel.is-open) #mobile-map-legend{visibility:hidden!important;pointer-events:none!important}
 }
