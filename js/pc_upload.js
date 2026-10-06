@@ -50,6 +50,9 @@ const PU = {
   vfilter: 'all',         // 검증 결과 필터: all | error | warn
   busy: '',               // '' | 'parsing' | 'preview' | 'import'
   dragOver: false,
+  hq: '', hfrom: '', hto: '',   // 이력 검색/기간
+  hsort: 'date', hdir: 'desc',   // 이력 정렬
+  hqFocus: false,
 };
 let puMenuCleanup = null;
 
@@ -140,13 +143,24 @@ function openModal(content, opts) {
   overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
   return { close };
 }
-function confirmModal({ title, message, confirmLabel }) {
+function confirmModal({ title, message, confirmLabel, rows, note }) {
   return new Promise((resolve) => {
     const wrap = el('div', 'pc-modal-body');
     const head = el('div', 'pc-modal-head');
     head.appendChild(el('h3', '', title));
     wrap.appendChild(head);
     wrap.appendChild(el('p', 'pc-up-confirm-msg', message));
+    if (rows && rows.length) {
+      const sumBox = el('div', 'pc-up-sumcard');
+      rows.forEach(([k, v, cls]) => {
+        const r = el('div', 'pc-up-sum-row' + (cls ? ' ' + cls : ''));
+        r.appendChild(el('span', '', k));
+        r.appendChild(el('strong', '', v));
+        sumBox.appendChild(r);
+      });
+      wrap.appendChild(sumBox);
+    }
+    if (note) wrap.appendChild(el('p', 'pc-up-hint is-err', note));
     const actions = el('div', 'pc-modal-actions');
     const cancel = el('button', 'pc-sv-secondary-btn', '취소');
     cancel.type = 'button';
@@ -176,6 +190,7 @@ export async function renderPcUploadPage() {
   }
   PU.page = 1;
   PU.checked = new Set();
+  bindPageDrop(root);
   paint();
   await refreshHistory();
 }
@@ -234,6 +249,7 @@ function paint() {
   root.appendChild(tabs);
 
   if (PU.tab === 'upload') {
+    root.appendChild(buildStepper());
     const grid = el('div', 'pc-up-grid');
     const left = el('div', 'pc-up-left');
     left.appendChild(buildUploadCard());
@@ -247,6 +263,80 @@ function paint() {
   } else {
     root.appendChild(buildHistoryCard({ compact: false }));
   }
+  if (PU.hqFocus) {
+    PU.hqFocus = false;
+    const qi = root.querySelector('.pc-up-hsearch');
+    if (qi) { qi.focus(); try { qi.setSelectionRange(qi.value.length, qi.value.length); } catch (e) { /* ignore */ } }
+  }
+}
+
+// ---- 진행 단계 표시줄 ----
+function currentStep() {
+  const parsed = !!state.uploadFileName && !!state.uploadDetectedForm && (state.uploadParsedRows || []).length > 0;
+  const saved = !!(state.uploadImportResult && state.uploadImportResult.success);
+  if (saved) return 4;
+  if (parsed && geocodeDone()) return 3;
+  if (parsed) return 2;
+  return 0;
+}
+function buildStepper() {
+  const cur = currentStep();
+  const bar = el('ol', 'pc-up-stepper');
+  ['파일 선택', '검증', '좌표 확인', '저장'].forEach((label, i) => {
+    const li = el('li', 'pc-up-step-item' + (i < cur ? ' is-done' : (i === cur ? ' is-current' : '')));
+    li.appendChild(el('span', 'pc-up-step-dot', i < cur ? '✓' : String(i + 1)));
+    li.appendChild(el('span', 'pc-up-step-label', label));
+    bar.appendChild(li);
+  });
+  return bar;
+}
+
+// 저장하지 않은 업로드 파일이 있는지(탭 이동/새로고침 경고에 사용)
+function isDirty() {
+  const saved = !!(state.uploadImportResult && state.uploadImportResult.success);
+  return !saved && (!!PU.busy || (!!state.uploadFileName && (state.uploadParsedRows || []).length > 0));
+}
+window.__pcUploadDirty = isDirty;
+if (!window.__pcUploadUnloadBound) {
+  window.__pcUploadUnloadBound = true;
+  window.addEventListener('beforeunload', (e) => {
+    if (document.getElementById('app') && document.getElementById('app').dataset.pcTab === 'upload' && window.__pcUploadDirty && window.__pcUploadDirty()) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+}
+
+// 페이지 어디에 파일을 끌어놓아도 업로드되도록 한다.
+function bindPageDrop(root) {
+  if (root.__puDropBound) return;
+  root.__puDropBound = true;
+  let depth = 0;
+  let overlay = null;
+  const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+  const hide = () => { depth = 0; if (overlay) { overlay.remove(); overlay = null; } };
+  root.addEventListener('dragenter', (e) => {
+    if (!hasFiles(e) || !isAdmin()) return;
+    depth++;
+    if (!overlay) {
+      overlay = el('div', 'pc-up-dropall');
+      overlay.appendChild(el('strong', '', '여기에 파일을 놓으세요'));
+      overlay.appendChild(el('span', '', '엑셀 파일(.xlsx, .xls) · 최대 10MB'));
+      root.appendChild(overlay);
+    }
+  });
+  root.addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
+  root.addEventListener('dragleave', (e) => { if (!hasFiles(e)) return; depth = Math.max(0, depth - 1); if (depth === 0) hide(); });
+  root.addEventListener('drop', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    hide();
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!f) return;
+    if (PU.busy || state.geocodeInProgress || state.uploadImportInProgress) { showToast('처리 중에는 새 파일을 올릴 수 없습니다.', 'error'); return; }
+    PU.tab = 'upload';
+    handleFile(f);
+  });
 }
 
 // ---- 좌측: 업로드 카드(드롭존 / 분석 결과 / 완료 결과) ----
@@ -297,15 +387,9 @@ function buildUploadCard() {
   btn.addEventListener('click', pick);
   box.appendChild(btn);
   box.appendChild(input);
-  box.addEventListener('dragover', (e) => { e.preventDefault(); if (!PU.dragOver) { PU.dragOver = true; box.classList.add('is-over'); } });
+  box.addEventListener('dragover', (e) => { if (!PU.dragOver) { PU.dragOver = true; box.classList.add('is-over'); } });
   box.addEventListener('dragleave', (e) => { if (!box.contains(e.relatedTarget)) { PU.dragOver = false; box.classList.remove('is-over'); } });
-  box.addEventListener('drop', (e) => {
-    e.preventDefault();
-    PU.dragOver = false;
-    box.classList.remove('is-over');
-    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-    if (f) handleFile(f);
-  });
+  box.addEventListener('drop', () => { PU.dragOver = false; });
   return box;
 }
 
@@ -376,6 +460,26 @@ function buildAnalyzedCard(pick, input) {
     stats.appendChild(c);
   });
   box.appendChild(stats);
+  if (s.errorCount > 0) {
+    const al = el('div', 'pc-up-alert is-err');
+    al.appendChild(el('span', 'pc-up-alert-text', `오류 ${fmtNum(s.errorCount)}건은 저장에서 제외됩니다. 엑셀을 수정해 다시 올리거나 그대로 진행할 수 있습니다.`));
+    const v = el('button', 'pc-up-link', '오류 행 보기');
+    v.type = 'button';
+    v.addEventListener('click', () => openValidationModal('error'));
+    const c = el('button', 'pc-up-link', '오류 행 CSV');
+    c.type = 'button';
+    c.addEventListener('click', downloadErrorRowsCsv);
+    al.appendChild(v); al.appendChild(c);
+    box.appendChild(al);
+  } else if (s.warningCount > 0) {
+    const al = el('div', 'pc-up-alert is-warn');
+    al.appendChild(el('span', 'pc-up-alert-text', `경고 ${fmtNum(s.warningCount)}건(주소·공사금액·법인번호 등 누락)이 있습니다. 저장은 가능합니다.`));
+    const v = el('button', 'pc-up-link', '경고 행 보기');
+    v.type = 'button';
+    v.addEventListener('click', () => openValidationModal('warn'));
+    al.appendChild(v);
+    box.appendChild(al);
+  }
   if (s.duplicateCount > 0) box.appendChild(el('p', 'pc-up-hint is-err', `배치 내 사업개시번호 중복 ${fmtNum(s.duplicateCount)}건은 오류로 처리되어 저장에서 제외됩니다.`));
 
   // 좌표 확인
@@ -418,7 +522,7 @@ function buildAnalyzedCard(pick, input) {
   const actions = el('div', 'pc-up-actions');
   const detailBtn = el('button', 'pc-up-ghost', '검증 결과 보기');
   detailBtn.type = 'button';
-  detailBtn.addEventListener('click', openValidationModal);
+  detailBtn.addEventListener('click', () => openValidationModal('all'));
   const adv = el('button', 'pc-up-link', '고급 복구 도구(기존 화면)');
   adv.type = 'button';
   adv.title = '결과없음 CSV, 후보 검색 등 기존 PC 업로드 화면을 엽니다(파일을 다시 선택해야 합니다).';
@@ -431,6 +535,7 @@ function buildAnalyzedCard(pick, input) {
   actions.appendChild(adv);
   actions.appendChild(imp);
   box.appendChild(actions);
+  if (PU.busy === 'import') box.appendChild(el('p', 'pc-up-saving', '저장 중입니다. 사업장 수에 따라 시간이 걸릴 수 있으니 창을 닫거나 다른 화면으로 이동하지 마세요.'));
   if (!geocodeDone() && !state.geocodeInProgress) box.appendChild(el('p', 'pc-up-hint', '주소 좌표 확인을 완료한 후 저장할 수 있습니다.'));
   if (r0() && !r0().success) box.appendChild(el('p', 'pc-up-error', `저장 실패: ${r0().message || '저장에 실패했습니다.'}`));
   if (state.importPreview && !state.importPreview.success) box.appendChild(el('p', 'pc-up-error', `사전 검증 실패: ${state.importPreview.message}`));
@@ -471,9 +576,22 @@ async function startImport() {
   }
   if (!preview || !preview.success) return;
 
+  const all = state.uploadParsedRows || [];
+  const targets = importableRows();
+  const qc = { EXACT: 0, ESTIMATED: 0, APPROXIMATE: 0, UNRESOLVED: 0 };
+  targets.forEach(r => { if (qc[r._locationQuality] !== undefined) qc[r._locationQuality]++; });
+  const noCoord = qc.UNRESOLVED;
   const ok = await confirmModal({
     title: '사업장 데이터 업로드',
-    message: `전체 ${fmtNum(preview.total)}건 중 신규 ${fmtNum(preview.insertCount)}건, 갱신 ${fmtNum(preview.updateCount)}건을 저장하시겠습니까?`,
+    message: '아래 내용으로 저장합니다. 저장 후에는 일괄로 되돌릴 수 없습니다.',
+    rows: [
+      ['파일', state.uploadFileName || '-'],
+      ['파일 전체 행', `${fmtNum(all.length)}건`],
+      ['오류로 제외', `${fmtNum(all.length - targets.length)}건`, all.length - targets.length ? 'is-err' : ''],
+      ['저장 대상', `${fmtNum(preview.total)}건 (신규 ${fmtNum(preview.insertCount)} · 갱신 ${fmtNum(preview.updateCount)})`],
+      ['위치 확인', `정확 ${fmtNum(qc.EXACT)} · 추정 ${fmtNum(qc.ESTIMATED)} · 대표위치 ${fmtNum(qc.APPROXIMATE)} · 미확인 ${fmtNum(qc.UNRESOLVED)}`],
+    ],
+    note: noCoord > 0 ? `위치 미확인 ${fmtNum(noCoord)}건은 좌표 없이 저장되어 지도에는 표시되지 않습니다.` : '',
     confirmLabel: '저장',
   });
   if (!ok) return;
@@ -587,7 +705,30 @@ function buildHistoryCard({ compact }) {
   }
   card.appendChild(head);
 
-  const list = PU.hist;
+  const frow = el('div', 'pc-up-hfilter');
+  const qin = el('input', 'pc-up-hsearch');
+  qin.type = 'search';
+  qin.placeholder = '파일명·업로드자 검색';
+  qin.value = PU.hq;
+  qin.addEventListener('input', () => { PU.hq = qin.value; PU.page = 1; PU.hqFocus = true; paint(); });
+  frow.appendChild(qin);
+  const rg = el('div', 'pc-up-range');
+  rg.appendChild(el('span', '', '기간'));
+  const f1 = el('input'); f1.type = 'date'; f1.value = PU.hfrom; f1.max = PU.hto || '';
+  const f2 = el('input'); f2.type = 'date'; f2.value = PU.hto; f2.min = PU.hfrom || '';
+  f1.addEventListener('change', () => { PU.hfrom = f1.value; PU.page = 1; paint(); });
+  f2.addEventListener('change', () => { PU.hto = f2.value; PU.page = 1; paint(); });
+  rg.appendChild(f1); rg.appendChild(el('span', '', '~')); rg.appendChild(f2);
+  frow.appendChild(rg);
+  if (PU.hq || PU.hfrom || PU.hto) {
+    const rs = el('button', 'pc-up-link', '필터 초기화');
+    rs.type = 'button';
+    rs.addEventListener('click', () => { PU.hq = ''; PU.hfrom = ''; PU.hto = ''; PU.page = 1; paint(); });
+    frow.appendChild(rs);
+  }
+  card.appendChild(frow);
+
+  const list = filteredHist();
   const total = list.length;
   const size = PU.size;
   const pages = Math.max(1, Math.ceil(total / size));
@@ -606,7 +747,16 @@ function buildHistoryCard({ compact }) {
   all.addEventListener('change', () => { slice.forEach(h => (all.checked ? PU.checked.add(h.id) : PU.checked.delete(h.id))); paint(); });
   thc.appendChild(all);
   hr.appendChild(thc);
-  ['업로드일시', '파일명', '건수', '처리 상태', '처리 결과', '작업'].forEach((t, i) => hr.appendChild(el('th', 'pc-up-th-' + i, t)));
+  [['업로드일시', 'date'], ['파일명', 'name'], ['건수', 'count'], ['처리 상태', 'status'], ['처리 결과', 'status'], ['작업', null]].forEach(([t, key], i) => {
+    const th = el('th', 'pc-up-th-' + i);
+    if (!key || (i === 4)) { th.textContent = t; hr.appendChild(th); return; }
+    const on = PU.hsort === key;
+    const sb = el('button', 'pc-up-sort' + (on ? ' is-on' : ''), t + (on ? (PU.hdir === 'asc' ? ' ▲' : ' ▼') : ' ↕'));
+    sb.type = 'button';
+    sb.addEventListener('click', () => { if (PU.hsort === key) PU.hdir = PU.hdir === 'asc' ? 'desc' : 'asc'; else { PU.hsort = key; PU.hdir = key === 'name' ? 'asc' : 'desc'; } PU.page = 1; paint(); });
+    th.appendChild(sb);
+    hr.appendChild(th);
+  });
   thead.appendChild(hr);
   table.appendChild(thead);
 
@@ -616,7 +766,7 @@ function buildHistoryCard({ compact }) {
   } else if (PU.histError) {
     const tr = el('tr'); const td = el('td', 'pc-up-empty', '업로드 이력을 불러오지 못했습니다.'); td.colSpan = 7; tr.appendChild(td); tbody.appendChild(tr);
   } else if (slice.length === 0) {
-    const tr = el('tr'); const td = el('td', 'pc-up-empty', '업로드 이력이 없습니다.'); td.colSpan = 7; tr.appendChild(td); tbody.appendChild(tr);
+    const tr = el('tr'); const td = el('td', 'pc-up-empty', (PU.hq || PU.hfrom || PU.hto) ? '조건에 맞는 업로드 이력이 없습니다.' : '업로드 이력이 없습니다.'); td.colSpan = 7; tr.appendChild(td); tbody.appendChild(tr);
   } else {
     slice.forEach(h => {
       const st = statusOf(h);
@@ -627,7 +777,9 @@ function buildHistoryCard({ compact }) {
       cb.addEventListener('change', () => { cb.checked ? PU.checked.add(h.id) : PU.checked.delete(h.id); paint(); });
       c0.appendChild(cb);
       tr.appendChild(c0);
-      tr.appendChild(el('td', '', fmtDT(h.uploaded_at)));
+      const tdDate = el('td', '', fmtDT(h.uploaded_at));
+      if (PU.hist[0] && PU.hist[0].id === h.id) tdDate.appendChild(el('span', 'pc-up-new', '최신'));
+      tr.appendChild(tdDate);
       tr.appendChild(el('td', 'pc-up-td-file', h.file_name || '-'));
       tr.appendChild(el('td', 'pc-up-td-num', fmtNum(h.total_rows)));
       const cs = el('td');
@@ -695,6 +847,38 @@ function buildHistoryCard({ compact }) {
   return card;
 }
 
+function ymdLocal(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+function filteredHist() {
+  const q = PU.hq.trim().toLowerCase();
+  const rows = PU.hist.filter(h => {
+    if (q && !`${h.file_name || ''} ${h.uploaded_by_name || ''}`.toLowerCase().includes(q)) return false;
+    if (PU.hfrom || PU.hto) {
+      const d = h.uploaded_at ? ymdLocal(h.uploaded_at) : '';
+      if (!d) return false;
+      if (PU.hfrom && d < PU.hfrom) return false;
+      if (PU.hto && d > PU.hto) return false;
+    }
+    return true;
+  });
+  const val = (h) => {
+    switch (PU.hsort) {
+      case 'name': return h.file_name || '';
+      case 'count': return Number(h.total_rows || 0);
+      case 'status': return Number(h.review_rows || 0);
+      default: return h.uploaded_at || '';
+    }
+  };
+  const dir = PU.hdir === 'asc' ? 1 : -1;
+  return rows.sort((a, b) => {
+    const x = val(a), y = val(b);
+    return (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'ko')) * dir;
+  });
+}
+
 function openDetail(id) {
   const h = PU.hist.find(x => x.id === id);
   if (h) openHistoryModal(h);
@@ -730,6 +914,14 @@ function openRowMenu(anchor, h) {
   };
 }
 
+// 오류 행만 '수정용' CSV로 저장한다(원인 확인 후 엑셀을 고쳐 다시 올릴 때 사용).
+function downloadErrorRowsCsv() {
+  const rows = (state.uploadParsedRows || []).filter(r => r._validation === 'ERROR');
+  downloadCsv('업로드_오류행.csv', [
+    ['엑셀 행', '오류 사유', '사업장명', '사업현장명', '산재관리번호', '사업개시번호', '주소', '공사금액', '공사시작일', '공사종료일'],
+    ...rows.map(r => [(r._rowIndex ?? 0) + 2, (r._errors || []).join(', '), r.company_name || '', r.site_name || '', r.industrial_accident_no || '', r.business_start_no || '', r.address || '', r.amount ?? '', r.period_start || '', r.period_end || '']),
+  ]);
+}
 function csvCell(v) { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }
 function downloadCsv(name, rows) {
   const blob = new Blob(['﻿' + rows.map(r => r.map(csvCell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
@@ -863,14 +1055,20 @@ function openRecoveryModal() {
     const q = { EXACT: 0, ESTIMATED: 0, APPROXIMATE: 0, UNRESOLVED: 0 };
     rows.forEach(r => { if (q[r._locationQuality] !== undefined) q[r._locationQuality]++; });
     body.appendChild(el('p', 'pc-up-rec-sum', `정확 ${fmtNum(q.EXACT)} · 추정 ${fmtNum(q.ESTIMATED)} · 대표위치(확인요망) ${fmtNum(q.APPROXIMATE)} · 확인필요 ${fmtNum(q.UNRESOLVED)}`));
-    body.appendChild(el('p', 'pc-up-hint', '위에서부터 순서대로 진행하는 것을 권장합니다. 확인필요로 남은 주소도 저장은 가능하며, 지도에서는 대표 위치로 표시됩니다.'));
+    body.appendChild(el('p', 'pc-up-hint', '위에서부터 순서대로 진행하는 것을 권장합니다. 확인필요로 남은 주소도 저장은 가능하지만, 좌표가 없어 지도에는 표시되지 않고 목록에만 나타납니다.'));
 
+    let recRecommendedShown = false;
     recSteps().forEach(st => {
       const box = el('div', 'pc-up-rec-step');
       const head = el('div', 'pc-up-rec-head');
+      const done = !!st.summary;
+      const recommended = !done && st.count > 0 && !recRecommendedShown;
+      if (recommended) recRecommendedShown = true;
+      box.classList.add(state[st.flag] ? 'is-running' : (done ? 'is-done' : (st.count === 0 ? 'is-skip' : (recommended ? 'is-next' : 'is-wait'))));
       const tt = el('div', 'pc-up-rec-title');
       tt.appendChild(el('strong', '', st.title));
       tt.appendChild(el('span', 'pc-up-rec-count', `대상 ${fmtNum(st.count)}건`));
+      tt.appendChild(el('span', 'pc-up-rec-tag', state[st.flag] ? '진행 중' : (done ? '실행 완료' : (st.count === 0 ? '대상 없음' : (recommended ? '다음 권장' : '대기')))));
       head.appendChild(tt);
       const b = el('button', 'pc-up-ghost', state[st.flag] ? '진행 중...' : '실행');
       b.type = 'button';
@@ -991,7 +1189,7 @@ function openHistoryModal(h) {
   wrap.appendChild(actions);
 }
 
-function openValidationModal() {
+function openValidationModal(initialFilter) {
   const { wrap, close } = modalShell('검증 결과');
   const rowsAll = state.uploadParsedRows || [];
   wrap.appendChild(el('p', 'pc-up-detail-file', `${state.uploadFileName || ''}${state.uploadDetectedForm ? ' · ' + FORM_SHORT[state.uploadDetectedForm] : ''}`));
@@ -999,7 +1197,7 @@ function openValidationModal() {
   const errCount = problems.filter(r => r._validation === 'ERROR').length;
   const warnCount = problems.length - errCount;
   const body = el('div');
-  let filter = 'all';
+  let filter = initialFilter === 'error' || initialFilter === 'warn' ? initialFilter : 'all';
   const draw = () => {
     body.innerHTML = '';
     const chips = el('div', 'pc-up-chips');

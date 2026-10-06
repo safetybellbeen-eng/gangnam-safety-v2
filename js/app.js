@@ -532,6 +532,10 @@ function showPcPageError(tab, err) {
 function activatePcTab(tab) {
   if (window.matchMedia('(max-width: 768px)').matches) return;
   const appEl = document.getElementById('app');
+  // 사업장 데이터 관리에서 저장하지 않은 업로드 파일이 있으면 다른 탭으로 가기 전에 확인한다.
+  if (appEl && appEl.dataset.pcTab === 'upload' && tab !== 'upload' && typeof window.__pcUploadDirty === 'function' && window.__pcUploadDirty()) {
+    if (!window.confirm('저장하지 않은 업로드 파일이 있습니다. 이 화면을 떠나시겠습니까?\n(돌아오면 진행 내용은 유지됩니다.)')) return;
+  }
   if (appEl) appEl.dataset.pcTab = tab;
 
   document.querySelectorAll('.pc-nav-btn[data-pc-tab]').forEach(btn => {
