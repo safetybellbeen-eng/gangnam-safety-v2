@@ -6475,6 +6475,19 @@ export async function renderHeaderUploadDate() {
   } catch (e) {
     console.warn('[헤더 업로드 날짜] 조회 실패:', e);
   }
+  // PC 지도/경로 탭 칩("데이터 기준 YYYY.MM.DD 업로드"). 이력이 없으면 숨긴다(CSS의 :empty 규칙).
+  const pcChip = document.getElementById('pc-map-upload-date');
+  if (pcChip) {
+    const d = iso ? new Date(iso) : null;
+    if (d && !Number.isNaN(d.getTime())) {
+      const ymd = `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+      pcChip.textContent = `데이터 기준 ${ymd} 업로드`;
+      pcChip.title = `최근 엑셀 업로드: ${formatUploadDateTime(iso)}\n지도의 핀은 이 업로드 기준 사업장 데이터입니다.`;
+    } else {
+      pcChip.textContent = '';
+      pcChip.removeAttribute('title');
+    }
+  }
   const text = formatHeaderUploadDate(iso);
   if (!text) {
     el.style.display = 'none';
