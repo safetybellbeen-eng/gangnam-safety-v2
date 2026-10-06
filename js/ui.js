@@ -2,7 +2,7 @@
 // XSS 방지: DB 값(site_name/company_name/address 등)은 innerHTML 문자열 조립에 쓰지 않고
 // 전부 textContent 또는 createElement 기반 DOM 생성으로만 넣는다.
 import { state } from './state.js';
-import { panToSite, renderMarkers, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight, refreshFavoriteMarker, initRouteMap, relayoutRouteMap, renderRouteMarkers, panToRouteSite, searchPlacesKeyword, showAddressSearchPin, clearAddressSearchPin, assignDongToSites, renderHqMarkerOnRouteMap, renderRouteSelectionOnMainMap, clearRouteSelectionOnMainMap, destroyRouteMap, centerRouteMapOnLocation, refreshRouteMap, resetRouteMapView } from './map.js';
+import { panToSite, renderMarkers, clearMarkers, fitMapToSites, setForcePinsVisible, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight, refreshFavoriteMarker, initRouteMap, relayoutRouteMap, renderRouteMarkers, panToRouteSite, searchPlacesKeyword, showAddressSearchPin, clearAddressSearchPin, assignDongToSites, renderHqMarkerOnRouteMap, renderRouteSelectionOnMainMap, clearRouteSelectionOnMainMap, destroyRouteMap, centerRouteMapOnLocation, refreshRouteMap, resetRouteMapView } from './map.js';
 import { getFilteredSortedSites, getDongOptions, loadActiveSites } from './sites.js';
 import { isFavorite, toggleFavorite, loadFavorites, addFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote, loadNotes } from './notes.js';
@@ -1609,6 +1609,13 @@ export function renderSiteList(containerId) {
 
   // 검색/정렬 결과에 맞춰 marker도 다시 그린다.
   renderMarkers(visibleSites, selectSite);
+
+  // STEP16.46: 즐겨찾기 탭의 작은 지도 박스는 이전 탭에서 물려받은 줌 레벨 때문에 핀이 안 보일 수
+  // 있으므로, 즐겨찾기 사업장들의 좌표에 맞춰 중심/줌을 강제로 맞춘다(PC 전용).
+  if (!isMobileViewport() && state.mobileActiveTab === 'favorite') {
+    fitMapToSites(visibleSites);
+  }
+
   renderPcSiteTable();
 
   // 선택된 사업장이 현재 결과에서 사라졌으면 상세를 닫는다. 단, 사용자 피드백(4): 지도 탭에서
@@ -2696,6 +2703,24 @@ export function renderMobileRouteView(containerId) {
   labelToggleRow.appendChild(labelToggleText);
   container.appendChild(labelToggleRow);
 
+  // 사용자 요청(PC 전용): 관할 전체 사업장 핀이 너무 많아 복잡하므로, 경로탭에서는 기본적으로
+  // 일반 사업장 핀을 숨기고 체크해야만 보이게 한다. CSS가 기본 display:none이고 PC에서만
+  // 보이게 하므로(css/desktop.css 참고) 모바일 화면에는 아무 변화가 없다.
+  const showAllPinsRow = document.createElement('label');
+  showAllPinsRow.className = 'route-show-all-pins-toggle';
+  const showAllPinsCheckbox = document.createElement('input');
+  showAllPinsCheckbox.type = 'checkbox';
+  showAllPinsCheckbox.checked = routeShowAllSitePins;
+  showAllPinsCheckbox.addEventListener('change', () => {
+    routeShowAllSitePins = showAllPinsCheckbox.checked;
+    applyRouteSitePinsVisibility();
+  });
+  showAllPinsRow.appendChild(showAllPinsCheckbox);
+  const showAllPinsText = document.createElement('span');
+  showAllPinsText.textContent = '지도에 전체 현장 핀 표시';
+  showAllPinsRow.appendChild(showAllPinsText);
+  container.appendChild(showAllPinsRow);
+
   // 선택 현장 목록(드래그로 순서 변경, 개별 삭제)
   if (selectedSites.length > 0) {
     const listEl = document.createElement('div');
@@ -2766,6 +2791,7 @@ export function renderMobileRouteView(containerId) {
   // 보여주지 않으므로, isMobileViewport()로 모바일을 완전히 제외해 모바일 동작/화면은 그대로 둔다.
   if (!isMobileViewport()) {
     renderRouteSelectionOnMainMap(state.currentLocation, selectedSites, (siteId) => selectSite(siteId), routeShowMarkerLabels);
+    applyRouteSitePinsVisibility();
   }
 }
 
@@ -2847,6 +2873,12 @@ let routeDetailViewSiteIds = null;
 // (렌더 쪽 isMobileViewport() 가드가 이미 모바일에서는 메인 지도 자체를 건드리지 않음).
 let routeShowMarkerLabels = false;
 
+// 사용자 요청: 경로 탭에 들어가면 관할 전체 사업장 핀이 너무 많아 복잡하므로, 기본값은
+// "꺼짐"(일반 사업장 핀 숨김)이고 체크해야만 보이게 한다. 탭을 오가도 유지되는 단순 화면
+// 표시 설정이라 DB/localStorage에는 저장하지 않는다. 모바일은 이 값을 전혀 쓰지 않는다
+// (모바일은 경로 탭에서 메인 지도 자체를 보여주지 않음).
+let routeShowAllSitePins = false;
+
 // 사용자 요청(경로 카드 "방문 완료" 체크): 서버/DB 변경 없이 이 기기에만 저장하는 가벼운
 // 표시 상태다(날짜별 방문 이력 관리가 아니라 "오늘 다니면서 체크"하는 용도). restoreRoutePlanFromStorage/
 // saveRoutePlanState가 다른 경로 상태와 함께 저장·복원한다. 모바일은 CSS로 체크박스 자체가
@@ -2856,6 +2888,23 @@ let routeVisitedSiteIds = new Set();
 // 사용자 요청(PC 전용, 좁은 화면에서 좌측 패널 접기): 새로고침 시 펼친 상태로 돌아가도 무방한
 // 가벼운 화면 상태라 저장하지 않는다.
 let routePanelCollapsed = false;
+
+// 사용자 요청: 경로 탭(PC 전용)에서 일반 사업장 핀(클러스터) 표시 여부를 체크옵션값에 맞춰
+// 다시 그린다. 경로 자체의 번호 핀/HQ 마커(renderRouteSelectionOnMainMap, 별도 배열)는 이
+// 함수가 전혀 건드리지 않는다. 모바일은 메인 지도를 안 보여주므로 아무 것도 하지 않는다.
+function applyRouteSitePinsVisibility() {
+  if (isMobileViewport()) return;
+  if (routeShowAllSitePins) {
+    // 체크옵션을 켠 것은 사용자가 명시적으로 "지금 보고싶다"는 요청이므로, 지도를 축소해
+    // 둔 상태였더라도(기본 배율 이상) updateBoundaryDisplayForZoom()의 줌 기준 숨김 로직과
+    // 무관하게 항상 보이게 한다(setForcePinsVisible).
+    setForcePinsVisible(true);
+    renderMarkers(getFilteredSortedSites(), selectSite);
+  } else {
+    setForcePinsVisible(false);
+    clearMarkers();
+  }
+}
 
 function sitesFromIds(ids) {
   return ids.map(id => state.sites.find(s => s.id === id)).filter(Boolean);

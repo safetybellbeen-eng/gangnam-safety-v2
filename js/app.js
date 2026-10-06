@@ -3,7 +3,7 @@
 import { state } from './state.js';
 import { sb } from './api.js';
 import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, verifySignupCode, checkIdExists, checkLoginLock, translateAuthError } from './auth.js';
-import { initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites, renderHqMarker, clearRouteSelectionOnMainMap } from './map.js';
+import { initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites, renderHqMarker, clearRouteSelectionOnMainMap, setForcePinsVisible } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
@@ -99,6 +99,14 @@ function activateMobileTab(tab) {
     const favBtn = document.getElementById('site-favorite-filter-btn');
     if (favBtn) favBtn.classList.toggle('active', state.favoriteOnly);
     renderSiteList('site-list'); // 검색/동/금액 등 다른 필터 state는 그대로 유지한 채 재렌더만 한다.
+  }
+
+  // 사용자 요청(PC 전용): 경로 탭에서는 체크옵션이 꺼져 있으면 일반 사업장 핀을 숨기므로,
+  // 경로 탭을 벗어나 다른 탭으로 가면(지도/현장/즐겨찾기) 그 핀이 다시 정상적으로 보이도록
+  // 강제로 다시 그린다 — 이 복원은 경로탭의 체크옵션 상태와 무관하게 항상 적용한다.
+  if (previousTab === 'route' && tab !== 'route') {
+    setForcePinsVisible(false); // 다른 탭에서는 평소처럼 줌 기준 숨김 로직을 따르게 되돌린다.
+    renderSiteList('site-list');
   }
 
   // STEP16.33: 사용자 요청 — "현장" 탭은 검색모드 컨트롤 자체가 없고(css/mobile.css가 숨김)

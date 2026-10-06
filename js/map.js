@@ -46,6 +46,15 @@ const OTHER_DONG_LABEL = '그외';
 let lastValidMarkers = [];
 let clustererShown = true;
 
+// STEP16.46: 경로탭의 "전체 현장 핀 표시" 체크옵션이 켜져 있는 동안은, 사용자가 명시적으로
+// 요청한 것이므로 아래 zoomedOut(기본 배율 이상 축소 시 핀 숨김) 로직과 무관하게 항상 핀을
+// 보여준다. state.selectedDongs 필터 활성 시와 동일한 방식의 예외 처리다.
+let forcePinsVisible = false;
+export function setForcePinsVisible(force) {
+  forcePinsVisible = !!force;
+  updateBoundaryDisplayForZoom();
+}
+
 // 단일 ring(닫힌 좌표 목록, [lng,lat][])에 대한 ray-casting 판정.
 function rayCastRing(lng, lat, ring) {
   let inside = false;
@@ -197,7 +206,7 @@ function setClustererShown(shown) {
 function updateBoundaryDisplayForZoom() {
   if (!state.map) return;
   const filterActive = Array.isArray(state.selectedDongs) && state.selectedDongs.length > 0;
-  const zoomedOut = !filterActive && state.map.getLevel() >= PIN_ZOOM_THRESHOLD;
+  const zoomedOut = !filterActive && !forcePinsVisible && state.map.getLevel() >= PIN_ZOOM_THRESHOLD;
 
   setClustererShown(!zoomedOut);
   dongLabelOverlays.forEach(overlay => {
@@ -730,6 +739,41 @@ export function clearMarkers() {
   state.markers.forEach(marker => marker.setMap(null));
   state.markers = [];
   state.siteMarkers.clear();
+}
+
+// STEP16.46: 즐겨찾기 탭처럼 작은 지도 박스가 이전 탭의 줌 레벨/중심을 그대로 물려받는 경우,
+// updateBoundaryDisplayForZoom()의 "기본 배율 이상이면 핀 숨김" 로직 때문에 핀이 전혀 안 보일 수
+// 있다. 전달된 사업장(들)의 좌표에 맞춰 중심/줌을 강제로 맞추고, 보이는 핀 상태도 즉시 재평가한다.
+export function fitMapToSites(sites) {
+  if (!state.map) return;
+  try {
+    state.map.relayout();
+    const validPoints = (sites || [])
+      .map(site => ({ lat: Number(site.lat), lng: Number(site.lng) }))
+      .filter(p =>
+        Number.isFinite(p.lat) && Number.isFinite(p.lng) &&
+        p.lat >= -90 && p.lat <= 90 &&
+        p.lng >= -180 && p.lng <= 180
+      );
+
+    if (validPoints.length === 0) {
+      state.map.setLevel(DEFAULT_LEVEL);
+      forceRepaint(state.map, new kakao.maps.LatLng(GANGNAM_CENTER.lat, GANGNAM_CENTER.lng));
+    } else if (validPoints.length === 1) {
+      state.map.setLevel(3);
+      forceRepaint(state.map, new kakao.maps.LatLng(validPoints[0].lat, validPoints[0].lng));
+    } else {
+      const bounds = new kakao.maps.LatLngBounds();
+      validPoints.forEach(p => bounds.extend(new kakao.maps.LatLng(p.lat, p.lng)));
+      state.map.setBounds(bounds, 40, 40, 40, 40);
+    }
+
+    // setLevel/setBounds가 줌 레벨을 바꾸면 보통 zoom_changed 이벤트로 자동 재평가되지만,
+    // 레벨이 바뀌지 않는 경우(예: 이미 레벨 3이었던 경우)에도 핀 표시 상태를 확실히 맞춘다.
+    updateBoundaryDisplayForZoom();
+  } catch (e) {
+    console.error('즐겨찾기 지도 범위 맞추기 실패:', e);
+  }
 }
 
 // 선택된 사업장 좌표로 지도를 이동한다. 좌표가 유효하지 않으면 조용히 무시한다(앱이 죽지 않아야 함).
