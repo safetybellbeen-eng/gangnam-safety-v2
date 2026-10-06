@@ -255,6 +255,20 @@ function renderNoteSection(panel, siteId) {
   textarea.value = existing ? existing.content : '';
   panel.appendChild(textarea);
 
+  // PC: 개인 메모 옆 "상세 메모" 버튼 — 현장 메모 탭으로 넘어가 이 현장을 선택한 채 자세히 작성한다.
+  if (!isMobileViewport()) {
+    title.classList.add('has-detail-btn');
+    const detailNoteBtn = document.createElement('button');
+    detailNoteBtn.type = 'button';
+    detailNoteBtn.className = 'pc-detail-note-btn';
+    detailNoteBtn.textContent = '상세 메모 ›';
+    detailNoteBtn.title = '현장 메모 탭에서 이 현장의 메모를 자세히 작성합니다.';
+    detailNoteBtn.addEventListener('click', () => {
+      document.dispatchEvent(new CustomEvent('pc-open-detail-note', { detail: { id: siteId, draft: textarea.value } }));
+    });
+    title.appendChild(detailNoteBtn);
+  }
+
   const noteActions = document.createElement('div');
   noteActions.className = 'site-detail-note-actions';
 
@@ -1891,7 +1905,7 @@ export function renderDetail(site) {
 
   const directionsBtn = document.createElement('button');
   directionsBtn.type = 'button';
-  directionsBtn.className = 'site-detail-action-btn site-detail-btn-primary';
+  directionsBtn.className = 'site-detail-action-btn site-detail-btn-primary site-detail-directions-btn';
   directionsBtn.textContent = '길찾기';
   const hasValidCoord = isValidSiteCoord(site);
   directionsBtn.disabled = !hasValidCoord;

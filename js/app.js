@@ -746,6 +746,17 @@ function bindPcWorkspace() {
     requestAnimationFrame(() => { go(); setTimeout(() => focusSiteOnMap(site), 250); });
   });
 
+  // 상세 패널 "상세 메모" 버튼: 현장 메모 탭으로 이동하면서 해당 현장을 선택한 상태로 연다.
+  document.addEventListener('pc-open-detail-note', async (e) => {
+    const { id, draft } = e.detail || {};
+    if (!id) return;
+    try {
+      const m = await import('./pc_pages.js');
+      m.openNoteForSite(id, draft);
+    } catch (err) { console.error('상세 메모 이동 실패:', err); return; }
+    activatePcTab('notes');
+  });
+
   const pcFavoriteFilter = document.getElementById('pc-favorite-filter-btn');
   if (pcFavoriteFilter) {
     pcFavoriteFilter.addEventListener('click', () => activatePcTab('favorite'));

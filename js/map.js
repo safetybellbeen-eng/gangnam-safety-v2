@@ -369,7 +369,9 @@ function getQualityMarkerImage(locationQuality, favorite) {
 // 28→32폭으로 넓히고 anchor(offset.x)를 14→16으로 재계산해 핀 끝이 계속 정확히 가리키게 한다.
 const selectedMarkerImageCache = new Map();
 function getSelectedMarkerImage(favorite) {
-  const cacheKey = favorite ? 'fav' : 'plain';
+  // PC(웹)에서는 선택한 핀을 주변 핀보다 확실히 크게(약 1.6배) 보여 시인성을 높인다. 모바일은 기존 크기 유지.
+  const big = window.innerWidth >= 769;
+  const cacheKey = (favorite ? 'fav' : 'plain') + (big ? '-big' : '');
   if (selectedMarkerImageCache.has(cacheKey)) return selectedMarkerImageCache.get(cacheKey);
 
   const badge = favorite
@@ -384,14 +386,46 @@ function getSelectedMarkerImage(favorite) {
     '</g>' +
     badge +
     '</svg>';
-  const src = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+  const W = big ? 52 : 32;
+  const H = big ? 62 : 38;
+  const svgOut = big ? svg.replace('width="32" height="38"', `width="${W}" height="${H}"`) : svg;
+  const src = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgOut);
   const image = new kakao.maps.MarkerImage(
     src,
-    new kakao.maps.Size(32, 38),
-    { offset: new kakao.maps.Point(16, 38) } // 뾰족한 끝이 좌표를 가리키도록(기본 핀과 동일한 원칙, 커진 크기에 맞춰 재계산).
+    new kakao.maps.Size(W, H),
+    { offset: new kakao.maps.Point(Math.round(W / 2), H) } // 뾰족한 끝이 좌표를 가리키도록(크기에 맞춰 재계산).
   );
   selectedMarkerImageCache.set(cacheKey, image);
   return image;
+}
+
+// PC: 선택한 현장 핀 위에 현장명 라벨을 얹는다(한 번에 하나).
+let selectedSiteLabelOverlay = null;
+function removeSelectedSiteLabel() {
+  if (selectedSiteLabelOverlay) {
+    selectedSiteLabelOverlay.setMap(null);
+    selectedSiteLabelOverlay = null;
+  }
+}
+function showSelectedSiteLabel(siteId, marker) {
+  removeSelectedSiteLabel();
+  if (window.innerWidth < 769 || !state.map || typeof kakao === 'undefined') return;
+  const site = state.sites.find(s => s.id === siteId);
+  if (!site || typeof marker.getPosition !== 'function') return;
+  const wrap = document.createElement('div');
+  wrap.className = 'selected-site-label-wrap';
+  const chip = document.createElement('div');
+  chip.className = 'selected-site-label';
+  chip.textContent = site.site_name || site.company_name || '선택한 현장';
+  wrap.appendChild(chip);
+  selectedSiteLabelOverlay = new kakao.maps.CustomOverlay({
+    position: marker.getPosition(),
+    content: wrap,
+    xAnchor: 0.5,
+    yAnchor: 1,
+    zIndex: 1100
+  });
+  selectedSiteLabelOverlay.setMap(state.map);
 }
 
 // state.selectedSiteId에 해당하는 마커를 "선택됨" 이미지로 바꾼다. 마커가 아직 없거나
@@ -403,6 +437,8 @@ export function highlightSelectedMarker() {
   const marker = state.siteMarkers.get(siteId);
   if (!marker || typeof marker.setImage !== 'function') return;
   marker.setImage(getSelectedMarkerImage(isFavorite(siteId)));
+  if (typeof marker.setZIndex === 'function') marker.setZIndex(1000);
+  showSelectedSiteLabel(siteId, marker);
 }
 
 // STEP16.19: 즐겨찾기 토글 직후 지도 위 해당 마커 한 개만 즉시 갱신한다(전체 재렌더 없이).
@@ -424,12 +460,14 @@ export function refreshFavoriteMarker(siteId) {
 // 특정 사업장의 마커를 원래(기본) 이미지로 되돌린다. 상세를 닫거나 다른 핀을 선택했을 때
 // 이전 선택 마커의 강조를 해제하는 데 쓴다.
 export function clearMarkerHighlight(siteId) {
+  removeSelectedSiteLabel();
   if (siteId === null || siteId === undefined) return;
   const marker = state.siteMarkers.get(siteId);
   if (!marker || typeof marker.setImage !== 'function') return;
   const site = state.sites.find(s => s.id === siteId);
   const image = getQualityMarkerImage(site ? site.location_quality : null, isFavorite(siteId));
   if (image) marker.setImage(image);
+  if (typeof marker.setZIndex === 'function') marker.setZIndex(0);
 }
 
 // SDK <script> 태그를 딱 1번만 생성한다 (중복 로드 방지).

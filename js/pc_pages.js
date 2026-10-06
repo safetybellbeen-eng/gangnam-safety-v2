@@ -991,7 +991,18 @@ const NP = {
   restoreDraft: null,   // 임시저장에서 복원할 메모 내용
   choose: null,         // 폼의 현장 선택 함수(저장된 메모 목록에서 호출)
   refreshSaved: null,   // 저장된 메모 목록 다시 그리기
+  pendingSiteId: null,  // 다른 탭의 '상세 메모' 버튼에서 넘어온 현장(한 번만 사용)
 };
+
+// 지도/현장/즐겨찾기 상세의 '상세 메모' 버튼: 현장 메모 탭을 해당 현장이 선택된 상태로 열기 위한 준비.
+// 상세 패널에서 작성 중이던(저장 전) 내용은 임시저장으로 넘겨 그대로 이어서 쓸 수 있게 한다.
+export function openNoteForSite(siteId, draftText) {
+  NP.pendingSiteId = siteId;
+  const saved = getNote(siteId);
+  const text = typeof draftText === 'string' ? draftText : '';
+  if (text.trim() && (!saved || saved.content !== text)) writeNoteDraft(siteId, text);
+  else clearNoteDraft();
+}
 const NOTE_DRAFT_KEY = 'gnmap_v2_note_draft';
 function readNoteDraft() {
   try {
@@ -1042,6 +1053,11 @@ export function renderPcNotesPage() {
       clearNoteDraft();
     }
   }
+  if (NP.pendingSiteId && (state.sites || []).some(x => x.id === NP.pendingSiteId)) {
+    if (NP.siteId !== NP.pendingSiteId) { NP.restoreDraft = null; }
+    NP.siteId = NP.pendingSiteId;
+  }
+  NP.pendingSiteId = null;
   paintNotesPage();
 }
 
