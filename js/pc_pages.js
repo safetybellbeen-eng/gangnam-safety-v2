@@ -20,7 +20,7 @@ const SV_MIN_DATE = '2000-01-01';
 const SV_MAX_DATE = '2100-12-31';
 const STATUS_LABEL = { scheduled: '예정', ongoing: '진행', done: '완료' };
 const TYPE_LABEL = { inspection: '점검', supervision: '감독' };
-const MAX_BAR_LANES = 3;
+const MAX_BAR_LANES = 2;
 
 const pad2 = (n) => String(n).padStart(2, '0');
 const toYMD = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -126,7 +126,22 @@ const SV = {
   selected: null,           // 우측 "선택 날짜 일정"에 보여줄 날짜
   rows: [],
   loadError: false,
+  manager: 'all',           // 'all' | 'mine' | 담당 감독관 이름
+  otherMode: 'upcoming',    // 우측 '다른 날짜 일정': 'upcoming'(오늘 이후) | 'past'(오늘 이전)
 };
+
+// 담당 감독관 필터가 적용된 일정 목록
+function svRows() {
+  if (SV.manager === 'all') return SV.rows;
+  if (SV.manager === 'mine') {
+    const me = ((state.profile && state.profile.name) || '').trim();
+    return me ? SV.rows.filter(sv => (sv.manager_name || '').includes(me)) : [];
+  }
+  return SV.rows.filter(sv => (sv.manager_name || '') === SV.manager);
+}
+function svDotClass(sv) {
+  return 'pc-sv-dot' + (sv.supervision_type === 'inspection' ? ' is-ring' : '');
+}
 
 function svTone(sv) {
   const status = computeSupervisionStatus(sv.start_date, sv.end_date);
@@ -213,6 +228,7 @@ async function refreshSv() {
 function paintSupervisionPage() {
   const root = document.getElementById('pc-supervision-page');
   if (!root) return;
+  closeDayPopover();
   root.innerHTML = '';
 
   const admin = isAdmin();
@@ -223,13 +239,28 @@ function paintSupervisionPage() {
   titleWrap.appendChild(el('h2', 'pc-sv-title', '감독일정관리'));
   titleWrap.appendChild(el('p', 'pc-sv-subtitle', '예정된 감독 일정을 확인하고 관리합니다.'));
   titleBar.appendChild(titleWrap);
+  const rightBox = el('div', 'pc-sv-titlebar-right');
+  const names = Array.from(new Set(SV.rows.map(sv => (sv.manager_name || '').trim()).filter(Boolean))).sort();
+  const filterWrap = el('label', 'pc-sv-filter');
+  filterWrap.appendChild(el('span', '', '담당 감독관'));
+  const filterSel = el('select', 'pc-sv-filter-select');
+  [['all', '전체 일정'], ['mine', '내 일정'], ...names.map(n => [n, n])].forEach(([v, label]) => {
+    const o = el('option', '', label);
+    o.value = v;
+    if (SV.manager === v) o.selected = true;
+    filterSel.appendChild(o);
+  });
+  filterSel.addEventListener('change', () => { SV.manager = filterSel.value; rerenderSv(); });
+  filterWrap.appendChild(filterSel);
+  rightBox.appendChild(filterWrap);
+  titleBar.appendChild(rightBox);
   if (admin) {
     const addBtn = el('button', 'pc-sv-add-btn');
     addBtn.type = 'button';
     addBtn.appendChild(icon('plus', 20));
     addBtn.appendChild(el('span', '', '감독일정 등록'));
     addBtn.addEventListener('click', () => openSvFormModal(null));
-    titleBar.appendChild(addBtn);
+    rightBox.appendChild(addBtn);
   }
   root.appendChild(titleBar);
 
@@ -246,7 +277,7 @@ function paintSupervisionPage() {
 
   // ---- 통계 카드 + 기간 이동/보기 전환 툴바
   const [mStart, mEnd] = monthRange(SV.anchor);
-  const monthRows = SV.rows.filter(sv => svOverlapsRange(sv, mStart, mEnd));
+  const monthRows = svRows().filter(sv => svOverlapsRange(sv, mStart, mEnd));
   const countBy = (st) => monthRows.filter(sv => computeSupervisionStatus(sv.start_date, sv.end_date) === st).length;
 
   const topLine = el('div', 'pc-sv-topline');
@@ -333,6 +364,13 @@ function buildLegend() {
     item.appendChild(document.createTextNode(label));
     legend.appendChild(item);
   });
+  legend.appendChild(el('span', 'pc-sv-legend-sep'));
+  [['', '감독'], [' is-ring', '점검']].forEach(([ring, label]) => {
+    const item = el('span', 'pc-sv-legend-item');
+    item.appendChild(el('i', 'pc-sv-dot is-neutral' + ring));
+    item.appendChild(document.createTextNode(label));
+    legend.appendChild(item);
+  });
   return legend;
 }
 
@@ -356,7 +394,7 @@ function buildMonthView(host) {
 function layoutWeek(days) {
   const ws = days[0];
   const we = days[6];
-  const segs = SV.rows
+  const segs = svRows()
     .filter(sv => svOverlapsRange(sv, ws, we))
     .map(sv => {
       const s = sv.start_date < ws ? ws : sv.start_date;
@@ -408,12 +446,53 @@ function buildWeekRow(days, anchorMonth, today) {
       more.type = 'button';
       more.style.gridColumn = String(col + 1);
       more.style.gridRow = String(MAX_BAR_LANES + 1);
-      more.addEventListener('click', () => { SV.selected = days[col]; rerenderSv(); });
+      more.addEventListener('click', (e) => {
+        e.stopPropagation();
+        SV.selected = days[col];
+        openDayPopover(more, days[col]);
+      });
       layer.appendChild(more);
     }
   }
   row.appendChild(layer);
   return row;
+}
+
+let svPopoverCleanup = null;
+function closeDayPopover() {
+  if (svPopoverCleanup) { svPopoverCleanup(); svPopoverCleanup = null; }
+}
+// "+N건" 클릭 시 그 날짜의 일정을 전부 작은 창으로 보여준다.
+function openDayPopover(anchorEl, dateStr) {
+  closeDayPopover();
+  const items = sortEvents(svRows().filter(sv => svOverlapsDate(sv, dateStr)));
+  const pop = el('div', 'pc-sv-popover');
+  pop.appendChild(el('div', 'pc-sv-popover-head', `${fmtDot(dateStr)} · ${items.length}건`));
+  items.forEach(sv => {
+    const b = el('button', 'pc-sv-popover-item');
+    b.type = 'button';
+    b.appendChild(el('i', `${svDotClass(sv)} pc-tone-${svTone(sv)}`));
+    const t = el('span', 'pc-sv-popover-text');
+    t.appendChild(el('strong', '', sv.title));
+    t.appendChild(el('small', '', sv.start_date === sv.end_date ? fmtMD(sv.start_date) : `${fmtMD(sv.start_date)} ~ ${fmtMD(sv.end_date)}`));
+    b.appendChild(t);
+    b.addEventListener('click', () => { closeDayPopover(); SV.selected = dateStr; rerenderSv(); });
+    pop.appendChild(b);
+  });
+  document.body.appendChild(pop);
+  const r0 = anchorEl.getBoundingClientRect();
+  const pw = pop.offsetWidth, ph = pop.offsetHeight;
+  pop.style.left = `${Math.max(8, Math.min(window.innerWidth - pw - 8, r0.left))}px`;
+  pop.style.top = `${r0.bottom + ph + 8 > window.innerHeight ? Math.max(8, r0.top - ph - 4) : r0.bottom + 4}px`;
+  const onDown = (e) => { if (!pop.contains(e.target)) { closeDayPopover(); rerenderSv(); } };
+  const onKey = (e) => { if (e.key === 'Escape') { closeDayPopover(); rerenderSv(); } };
+  setTimeout(() => document.addEventListener('mousedown', onDown), 0);
+  document.addEventListener('keydown', onKey);
+  svPopoverCleanup = () => {
+    document.removeEventListener('mousedown', onDown);
+    document.removeEventListener('keydown', onKey);
+    pop.remove();
+  };
 }
 
 function buildBar(sg, days) {
@@ -426,7 +505,7 @@ function buildBar(sg, days) {
   bar.style.gridColumn = `${sg.c0 + 1} / ${sg.c1 + 2}`;
   bar.style.gridRow = String(sg.lane + 1);
   bar.title = `${sv.title} (${fmtMD(sv.start_date)} ~ ${fmtMD(sv.end_date)})`;
-  bar.appendChild(el('i', 'pc-sv-dot'));
+  bar.appendChild(el('i', svDotClass(sv)));
   const multi = sv.start_date !== sv.end_date;
   const text = el('span', 'pc-sv-bar-title', sv.title);
   bar.appendChild(text);
@@ -440,38 +519,41 @@ function buildBar(sg, days) {
   return bar;
 }
 
-// ---- 주 보기
+// ---- 주 보기 (월 보기와 같은 막대 표시)
 function buildWeekView(host) {
   host.classList.add('is-week');
   const ws = weekStartOf(SV.anchor);
   const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
   const today = todayDateString();
-  const grid = el('div', 'pc-sv-weekgrid');
+  const head = el('div', 'pc-sv-weekhead');
+  const body = el('div', 'pc-sv-weekbody');
   days.forEach((d, col) => {
     const date = parseYMD(d);
-    const colEl = el('div', 'pc-sv-weekcol' + (d === SV.selected ? ' is-selected' : '') + (d === today ? ' is-today' : ''));
-    const head = el('button', 'pc-sv-weekcol-head' + (col === 0 ? ' is-sun' : col === 6 ? ' is-sat' : ''));
-    head.type = 'button';
-    head.appendChild(el('span', 'pc-sv-weekcol-wd', WEEKDAYS[col]));
-    head.appendChild(el('strong', 'pc-sv-weekcol-num', String(date.getDate())));
-    head.addEventListener('click', () => { SV.selected = d; rerenderSv(); });
-    colEl.appendChild(head);
-    const list = el('div', 'pc-sv-weekcol-list');
-    sortEvents(SV.rows.filter(sv => svOverlapsDate(sv, d))).forEach(sv => {
-      const item = el('button', `pc-sv-chip pc-tone-${svTone(sv)}`);
-      item.type = 'button';
-      item.appendChild(el('i', 'pc-sv-dot'));
-      const t = el('span', 'pc-sv-chip-text');
-      t.appendChild(el('strong', '', sv.title));
-      t.appendChild(el('small', '', sv.start_date === sv.end_date ? fmtMD(sv.start_date) : `${fmtMD(sv.start_date)} ~ ${fmtMD(sv.end_date)}`));
-      item.appendChild(t);
-      item.addEventListener('click', () => { SV.selected = d; rerenderSv(); });
-      list.appendChild(item);
-    });
-    colEl.appendChild(list);
-    grid.appendChild(colEl);
+    const flags = (col === 0 ? ' is-sun' : col === 6 ? ' is-sat' : '') + (d === today ? ' is-today' : '') + (d === SV.selected ? ' is-selected' : '');
+    const h = el('button', 'pc-sv-weekhead-cell' + flags);
+    h.type = 'button';
+    h.appendChild(el('span', 'pc-sv-weekcol-wd', WEEKDAYS[col]));
+    h.appendChild(el('strong', 'pc-sv-weekcol-num', String(date.getDate())));
+    h.addEventListener('click', () => { SV.selected = d; rerenderSv(); });
+    head.appendChild(h);
+    const cell = el('button', 'pc-sv-weekcell' + flags);
+    cell.type = 'button';
+    cell.setAttribute('aria-label', fmtDot(d));
+    cell.addEventListener('click', () => { SV.selected = d; rerenderSv(); });
+    body.appendChild(cell);
   });
-  host.appendChild(grid);
+  const segs = layoutWeek(days);
+  const layer = el('div', 'pc-sv-week-events is-week');
+  segs.forEach(sg => layer.appendChild(buildBar(sg, days)));
+  body.appendChild(layer);
+  const lanes = segs.reduce((m, sg) => Math.max(m, sg.lane + 1), 0);
+  body.style.minHeight = `${Math.max(320, 28 + lanes * 42)}px`;
+  if (segs.length === 0) {
+    const none = el('div', 'pc-sv-week-none', '이 주에 등록된 감독일정이 없습니다.');
+    body.appendChild(none);
+  }
+  host.appendChild(head);
+  host.appendChild(body);
 }
 
 // ---- 일 보기
@@ -479,7 +561,7 @@ function buildDayView(host) {
   host.classList.add('is-day');
   const d = SV.anchor;
   const list = el('div', 'pc-sv-daylist');
-  const items = sortEvents(SV.rows.filter(sv => svOverlapsDate(sv, d)));
+  const items = sortEvents(svRows().filter(sv => svOverlapsDate(sv, d)));
   if (items.length === 0) {
     list.appendChild(buildEmpty('이 날짜에 등록된 감독일정이 없습니다.'));
   } else {
@@ -492,7 +574,7 @@ function buildDayView(host) {
 function buildListView(host) {
   host.classList.add('is-list');
   const [a, b] = monthRange(SV.anchor);
-  const items = sortEvents(SV.rows.filter(sv => svOverlapsRange(sv, a, b)));
+  const items = sortEvents(svRows().filter(sv => svOverlapsRange(sv, a, b)));
   if (items.length === 0) {
     host.appendChild(buildEmpty('이 달에 등록된 감독일정이 없습니다.'));
     return;
@@ -551,11 +633,25 @@ function buildSidePanel() {
   const side = el('div', 'pc-sv-side');
   const admin = isAdmin();
 
+  // 오늘 요약
+  const todayStr = todayDateString();
+  const todayCount = svRows().filter(sv => svOverlapsDate(sv, todayStr)).length;
+  const ongoingCount = svRows().filter(sv => computeSupervisionStatus(sv.start_date, sv.end_date) === 'ongoing').length;
+  const todayBar = el('button', 'pc-sv-today-bar');
+  todayBar.type = 'button';
+  todayBar.appendChild(icon('calendar', 20));
+  todayBar.appendChild(el('span', 'pc-sv-today-text', `오늘 ${todayCount}건`));
+  todayBar.appendChild(el('i', 'pc-sv-today-sep'));
+  todayBar.appendChild(el('span', 'pc-sv-today-text is-ongoing', `진행 중 ${ongoingCount}건`));
+  todayBar.appendChild(el('span', 'pc-sv-today-go', '오늘로 이동'));
+  todayBar.addEventListener('click', () => { SV.anchor = todayStr; SV.selected = todayStr; rerenderSv(); });
+  side.appendChild(todayBar);
+
   const sel = el('div', 'pc-sv-side-card is-selected-card');
   const selHead = el('div', 'pc-sv-side-head');
   selHead.appendChild(el('strong', '', '선택 날짜 일정'));
   selHead.appendChild(el('span', 'pc-sv-side-date', `${parseYMD(SV.selected).getFullYear()}년 ${parseYMD(SV.selected).getMonth() + 1}월 ${parseYMD(SV.selected).getDate()}일 (${WEEKDAYS[parseYMD(SV.selected).getDay()]})`));
-  const dayRows = sortEvents(SV.rows.filter(sv => svOverlapsDate(sv, SV.selected)));
+  const dayRows = sortEvents(svRows().filter(sv => svOverlapsDate(sv, SV.selected)));
   selHead.appendChild(el('span', 'pc-sv-count-badge', `${dayRows.length}건`));
   sel.appendChild(selHead);
   if (dayRows.length === 0) {
@@ -574,12 +670,23 @@ function buildSidePanel() {
 
   // 다른 날짜 일정(오늘 이후, 선택한 날짜와 겹치지 않는 것) — 가까운 순 3건.
   const today = todayDateString();
-  const upcoming = sortEvents(SV.rows.filter(sv => sv.end_date >= today && !svOverlapsDate(sv, SV.selected))).slice(0, 3);
+  const isPast = SV.otherMode === 'past';
+  const upcoming = isPast
+    ? svRows().filter(sv => sv.end_date < today && !svOverlapsDate(sv, SV.selected)).sort((a, b) => b.end_date.localeCompare(a.end_date)).slice(0, 3)
+    : sortEvents(svRows().filter(sv => sv.end_date >= today && !svOverlapsDate(sv, SV.selected))).slice(0, 3);
   const other = el('div', 'pc-sv-side-card is-other-card');
   const otherHead = el('div', 'pc-sv-side-head');
   const otherTitle = el('strong', '', '다른 날짜 일정');
   otherHead.appendChild(otherTitle);
-  otherHead.appendChild(el('span', 'pc-sv-side-date is-plain', '(오늘 이후)'));
+  otherHead.appendChild(el('span', 'pc-sv-side-date is-plain', isPast ? '(오늘 이전)' : '(오늘 이후)'));
+  const modeToggle = el('div', 'pc-sv-mode-toggle');
+  [['upcoming', '예정'], ['past', '지난']].forEach(([key, label]) => {
+    const mb = el('button', 'pc-sv-mode-btn' + (SV.otherMode === key ? ' active' : ''), label);
+    mb.type = 'button';
+    mb.addEventListener('click', () => { SV.otherMode = key; rerenderSv(); });
+    modeToggle.appendChild(mb);
+  });
+  otherHead.appendChild(modeToggle);
   const more = el('button', 'pc-sv-more-link');
   more.type = 'button';
   more.appendChild(document.createTextNode('더보기'));
@@ -588,20 +695,20 @@ function buildSidePanel() {
   otherHead.appendChild(more);
   other.appendChild(otherHead);
   if (upcoming.length === 0) {
-    other.appendChild(el('p', 'pc-sv-side-empty', '예정된 다른 일정이 없습니다.'));
+    other.appendChild(el('p', 'pc-sv-side-empty', isPast ? '지난 일정이 없습니다.' : '예정된 다른 일정이 없습니다.'));
   } else {
     upcoming.forEach(sv => {
       const st = computeSupervisionStatus(sv.start_date, sv.end_date);
       const item = el('button', 'pc-sv-mini');
       item.type = 'button';
-      item.appendChild(el('i', `pc-sv-dot pc-tone-${svTone(sv)}`));
+      item.appendChild(el('i', `${svDotClass(sv)} pc-tone-${svTone(sv)}`));
       const info = el('div', 'pc-sv-mini-info');
       info.appendChild(el('strong', '', sv.title));
       info.appendChild(el('span', '', fmtRangeDot(sv.start_date, sv.end_date)));
       item.appendChild(info);
       item.appendChild(el('span', `pc-sv-badge pc-status-${st}`, STATUS_LABEL[st]));
       item.addEventListener('click', () => {
-        SV.selected = sv.start_date < today ? today : sv.start_date;
+        SV.selected = (!isPast && sv.start_date < today) ? today : sv.start_date;
         SV.anchor = SV.selected;
         rerenderSv();
       });
@@ -881,7 +988,36 @@ async function openSvFormModal(existing, presetDate) {
 const NP = {
   siteId: null,
   helpOpen: true,
+  restoreDraft: null,   // 임시저장에서 복원할 메모 내용
+  choose: null,         // 폼의 현장 선택 함수(저장된 메모 목록에서 호출)
+  refreshSaved: null,   // 저장된 메모 목록 다시 그리기
 };
+const NOTE_DRAFT_KEY = 'gnmap_v2_note_draft';
+function readNoteDraft() {
+  try {
+    const d = JSON.parse(localStorage.getItem(NOTE_DRAFT_KEY) || 'null');
+    const uid = state.user && state.user.id;
+    return d && d.siteId && d.uid === uid ? d : null;
+  } catch (e) { return null; }
+}
+function writeNoteDraft(siteId, content) {
+  try {
+    if (!siteId || !content || !content.trim()) { localStorage.removeItem(NOTE_DRAFT_KEY); return; }
+    localStorage.setItem(NOTE_DRAFT_KEY, JSON.stringify({ siteId, content, uid: state.user && state.user.id, ts: Date.now() }));
+  } catch (e) { /* 저장소를 못 써도 작성에는 영향 없음 */ }
+}
+function clearNoteDraft() { try { localStorage.removeItem(NOTE_DRAFT_KEY); } catch (e) { /* ignore */ } }
+function fmtAmount(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) return '-';
+  if (n >= 1e8) return `${(n / 1e8).toFixed(1).replace(/\.0$/, '')}억원`;
+  return `${Math.round(n / 1e4).toLocaleString('ko-KR')}만원`;
+}
+const NOTE_TEMPLATES = [
+  ['점검 사항', '[점검 사항]\n- '],
+  ['시정 요청', '[시정 요청]\n- '],
+  ['재점검 예정', '[재점검 예정]\n- 예정일: '],
+];
 const NOTE_MAX = 1000;
 const NOTE_OPTION_LIMIT = 80;
 let npOutsideHandler = null;
@@ -894,6 +1030,18 @@ export function renderPcNotesPage() {
   const root = document.getElementById('pc-notes-page');
   if (!root) return;
   NP.siteId = null; // 탭에 들어올 때마다 빈 작성 화면으로 시작한다.
+  NP.restoreDraft = null;
+  // 작성 중 새로고침/탭 이동으로 사라진 메모가 있으면 임시저장본을 복원한다.
+  const draft = readNoteDraft();
+  if (draft && (state.sites || []).some(x => x.id === draft.siteId)) {
+    const saved = getNote(draft.siteId);
+    if (!saved || saved.content !== draft.content) {
+      NP.siteId = draft.siteId;
+      NP.restoreDraft = draft.content;
+    } else {
+      clearNoteDraft();
+    }
+  }
   paintNotesPage();
 }
 
@@ -910,7 +1058,10 @@ function paintNotesPage() {
 
   const grid = el('div', 'pc-np-grid');
   grid.appendChild(buildNoteFormCard());
-  grid.appendChild(buildNoteHelpCard());
+  const side = el('div', 'pc-np-side');
+  side.appendChild(buildNoteHelpCard());
+  side.appendChild(buildSavedNotesCard());
+  grid.appendChild(side);
   root.appendChild(grid);
 }
 
@@ -950,6 +1101,9 @@ function buildNoteFormCard() {
   const hint = el('p', 'pc-np-existing-hint');
   hint.hidden = true;
   siteField.appendChild(hint);
+  const summary = el('div', 'pc-np-site-summary');
+  summary.hidden = true;
+  siteField.appendChild(summary);
   card.appendChild(siteField);
 
   // ---- 메모
@@ -957,9 +1111,12 @@ function buildNoteFormCard() {
   const memoLab = el('div', 'pc-np-label', '메모');
   memoLab.appendChild(el('span', 'pc-req', '*'));
   memoField.appendChild(memoLab);
+  const tplRow = el('div', 'pc-np-templates');
+  tplRow.appendChild(el('span', 'pc-np-templates-label', '빠른 입력'));
   const textarea = el('textarea', 'pc-np-textarea');
   textarea.maxLength = NOTE_MAX;
   textarea.placeholder = '현장에서 확인한 내용이나 추가 확인이 필요한 사항을 입력해주세요.';
+  memoField.appendChild(tplRow);
   memoField.appendChild(textarea);
   const counter = el('div', 'pc-np-counter', `0 / ${NOTE_MAX}`);
   memoField.appendChild(counter);
@@ -997,6 +1154,46 @@ function buildNoteFormCard() {
   // ---------------- 동작 ----------------
   const selectedSite = () => (NP.siteId ? (state.sites || []).find(s => s.id === NP.siteId) : null);
   let activeIndex = -1;
+  let draftRestored = false;
+
+  function renderSummary(site) {
+    summary.innerHTML = '';
+    if (!site) { summary.hidden = true; return; }
+    summary.hidden = false;
+    const rows = [
+      ['업체명', site.company_name || '-'],
+      ['소재지', site.address || '-'],
+      ['공사금액', fmtAmount(site.amount)],
+      ['공사기간', site.period_start || site.period_end ? `${(site.period_start || '').replaceAll('-', '.') || '-'} ~ ${(site.period_end || '').replaceAll('-', '.') || '-'}` : '-'],
+    ];
+    rows.forEach(([k, v]) => {
+      const it = el('div', 'pc-np-summary-item');
+      it.appendChild(el('span', '', k));
+      it.appendChild(el('strong', '', v));
+      summary.appendChild(it);
+    });
+  }
+  function persistDraft() {
+    const saved = NP.siteId ? getNote(NP.siteId) : null;
+    if (saved && saved.content === textarea.value) clearNoteDraft();
+    else writeNoteDraft(NP.siteId, textarea.value);
+  }
+  NOTE_TEMPLATES.forEach(([label, text]) => {
+    const b = el('button', 'pc-np-template-btn', `+ ${label}`);
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      if (!NP.siteId) { showToast('먼저 현장을 선택해주세요.'); return; }
+      let v = textarea.value;
+      if (v && !v.endsWith('\n')) v += '\n';
+      v = (v + text).slice(0, NOTE_MAX);
+      textarea.value = v;
+      textarea.focus();
+      textarea.setSelectionRange(v.length, v.length);
+      draftRestored = false;
+      syncCounter(); refreshButtons(); persistDraft();
+    });
+    tplRow.appendChild(b);
+  });
 
   function refreshButtons() {
     const hasSite = !!NP.siteId;
@@ -1004,7 +1201,12 @@ function buildNoteFormCard() {
     saveBtn.disabled = !(hasSite && hasContent);
     const existing = hasSite ? getNote(NP.siteId) : null;
     delBtn.hidden = !existing;
-    if (existing) {
+    renderSummary(hasSite ? selectedSite() : null);
+    tplRow.classList.toggle('is-disabled', !hasSite);
+    if (draftRestored) {
+      hint.hidden = false;
+      hint.textContent = '작성 중이던 내용(임시저장)을 불러왔습니다. 저장 버튼을 눌러야 반영됩니다.';
+    } else if (existing) {
       hint.hidden = false;
       hint.textContent = '이미 작성된 메모가 있어 불러왔습니다. 내용을 수정하고 저장할 수 있습니다.';
     } else {
@@ -1025,10 +1227,18 @@ function buildNoteFormCard() {
     NP.siteId = site.id;
     const existing = getNote(site.id);
     textarea.value = existing ? existing.content : '';
+    draftRestored = false;
+    const d = readNoteDraft();
+    if (d && d.siteId === site.id && d.content !== textarea.value) {
+      textarea.value = d.content;
+      draftRestored = true;
+    }
     syncCounter();
     closeList();
     refreshButtons();
+    if (NP.refreshSaved) NP.refreshSaved();
   }
+  NP.choose = choose;
   function renderList(query) {
     list.innerHTML = '';
     const q = (query || '').trim();
@@ -1113,9 +1323,10 @@ function buildNoteFormCard() {
   };
   document.addEventListener('mousedown', npOutsideHandler);
 
-  textarea.addEventListener('input', () => { syncCounter(); refreshButtons(); });
+  textarea.addEventListener('input', () => { draftRestored = false; syncCounter(); refreshButtons(); persistDraft(); });
 
   cancelBtn.addEventListener('click', () => {
+    clearNoteDraft();
     NP.siteId = null;
     paintNotesPage();
   });
@@ -1128,7 +1339,10 @@ function buildNoteFormCard() {
       const ok = await saveNote(siteId, textarea.value);
       if (ok) {
         showToast('메모가 저장되었습니다.', 'success');
+        clearNoteDraft();
+        draftRestored = false;
         refreshButtons();
+        if (NP.refreshSaved) NP.refreshSaved();
       } else {
         showToast('메모 저장에 실패했습니다. 다시 시도해주세요.');
         saveBtn.disabled = false;
@@ -1153,7 +1367,10 @@ function buildNoteFormCard() {
       if (ok) {
         textarea.value = '';
         syncCounter();
+        clearNoteDraft();
+        draftRestored = false;
         showToast('메모가 삭제되었습니다.', 'success');
+        if (NP.refreshSaved) NP.refreshSaved();
       } else {
         showToast('메모 삭제에 실패했습니다. 다시 시도해주세요.');
       }
@@ -1170,9 +1387,53 @@ function buildNoteFormCard() {
     input.value = siteLabel(site);
     const existing = getNote(site.id);
     textarea.value = existing ? existing.content : '';
+    if (NP.restoreDraft !== null) {
+      textarea.value = NP.restoreDraft;
+      draftRestored = true;
+      NP.restoreDraft = null;
+    }
     syncCounter();
   }
   refreshButtons();
+  return card;
+}
+
+function buildSavedNotesCard() {
+  const card = el('div', 'pc-np-saved');
+  const head = el('div', 'pc-np-saved-head');
+  head.appendChild(el('strong', '', '저장된 메모'));
+  const badge = el('span', 'pc-sv-count-badge', '0건');
+  head.appendChild(badge);
+  card.appendChild(head);
+  const body = el('div', 'pc-np-saved-list');
+  card.appendChild(body);
+
+  function paint() {
+    body.innerHTML = '';
+    const sitesById = new Map((state.sites || []).map(x => [x.id, x]));
+    const notes = Array.from((state.siteNotes && state.siteNotes.values && state.siteNotes.values()) || [])
+      .filter(n => sitesById.has(n.site_id))
+      .sort((a, b) => String(b.updated_at || b.created_at || '').localeCompare(String(a.updated_at || a.created_at || '')));
+    badge.textContent = `${notes.length}건`;
+    if (notes.length === 0) {
+      body.appendChild(el('p', 'pc-np-saved-empty', '저장된 메모가 없습니다.'));
+      return;
+    }
+    notes.forEach(n => {
+      const site = sitesById.get(n.site_id);
+      const item = el('button', 'pc-np-saved-item' + (n.site_id === NP.siteId ? ' is-active' : ''));
+      item.type = 'button';
+      const top = el('div', 'pc-np-saved-top');
+      top.appendChild(el('strong', '', siteLabel(site)));
+      top.appendChild(el('span', '', fmtTimestampDate(n.updated_at || n.created_at)));
+      item.appendChild(top);
+      item.appendChild(el('p', '', String(n.content || '').replace(/\s+/g, ' ').trim().slice(0, 70)));
+      item.addEventListener('click', () => { if (NP.choose) NP.choose(site); });
+      body.appendChild(item);
+    });
+  }
+  NP.refreshSaved = paint;
+  paint();
   return card;
 }
 
