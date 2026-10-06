@@ -3909,4 +3909,6 @@
   .pc-np-help-ic{display:flex;flex:0 0 auto;margin-top:1px}
   .pc-np-help-ic.is-check{color:#0b63f6}.pc-np-help-ic.is-warn{color:#f59e0b}
   .pc-np-help-caution{margin-top:18px;padding:18px 6px 0;border-top:1px solid #e2eaf5}
+  .pc-np-option-count{padding:9px 16px;font-size:12.5px;color:#5c7099;background:#f6f9fe;border-bottom:1px solid #e6edf7;position:sticky;top:0}
+  .pc-np-option mark{background:#fff1b8;color:inherit;border-radius:2px;padding:0 1px}
 }
