@@ -4632,3 +4632,26 @@
   #app[data-pc-tab="map"] #site-detail-panel .site-detail-section-title .pc-detail-note-btn,#app[data-pc-tab="site"] #site-detail-panel .site-detail-section-title .pc-detail-note-btn,#app[data-pc-tab="favorite"] #site-detail-panel .site-detail-section-title .pc-detail-note-btn{height:28px!important;min-height:0!important;width:auto!important;padding:0 10px!important;margin:0!important;font-size:12px!important;font-weight:750!important;line-height:1!important;border:1px solid #0b63f6!important;border-radius:6px!important;background:#fff!important;color:#0b63f6!important;box-shadow:none!important}
   #app[data-pc-tab="map"] #site-detail-panel .site-detail-section-title .pc-detail-note-btn:hover,#app[data-pc-tab="site"] #site-detail-panel .site-detail-section-title .pc-detail-note-btn:hover,#app[data-pc-tab="favorite"] #site-detail-panel .site-detail-section-title .pc-detail-note-btn:hover{background:#f1f6ff!important}
 }
+
+/* QR 팝업 = 앱 설치 안내(탭 전환형). 모달은 PC 사이드바 QR에서만 열린다. */
+.pc-qr-modal-box{flex-direction:row;align-items:stretch;gap:0;padding:0;width:860px;height:560px;overflow:hidden}
+.pc-qr-modal-box .pc-qr-modal-close{color:#8a97ab;z-index:2}
+.pc-qr-left{width:330px;flex:none;background:linear-gradient(160deg,#0b2a6b,#1f5eff);color:#fff;padding:36px 32px;display:flex;flex-direction:column;align-items:center;box-sizing:border-box}
+.pc-qr-brand{align-self:flex-start;font-size:13px;opacity:.85}
+.pc-qr-headline{align-self:flex-start;font-size:22px;font-weight:700;line-height:1.4;margin:8px 0 22px}
+.pc-qr-img-wrap{width:210px;background:#fff;border-radius:12px;padding:10px;box-sizing:border-box}
+.pc-qr-img-wrap .pc-qr-modal-img{display:block;width:100%;height:auto;max-width:none;max-height:none}
+.pc-qr-left .pc-qr-modal-text{color:#fff;opacity:.9;font-size:13px;font-weight:500;line-height:1.5;margin-top:16px}
+.pc-qr-right{flex:1;padding:34px;box-sizing:border-box;overflow:auto}
+.pc-qr-tabs{display:flex;gap:8px;margin-bottom:22px}
+.pc-qr-tab{padding:9px 22px;border:0;border-radius:10px;background:#eef2f8;color:#5b6a82;font-weight:700;font-size:14px;cursor:pointer}
+.pc-qr-tab.active{background:#1f5eff;color:#fff}
+.pc-qr-steps{list-style:none;margin:0;padding:0}
+.pc-qr-steps[hidden]{display:none!important}
+.pc-qr-steps li{display:flex;gap:12px;align-items:flex-start;margin-bottom:14px}
+.pc-qr-num{width:26px;height:26px;border-radius:50%;background:#1f5eff;color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex:none}
+.pc-qr-steps b{display:block;font-size:15px;color:#16233b;margin-bottom:2px}
+.pc-qr-steps li span:not(.pc-qr-num){font-size:13px;color:#5b6a82;line-height:1.5}
+.pc-qr-tip{margin-top:18px;padding:12px 14px;background:#f3f6fb;border-radius:10px;font-size:12px;color:#7b889c;line-height:1.5}
+.pc-qr-modal-box{height:auto;min-height:500px;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",Pretendard,"Noto Sans KR","Segoe UI",sans-serif}
+.pc-qr-modal-box button{font-family:inherit}
