@@ -1081,10 +1081,33 @@ if(p.length)Promise.all(p).then(function(){location.reload();}).catch(function()
      DOM에 아무 영향이 없다(모바일은 트리거 버튼 자체가 #pc-sidebar 안에 있어 애초에 열 수 없다). -->
 <div id="pc-qr-modal" class="pc-qr-modal" hidden>
   <div class="pc-qr-modal-backdrop" id="pc-qr-modal-backdrop"></div>
-  <div class="pc-qr-modal-box" role="dialog" aria-modal="true" aria-label="모바일 QR코드">
+  <div class="pc-qr-modal-box" role="dialog" aria-modal="true" aria-label="모바일 앱 설치 안내">
     <button type="button" id="pc-qr-modal-close" class="pc-qr-modal-close" aria-label="닫기">×</button>
-    <img src="assets/icons/mobile-qr.png" alt="모바일 접속 QR코드" class="pc-qr-modal-img">
-    <p class="pc-qr-modal-text">모바일 카메라로 QR코드를 스캔하세요</p>
+    <div class="pc-qr-left">
+      <div class="pc-qr-brand">산업안전 순찰지도</div>
+      <div class="pc-qr-headline">휴대폰에 앱처럼<br>설치해서 쓰세요</div>
+      <div class="pc-qr-img-wrap"><img src="assets/icons/mobile-qr.png" alt="모바일 접속 QR코드" class="pc-qr-modal-img"></div>
+      <p class="pc-qr-modal-text">휴대폰 카메라로 QR을 스캔하면<br>접속 주소가 열려요</p>
+    </div>
+    <div class="pc-qr-right">
+      <div class="pc-qr-tabs" role="tablist">
+        <button type="button" class="pc-qr-tab active" role="tab" data-qr-os="android">안드로이드</button>
+        <button type="button" class="pc-qr-tab" role="tab" data-qr-os="ios">iPhone (iOS)</button>
+      </div>
+      <ol class="pc-qr-steps" data-qr-panel="android">
+        <li><span class="pc-qr-num">1</span><div><b>QR 스캔 후 Chrome으로 열기</b><span>카메라 앱으로 QR을 비추고 나오는 링크를 눌러요.</span></div></li>
+        <li><span class="pc-qr-num">2</span><div><b>우측 상단 ⋮ 메뉴 누르기</b><span>Chrome 주소창 오른쪽의 점 세 개 메뉴를 열어요.</span></div></li>
+        <li><span class="pc-qr-num">3</span><div><b>“앱 설치” 또는 “홈 화면에 추가”</b><span>안내창에서 “설치”를 누르면 앱 아이콘이 생겨요.</span></div></li>
+        <li><span class="pc-qr-num">4</span><div><b>홈 화면의 아이콘으로 실행</b><span>주소창 없이 전체 화면 앱으로 열려요.</span></div></li>
+      </ol>
+      <ol class="pc-qr-steps" data-qr-panel="ios" hidden>
+        <li><span class="pc-qr-num">1</span><div><b>QR 스캔 후 Safari로 열기</b><span>카카오톡 등 앱 안 브라우저가 아닌 Safari에서 열어요.</span></div></li>
+        <li><span class="pc-qr-num">2</span><div><b>하단 공유(⬆) 버튼 누르기</b><span>화면 아래 가운데에 있는 네모 위 화살표 아이콘이에요.</span></div></li>
+        <li><span class="pc-qr-num">3</span><div><b>“홈 화면에 추가” 선택</b><span>목록을 위로 올려 항목을 찾아 누르고 “추가”를 눌러요.</span></div></li>
+        <li><span class="pc-qr-num">4</span><div><b>홈 화면의 아이콘으로 실행</b><span>주소창 없이 전체 화면 앱으로 열려요.</span></div></li>
+      </ol>
+      <div class="pc-qr-tip">💡 설치 후에도 로그인 계정은 동일해요. 업데이트는 자동으로 적용돼요.</div>
+    </div>
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
