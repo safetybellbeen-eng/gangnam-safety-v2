@@ -5342,8 +5342,7 @@
    #app label{flex-direction:column} 때문에 체크박스와 글씨가 위아래로 갈라져 보이던 것을
    "체크박스 + 글씨" 한 줄 행으로 바로잡는다. 경로탭 내부 요소에만 적용(다른 탭/PC 영향 없음). */
 @media (max-width: 768px) {
-  #app .route-label-toggle,
-  #app .route-show-all-pins-toggle {
+  #app .route-label-toggle {
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -5364,9 +5363,8 @@
     box-sizing: border-box;
     width: 100%;
   }
-  #app .route-show-all-pins-toggle { margin-bottom: 12px; }
-  #app .route-label-toggle input[type="checkbox"],
-  #app .route-show-all-pins-toggle input[type="checkbox"] {
+  #app .route-label-toggle { margin-bottom: 12px; }
+  #app .route-label-toggle input[type="checkbox"] {
     flex: 0 0 auto;
     width: 20px;
     height: 20px;
