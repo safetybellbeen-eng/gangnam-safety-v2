@@ -4273,4 +4273,330 @@
   #app[data-pc-tab="map"] #pc-map-toolbar,#app[data-pc-tab="route"] #pc-map-toolbar{flex-wrap:wrap;max-width:calc(100% - 24px);row-gap:6px}
   #app[data-pc-tab="map"] #pc-map-toolbar button,#app[data-pc-tab="route"] #pc-map-toolbar button{white-space:nowrap;flex:0 0 auto}
   #app[data-pc-tab="map"] #pc-map-upload-date:not(:empty),#app[data-pc-tab="route"] #pc-map-upload-date:not(:empty){margin-left:0}
+
+  /* ===== PC: 앱 설정 / 비밀번호 변경 / 알림 설정 / 내 정보 — 모바일 전용 패널을 PC에서는 가운데 모달로 표시 =====
+     (모바일 CSS가 PC 폭에서는 적용되지 않아 스타일 없는 큰 SVG가 화면 곳곳에 번지던 문제 방지) */
+  :is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel)[style*="display: block"]{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:560px;max-width:92vw;max-height:86vh;overflow:auto;box-sizing:border-box;background:#fff;border-radius:14px;padding:6px 0 18px;z-index:300;box-shadow:0 0 0 100vmax rgba(10,25,60,.45),0 24px 60px rgba(0,0,0,.3);color:#173467}
+  :is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) svg{max-width:100%}
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .sv-mobile-subtitle{font-size: 13px;
+    color: var(--gnmap-text-sub);
+    margin: 0;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .sv-mobile-subheader{display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .sv-mobile-back-btn{width: 32px;
+    height: 32px;
+    border: none;
+    background: none;
+    color: var(--gnmap-navy);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .sv-mobile-back-btn svg{width: 22px;
+    height: 22px;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .sv-mobile-subheader-title{font-size: 17px;
+    font-weight: var(--gnmap-fw-bold);
+    color: var(--gnmap-navy);
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .sv-mobile-form{padding: 4px 16px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .sv-mobile-field label,:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .sv-mobile-field-label{display: block;
+    font-size: 13px;
+    font-weight: var(--gnmap-fw-semibold);
+    color: var(--gnmap-navy);
+    margin-bottom: 6px;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .sv-mobile-field input[type="text"],:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .sv-mobile-field input[type="date"],:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .sv-mobile-field textarea{width: 100%;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--gnmap-border);
+    border-radius: var(--gnmap-radius-sm);
+    font-size: 14px;
+    box-sizing: border-box;
+    background: #fff;
+    color: var(--gnmap-text-primary);
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .sv-mobile-field-error{color: var(--gnmap-red);
+    font-size: 12px;
+    margin-top: 6px;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .sv-mobile-submit-btn{width: 100%;
+    min-height: 48px;
+    border: none;
+    border-radius: var(--gnmap-radius-sm);
+    background: var(--gnmap-blue);
+    color: #fff;
+    font-size: 15px;
+    font-weight: bold;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .sv-mobile-submit-btn:disabled{opacity: 0.6;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .mobile-signup-match-msg{display: block;
+    font-size: 12px;
+    font-weight: 400;
+    margin-top: 2px;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .mobile-signup-match-msg:empty{display: none;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .mobile-signup-match-msg.is-match{color: #1a8f4c;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .mobile-signup-match-msg.is-mismatch{color: #e0402e;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .mobile-signup-match-msg.is-checking{color: #8a93a3;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-card{background: #fff;
+    border: 1px solid var(--gnmap-border);
+    border-radius: 14px;
+    margin: 0 16px 16px;
+    overflow: hidden;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-card-title{display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 16px 6px;
+    font-size: 14px;
+    font-weight: var(--gnmap-fw-bold);
+    color: var(--gnmap-navy);
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-card-title svg{width: 18px; height: 18px; }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-row{display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    border-top: 1px solid var(--gnmap-border);
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-card-title + .settings-row{border-top: none; }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-row.is-disabled{opacity: 0.45; }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-row-icon{flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    color: var(--gnmap-text-sub);
+    margin-top: 1px;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-row-icon svg{width: 20px; height: 20px; }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-row-text{flex: 1; min-width: 0; }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-row-title{font-size: 14px;
+    font-weight: var(--gnmap-fw-bold);
+    color: #1a2233;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-row-badge{font-size: 11px;
+    font-weight: bold;
+    color: var(--gnmap-blue);
+    background: var(--gnmap-blue-light);
+    border-radius: 6px;
+    padding: 1px 6px;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-row-desc{font-size: 12px;
+    color: var(--gnmap-text-sub);
+    margin-top: 2px;
+    line-height: 1.4;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-row-control{flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    padding-top: 1px;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-toggle{position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 26px;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-toggle input{position: absolute;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    cursor: pointer;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-toggle-track{position: absolute;
+    inset: 0;
+    background: #d5d9e0;
+    border-radius: 999px;
+    transition: background 0.15s ease;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-toggle-track::before{content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    transition: transform 0.15s ease;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-toggle input:checked + .settings-toggle-track{background: var(--gnmap-blue);
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-toggle input:checked + .settings-toggle-track::before{transform: translateX(18px);
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-toggle.is-disabled{opacity: 0.6; }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-toggle input:disabled{cursor: not-allowed; }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-value-btn{display: flex;
+    align-items: center;
+    gap: 2px;
+    border: none;
+    background: none;
+    color: var(--gnmap-blue);
+    font-size: 13px;
+    font-weight: bold;
+    padding: 4px 0;
+    white-space: nowrap;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-value-btn svg{width: 16px; height: 16px; }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-value-btn:disabled{color: var(--gnmap-text-meta); }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-sheet-option{width: 100%;
+    text-align: left;
+    padding: 12px 4px;
+    border: none;
+    background: none;
+    border-top: 1px solid var(--gnmap-border);
+    font-size: 14px;
+    color: #333;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-sheet-option:first-of-type{border-top: none; }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-sheet-option.active{color: var(--gnmap-blue);
+    font-weight: bold;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-notice-card{display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--gnmap-blue-light);
+    border-radius: 12px;
+    margin: 0 16px 16px;
+    padding: 14px;
+    font-size: 13px;
+    color: #1a2233;
+    line-height: 1.4;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-notice-card svg{width: 20px; height: 20px; flex-shrink: 0; color: var(--gnmap-blue); }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-notice-card-column{flex-direction: column;
+    align-items: stretch;
+    background: var(--gnmap-bg-soft);
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-notice-card-header{display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: bold;
+    margin-bottom: 6px;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-permission-btn{align-self: flex-start;
+    margin-top: 4px;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-form{padding: 0 16px 24px; }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-field{margin-bottom: 16px; }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-password-wrap{position: relative;
+    display: flex;
+    align-items: center;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-password-wrap input{width: 100%;
+    height: 44px;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 12px;
+    border: 1px solid var(--gnmap-border);
+    background: var(--gnmap-bg-soft);
+    padding: 0 46px 0 14px;
+    font-size: 14px;
+    color: #1a2233;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-password-wrap input:focus{outline: none;
+    border-color: var(--gnmap-blue);
+    background: #fff;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-password-eye-btn{position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    padding: 8px;
+    color: #a3abb8;
+    cursor: pointer;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-password-eye-btn svg{width: 18px; height: 18px; }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-password-eye-btn.active{color: var(--gnmap-blue); }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-guide-card{background: var(--gnmap-bg-soft);
+    border-radius: 12px;
+    padding: 14px;
+    margin: 4px 0 20px;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-guide-title{font-size: 13px;
+    font-weight: bold;
+    color: var(--gnmap-navy);
+    margin-bottom: 6px;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-guide-card ul{margin: 0;
+    padding-left: 18px;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-guide-card li{font-size: 12px;
+    color: var(--gnmap-text-sub);
+    line-height: 1.6;
+  }
+:is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .settings-success-text{color: var(--gnmap-green) !important; }
+  :is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .sv-mobile-subheader{display:flex;align-items:center;gap:10px;padding:14px 18px 10px}
+  :is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .sv-mobile-back-btn{width:32px;height:32px;border:0;border-radius:50%;background:#f3f8ff;color:#173467;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}
+  :is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .sv-mobile-back-btn svg{width:18px;height:18px}
+  :is(#app-settings-panel,#password-change-panel,#account-info-panel,#notification-settings-panel) .sv-mobile-subheader-title{font-size:18px;font-weight:800;color:#173467}
+  .pc-user-area{cursor:pointer}
+  .pc-bell{cursor:pointer}
+  #pc-user-menu{position:fixed;top:64px;right:24px;width:236px;background:#fff;border:1px solid #d9e5f5;border-radius:10px;box-shadow:0 12px 32px rgba(16,52,94,.18);padding:6px;z-index:250;font-family:inherit}
+  #pc-user-menu button,#pc-user-menu .pc-user-menu-row{display:flex;align-items:center;justify-content:space-between;width:100%;height:38px;padding:0 12px;border:0;background:#fff;border-radius:7px;color:#173467;font-size:13.5px;font-weight:650;cursor:pointer;text-align:left;box-sizing:border-box}
+  #pc-user-menu button:hover{background:#f3f8ff}
+  #pc-user-menu .pc-user-menu-row{cursor:default;color:#61779c;font-weight:600}
+  #pc-user-menu .pc-user-menu-sep{height:1px;background:#e5edf8;margin:4px 6px}
+  #pc-user-menu .is-danger{color:#d92d20}
+  #pc-user-menu .pc-user-menu-head{padding:8px 12px 6px;font-size:12px;color:#61779c;line-height:1.4}
+  #pc-user-menu .pc-user-menu-head strong{display:block;font-size:14px;color:#173467}
+
+:is(#password-change-panel) .mobile-signup-rules{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    margin: 2px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+:is(#password-change-panel) .mobile-signup-rules li{
+    font-size: 11.5px;
+    color: #a3abb8;
+    position: relative;
+    padding-left: 14px;
+  }
+:is(#password-change-panel) .mobile-signup-rules li::before{
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1.5px solid #c7cfdb;
+    box-sizing: border-box;
+  }
+:is(#password-change-panel) .mobile-signup-rules li.is-met{
+    color: #1a8f4c;
+    font-weight: 600;
+  }
+:is(#password-change-panel) .mobile-signup-rules li.is-met::before{
+    border-color: #1a8f4c;
+    background: #1a8f4c;
+  }
+  #pc-user-menu,#pc-user-menu *{font-family:Arial,'Noto Sans KR','Malgun Gothic',sans-serif}
 }
