@@ -1367,9 +1367,9 @@ export function renderPcSiteTable() {
     if (site.company_name && site.company_name !== site.site_name) { const small=document.createElement('small'); small.textContent=site.company_name; nameWrap.appendChild(small); }
     nameTd.appendChild(nameWrap); tr.appendChild(nameTd);
 
-    const addressTd=document.createElement('td'); addressTd.textContent=displayValue(site.address); addressTd.title=displayValue(site.address); tr.appendChild(addressTd);
+    const addressTd=document.createElement('td'); const addressSpan=document.createElement('span'); addressSpan.className='pc-table-addr'; addressSpan.textContent=displayValue(site.address); addressTd.appendChild(addressSpan); addressTd.title=displayValue(site.address); tr.appendChild(addressTd);
     const amountTd=document.createElement('td'); amountTd.textContent=formatAmountKRW(site.amount); tr.appendChild(amountTd);
-    const periodTd=document.createElement('td'); periodTd.textContent=formatPeriodKR(site.period_start, site.period_end); tr.appendChild(periodTd);
+    const periodTd=document.createElement('td'); const periodText=formatPeriodKR(site.period_start, site.period_end); const periodParts=String(periodText).split(' ~ '); if(periodParts.length===2){ periodTd.appendChild(document.createTextNode(periodParts[0]+' ~')); periodTd.appendChild(document.createElement('br')); periodTd.appendChild(document.createTextNode(periodParts[1])); } else { periodTd.textContent=periodText; } periodTd.title=periodText; tr.appendChild(periodTd);
     const qualityTd=document.createElement('td'); const [ql, qc]=pcLocationQuality(site); const qspan=document.createElement('span'); qspan.className=`pc-table-quality ${qc}`; const dot=document.createElement('i'); qspan.appendChild(dot); qspan.append(document.createTextNode(ql)); qualityTd.appendChild(qspan); tr.appendChild(qualityTd);
     const noteTd=document.createElement('td'); noteTd.style.textAlign='center'; const noteBtn=document.createElement('button'); noteBtn.type='button'; noteBtn.className='pc-table-note'; noteBtn.textContent=getNote(site.id)?'▣':'▤'; noteBtn.title=getNote(site.id)?'메모 있음':'메모 작성'; noteBtn.addEventListener('click', e=>{e.stopPropagation(); selectSite(site.id);}); noteTd.appendChild(noteBtn); tr.appendChild(noteTd);
     tr.addEventListener('click', ()=>selectSite(site.id)); body.appendChild(tr);
