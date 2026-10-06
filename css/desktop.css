@@ -1146,7 +1146,7 @@
 /* ===== PC 로그인 이후 업무화면 (2026-10) ===== */
 #pc-sidebar,#pc-app-header,#pc-page-heading{display:none}
 #pc-supervision-page,#pc-notes-page,.pc-modal-overlay,.pc-sv-popover,.pc-ad-menu,#pc-admin-page,#pc-upload-page{display:none}
-.pc-site-quality,.pc-site-row-meta,.site-detail-label-icon,.site-amount-filter-custom,.pc-site-accident-flag,.pc-map-empty-state,.pc-site-quality-row,.route-picker-quality-filter,.route-label-toggle,.route-site-visited-toggle,.route-total-distance,.route-copy-list-btn,.route-picker-favorite-only,.route-panel-collapse-btn,.pc-map-refresh-btn,.route-detail-map-toolbar,.pc-favorite-map-badge,.pc-favorite-map-view-btn,.route-show-all-pins-toggle{display:none}
+.pc-site-quality,.pc-site-row-meta,.site-detail-label-icon,.site-amount-filter-custom,.pc-site-accident-flag,.pc-map-empty-state,.pc-site-quality-row,.route-picker-quality-filter,.route-label-toggle,.route-site-visited-toggle,.route-total-distance,.route-copy-list-btn,.route-picker-favorite-only,.route-panel-collapse-btn,.pc-map-refresh-btn,.route-detail-map-toolbar,.pc-favorite-map-badge,.pc-favorite-map-view-btn,.route-show-all-pins-toggle,#pc-map-upload-date{display:none}
 @media (min-width:769px){
   #view-approved{--side:220px;--head:70px;--ink:#08265f;--blue:#0b63f6;--line:#d9e5f5;--soft:#f5f9ff;position:fixed!important;inset:0!important;overflow:hidden;background:#f8fbff;color:var(--ink);font-family:Arial,'Noto Sans KR',sans-serif}
   #view-approved>h1,#view-approved>#approved-role-badge,#view-approved>#btn-current-location,#view-approved>#location-message,#view-approved>#btn-admin-panel,#view-approved>#btn-upload-panel,#view-approved>#btn-supervision-panel,#view-approved>#logout-approved,#view-approved>#mobile-app-header,#view-approved>#mobile-bottom-nav,#view-approved>#favorite-subtabs{display:none!important}
@@ -4261,4 +4261,16 @@
   #app .route-label-toggle input,#app .route-show-all-pins-toggle input{margin:0;flex:0 0 auto}
   /* 현장/즐겨찾기 표: 공사기간이 좁은 화면에서 '2025.01.01 ~ 202…'로 잘리던 것을 2줄로 표시 */
   #pc-site-table tbody tr td:nth-child(6){white-space:normal!important;text-overflow:clip!important;line-height:1.35;word-break:keep-all}
+
+  /* 지도/경로 탭 상단 툴바 끝의 "데이터 기준 업로드일" 칩 */
+  #app[data-pc-tab="map"] #pc-map-upload-date:not(:empty),#app[data-pc-tab="route"] #pc-map-upload-date:not(:empty){
+    display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;margin-left:8px;box-sizing:border-box;
+    border:1px solid #c9d8ec;border-radius:8px;background:rgba(255,255,255,.96);color:#173467;font-size:12px;font-weight:700;
+    box-shadow:0 2px 8px rgba(18,58,111,.10);white-space:nowrap;vertical-align:middle;cursor:default}
+  #app[data-pc-tab="map"] #pc-map-upload-date:not(:empty)::before,#app[data-pc-tab="route"] #pc-map-upload-date:not(:empty)::before{
+    content:"";width:7px;height:7px;border-radius:50%;background:#1f9d55}
+
+  #app[data-pc-tab="map"] #pc-map-toolbar,#app[data-pc-tab="route"] #pc-map-toolbar{flex-wrap:wrap;max-width:calc(100% - 24px);row-gap:6px}
+  #app[data-pc-tab="map"] #pc-map-toolbar button,#app[data-pc-tab="route"] #pc-map-toolbar button{white-space:nowrap;flex:0 0 auto}
+  #app[data-pc-tab="map"] #pc-map-upload-date:not(:empty),#app[data-pc-tab="route"] #pc-map-upload-date:not(:empty){margin-left:0}
 }
