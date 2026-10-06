@@ -1,6 +1,7 @@
 // app.js — STEP 3B. 인증 흐름 최소 테스트 UI 연결.
 // 지도/사업장 등 실제 기능은 이후 STEP에서 추가한다 (CLAUDE.md 12절: 대규모 UI 금지).
 import { CONFIG } from './config.js';
+import { maybeStartTutorial, startTutorial } from './pc_tutorial.js';
 import { state } from './state.js';
 import { sb } from './api.js';
 import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, verifySignupCode, checkIdExists, checkLoginLock, translateAuthError } from './auth.js';
@@ -278,6 +279,7 @@ function routeByProfile() {
       // 부가 정보라 await 없이 별도로 요청한다(실패해도 헤더 배지만 숨겨질 뿐 나머지 화면에
       // 영향 없음, renderHeaderUploadDate 내부에서 에러를 흡수).
       renderHeaderUploadDate();
+      maybeStartTutorial(); // PC 첫 로그인 튜토리얼(모바일에서는 동작 안 함)
       // STEP15-C.2: initMap()보다 먼저 data-mobile-tab을 적용해, 모바일에서 Kakao 지도가
       // display:none인 #map-container(크기 0) 위에 생성되지 않도록 한다(흰 화면의 실제 원인 — 아래 보고 참고).
       // PC에서는 이 속성이 어떤 CSS에도 영향을 주지 않으므로 PC 동작은 그대로다.
@@ -712,6 +714,7 @@ function bindPcWorkspace() {
       item('비밀번호 변경', () => openPcPanel('password-change-panel', renderPasswordChangePanel));
       item('알림 설정', () => openPcPanel('notification-settings-panel', renderNotificationSettingsPanel));
       item('앱 설정', () => openPcPanel('app-settings-panel', renderAppSettingsPanel));
+      item('사용 가이드 다시 보기', () => { closePcUserMenu(); startTutorial(); });
       sep();
       const ver = document.createElement('div');
       ver.className = 'pc-user-menu-row';
