@@ -1033,9 +1033,26 @@ function buildNoteFormCard() {
     list.innerHTML = '';
     const q = (query || '').trim();
     const sites = state.sites || [];
-    const matches = q
-      ? sites.filter(s => (s.site_name || '').includes(q) || (s.company_name || '').includes(q) || (s.address || '').includes(q))
+    // 공백으로 나눈 모든 검색어가 사업장명/업체명/주소/동 중 어디든 들어 있으면 검색된다(대소문자 무시).
+    const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
+    const matches = tokens.length
+      ? sites.filter(s => {
+          const hay = `${s.site_name || ''} ${s.company_name || ''} ${s.address || ''} ${s.dong || ''}`.toLowerCase();
+          return tokens.every(t => hay.includes(t));
+        })
       : sites;
+    if (tokens.length) {
+      list.appendChild(el('div', 'pc-np-option-count', `검색 결과 ${matches.length}건`));
+    }
+    const hl = (parent, text) => {
+      const str = String(text || '');
+      if (!tokens.length) { parent.textContent = str; return; }
+      const re = new RegExp('(' + tokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')', 'gi');
+      str.split(re).forEach((part, i) => {
+        if (i % 2 === 1) { const m = document.createElement('mark'); m.textContent = part; parent.appendChild(m); }
+        else if (part) parent.appendChild(document.createTextNode(part));
+      });
+    };
     if (matches.length === 0) {
       list.appendChild(el('div', 'pc-np-option-empty', '검색 결과가 없습니다.'));
       return;
@@ -1046,8 +1063,10 @@ function buildNoteFormCard() {
       opt.setAttribute('role', 'option');
       opt.dataset.index = String(idx);
       const main = el('div', 'pc-np-option-main');
-      main.appendChild(el('strong', '', siteLabel(site)));
-      if (site.address) main.appendChild(el('span', '', site.address));
+      const nameEl = el('strong');
+      hl(nameEl, siteLabel(site));
+      main.appendChild(nameEl);
+      if (site.address) { const addrEl = el('span'); hl(addrEl, site.address); main.appendChild(addrEl); }
       opt.appendChild(main);
       if (getNote(site.id)) opt.appendChild(el('em', 'pc-np-option-tag', '메모 작성됨'));
       opt.addEventListener('mousedown', (e) => e.preventDefault()); // input blur 방지
