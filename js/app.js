@@ -9,7 +9,6 @@ import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
 import { renderSiteList, renderPcSiteTable, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView, renderHeaderUploadDate, setSiteSearchMode, renderSiteNotesPanel, renderAppSettingsPanel, restorePcSiteFiltersToRow, updateDongFilterLabel } from './ui.js';
 import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
-import { renderPcSupervisionPage, renderPcNotesPage } from './pc_pages.js';
 
 const VIEWS = [
   'view-login', 'view-signup', 'view-signup-done',
@@ -566,7 +565,11 @@ function activatePcTab(tab) {
   } else if (tab === 'supervision' || tab === 'notes') {
     restorePcSiteFiltersToRow();
     try {
-      Promise.resolve(tab === 'supervision' ? renderPcSupervisionPage() : renderPcNotesPage()).catch((err) => showPcPageError(tab, err));
+      // pc_pages.js는 정적 import 대신 필요할 때 불러온다 — 파일이 없거나 오류가 나도 앱 전체가
+      // 멈추지 않고 해당 탭에만 오류 문구가 나온다.
+      import('./pc_pages.js')
+        .then((m) => (tab === 'supervision' ? m.renderPcSupervisionPage() : m.renderPcNotesPage()))
+        .catch((err) => showPcPageError(tab, err));
     } catch (err) {
       showPcPageError(tab, err);
     }

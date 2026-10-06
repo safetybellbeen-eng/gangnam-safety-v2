@@ -5305,7 +5305,7 @@ const SUPERVISION_MAX_DATE = '2100-12-31';
 
 // 오늘 날짜를 로컬 타임존 기준 'YYYY-MM-DD'로 반환한다(new Date().toISOString()은 UTC라
 // 자정 근처에 하루가 밀릴 수 있어 사용하지 않는다).
-function todayDateString() {
+export function todayDateString() {
   const now = new Date();
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -5317,7 +5317,7 @@ function todayDateString() {
 // 사용자가 상태를 직접 고르지 않으므로 등록/수정 시 저장할 값과, 목록에 보여줄 값 모두
 // 이 함수 하나로만 결정한다 — 두 곳의 판정 기준이 어긋나는 일이 없도록 한다.
 // 'YYYY-MM-DD' 문자열은 사전식 비교가 곧 날짜 비교와 같다(항상 zero-padded ISO 형식이므로).
-function computeSupervisionStatus(startDate, endDate) {
+export function computeSupervisionStatus(startDate, endDate) {
   const today = todayDateString();
   if (today < startDate) return 'scheduled';
   if (today > endDate) return 'done';
