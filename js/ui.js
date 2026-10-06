@@ -2583,6 +2583,14 @@ function openRouteAddressSearchSheet(containerId) {
 }
 
 // ① 경로 만들기 — 하단 탭 "경로"의 첫 화면(#mobile-route-content).
+// PC 경로 탭 툴바(지도 초기화/새로고침)용: 현재 선택한 현장 핀을 메인 지도에 다시 그리고 범위를 맞춘다.
+export function redrawRouteSelectionOnMainMap() {
+  if (isMobileViewport()) return;
+  const sites = getRoutePlanSites();
+  if (sites.length === 0) return;
+  renderRouteSelectionOnMainMap(state.currentLocation, sites, (siteId) => selectSite(siteId), routeShowMarkerLabels);
+}
+
 export function renderMobileRouteView(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;

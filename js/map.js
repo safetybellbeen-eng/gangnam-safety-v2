@@ -682,12 +682,10 @@ export function renderMarkers(sites, onMarkerClick) {
   const validMarkers = [];
 
   sites.forEach(site => {
-    const lat = Number(site.lat);
-    const lng = Number(site.lng);
-    const isValid =
-      Number.isFinite(lat) && Number.isFinite(lng) &&
-      lat >= -90 && lat <= 90 &&
-      lng >= -180 && lng <= 180;
+    const __c = parseCoord(site);
+    const lat = __c ? __c.lat : NaN;
+    const lng = __c ? __c.lng : NaN;
+    const isValid = !!__c;
 
     if (!isValid) return; // 유효하지 않은 좌표는 마커를 생성하지 않고 skip
 
@@ -749,12 +747,8 @@ export function fitMapToSites(sites) {
   try {
     state.map.relayout();
     const validPoints = (sites || [])
-      .map(site => ({ lat: Number(site.lat), lng: Number(site.lng) }))
-      .filter(p =>
-        Number.isFinite(p.lat) && Number.isFinite(p.lng) &&
-        p.lat >= -90 && p.lat <= 90 &&
-        p.lng >= -180 && p.lng <= 180
-      );
+      .map(site => parseCoord(site))
+      .filter(Boolean);
 
     if (validPoints.length === 0) {
       state.map.setLevel(DEFAULT_LEVEL);
@@ -779,12 +773,10 @@ export function fitMapToSites(sites) {
 // 선택된 사업장 좌표로 지도를 이동한다. 좌표가 유효하지 않으면 조용히 무시한다(앱이 죽지 않아야 함).
 export function panToSite(site) {
   if (!state.map || !site) return;
-  const lat = Number(site.lat);
-  const lng = Number(site.lng);
-  const isValid =
-    Number.isFinite(lat) && Number.isFinite(lng) &&
-    lat >= -90 && lat <= 90 &&
-    lng >= -180 && lng <= 180;
+  const __c = parseCoord(site);
+  const lat = __c ? __c.lat : NaN;
+  const lng = __c ? __c.lng : NaN;
+  const isValid = !!__c;
   if (!isValid) return;
   state.map.panTo(new kakao.maps.LatLng(lat, lng));
 }
@@ -797,6 +789,20 @@ export function panToSite(site) {
 // 컨테이너 id별로 인스턴스를 1개만 만들어 재사용한다(§37: 중복 초기화/리스너 누적 방지).
 // 실제 경로선(polyline)이나 거리/시간 계산은 절대 하지 않는다 — 승인된 축소 범위는
 // "현재 위치 + 사용자가 정한 순서의 번호 마커"만 지도에 표시하는 것까지다(가짜 경로 금지).
+
+// 좌표 유효성: null/''/undefined는 Number()에서 0이 되어 (0,0)(아프리카 앞바다)로 오인되므로 먼저 걸러낸다.
+function parseCoord(obj) {
+  if (!obj) return null;
+  const blank = v => v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
+  if (blank(obj.lat) || blank(obj.lng)) return null;
+  const lat = Number(obj.lat);
+  const lng = Number(obj.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+  if (lat === 0 && lng === 0) return null;
+  return { lat, lng };
+}
+
 const routeMaps = new Map(); // containerId -> { map, markers: kakao.maps.Marker[] }
 
 // 색상별이 아니라 "번호"별로 캐시한다(방문 순서가 바뀌면 같은 site라도 번호가 바뀔 수 있음).
@@ -966,10 +972,7 @@ export function renderRouteMarkers(containerId, currentLocation, orderedSites, o
   const bounds = new kakao.maps.LatLngBounds();
   let hasPoint = false;
 
-  const validLocation =
-    currentLocation && Number.isFinite(currentLocation.lat) && Number.isFinite(currentLocation.lng) &&
-    currentLocation.lat >= -90 && currentLocation.lat <= 90 &&
-    currentLocation.lng >= -180 && currentLocation.lng <= 180;
+  const validLocation = !!parseCoord(currentLocation);
 
   if (validLocation) {
     const position = new kakao.maps.LatLng(currentLocation.lat, currentLocation.lng);
@@ -981,11 +984,10 @@ export function renderRouteMarkers(containerId, currentLocation, orderedSites, o
   }
 
   (orderedSites || []).forEach((site, index) => {
-    const lat = Number(site.lat);
-    const lng = Number(site.lng);
-    const isValid =
-      Number.isFinite(lat) && Number.isFinite(lng) &&
-      lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+    const __c = parseCoord(site);
+    const lat = __c ? __c.lat : NaN;
+    const lng = __c ? __c.lng : NaN;
+    const isValid = !!__c;
     if (!isValid) return; // 좌표 없는 사업장은 지도에 표시하지 않는다(§31 예외처리 — 목록/안내문에서 별도 처리)
 
     const position = new kakao.maps.LatLng(lat, lng);
@@ -1013,11 +1015,10 @@ export function renderRouteMarkers(containerId, currentLocation, orderedSites, o
 export function panToRouteSite(containerId, site) {
   const entry = routeMaps.get(containerId);
   if (!entry || !site) return;
-  const lat = Number(site.lat);
-  const lng = Number(site.lng);
-  const isValid =
-    Number.isFinite(lat) && Number.isFinite(lng) &&
-    lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+  const __c = parseCoord(site);
+  const lat = __c ? __c.lat : NaN;
+  const lng = __c ? __c.lng : NaN;
+  const isValid = !!__c;
   if (!isValid) return;
   entry.map.panTo(new kakao.maps.LatLng(lat, lng));
 }
@@ -1044,10 +1045,7 @@ export function renderRouteSelectionOnMainMap(currentLocation, orderedSites, onM
   const bounds = new kakao.maps.LatLngBounds();
   let hasPoint = false;
 
-  const validLocation =
-    currentLocation && Number.isFinite(currentLocation.lat) && Number.isFinite(currentLocation.lng) &&
-    currentLocation.lat >= -90 && currentLocation.lat <= 90 &&
-    currentLocation.lng >= -180 && currentLocation.lng <= 180;
+  const validLocation = !!parseCoord(currentLocation);
 
   if (validLocation) {
     const position = new kakao.maps.LatLng(currentLocation.lat, currentLocation.lng);
@@ -1059,11 +1057,10 @@ export function renderRouteSelectionOnMainMap(currentLocation, orderedSites, onM
   }
 
   (orderedSites || []).forEach((site, index) => {
-    const lat = Number(site.lat);
-    const lng = Number(site.lng);
-    const isValid =
-      Number.isFinite(lat) && Number.isFinite(lng) &&
-      lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+    const __c = parseCoord(site);
+    const lat = __c ? __c.lat : NaN;
+    const lng = __c ? __c.lng : NaN;
+    const isValid = !!__c;
     if (!isValid) return;
 
     const position = new kakao.maps.LatLng(lat, lng);
@@ -1096,7 +1093,32 @@ export function renderRouteSelectionOnMainMap(currentLocation, orderedSites, onM
   });
 
   if (hasPoint) {
-    state.map.setBounds(bounds, 60, 60, 60, 60);
+    try {
+      state.map.relayout();
+      state.map.setBounds(bounds, 60, 60, 60, 60);
+    } catch (e) {
+      console.error('경로 지도 범위(setBounds) 설정 실패:', e);
+    }
+  }
+}
+
+// PC 지도/경로 탭 공용 툴바("지도 초기화"/"새로고침")용. 메인 지도(state.map)를 relayout 후
+// 좌표를 살짝 옮겼다 되돌려 강제로 다시 그린다(forceRepaint). reset=true면 강남구 기본
+// 중심/배율로 복귀한다. 예외가 나도 버튼이 "무반응"처럼 보이지 않도록 try/catch로 감싼다.
+export function repaintMainMap(reset) {
+  if (!state.map || typeof kakao === 'undefined' || !kakao.maps) return false;
+  try {
+    state.map.relayout();
+    if (reset) {
+      state.map.setLevel(DEFAULT_LEVEL);
+      forceRepaint(state.map, new kakao.maps.LatLng(GANGNAM_CENTER.lat, GANGNAM_CENTER.lng));
+    } else {
+      forceRepaint(state.map, state.map.getCenter());
+    }
+    return true;
+  } catch (e) {
+    console.error('메인 지도 다시 그리기 실패:', e);
+    return false;
   }
 }
 
@@ -1110,12 +1132,10 @@ export function renderRouteSelectionOnMainMap(currentLocation, orderedSites, onM
 // getProjection/panBy를 지원하지 않는 환경(테스트 스텁 등)에서는 기존 panToSite로 대체한다.
 export function centerSiteInVisibleArea(site, hiddenBottomPx) {
   if (!state.map || !site) return;
-  const lat = Number(site.lat);
-  const lng = Number(site.lng);
-  const isValid =
-    Number.isFinite(lat) && Number.isFinite(lng) &&
-    lat >= -90 && lat <= 90 &&
-    lng >= -180 && lng <= 180;
+  const __c = parseCoord(site);
+  const lat = __c ? __c.lat : NaN;
+  const lng = __c ? __c.lng : NaN;
+  const isValid = !!__c;
   if (!isValid) return;
 
   const target = new kakao.maps.LatLng(lat, lng);
