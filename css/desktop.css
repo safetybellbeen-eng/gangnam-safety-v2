@@ -4185,4 +4185,7 @@
   .pc-up-rec .pc-up-progress:empty{display:none}
   .pc-up-td-reason{white-space:pre-line!important}
   .pc-modal.is-wide{max-height:calc(100vh - 40px)}
+  /* 경로 탭: 현장 선택 시 오른쪽 사업장 상세 패널을 열지 않는다(경로 상세는 왼쪽 패널 그대로) */
+  #app[data-pc-tab="route"] #site-detail-panel,#app[data-pc-tab="route"][data-detail-open="true"] #site-detail-panel{display:none!important}
+  #app[data-pc-tab="route"][data-detail-open="true"] #map-container{right:12px!important}
 }
