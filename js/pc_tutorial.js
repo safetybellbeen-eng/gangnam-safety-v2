@@ -31,7 +31,7 @@ function injectStyle() {
   #pc-tutorial .tt-bubble.is-below:before{top:-10px;right:36px;border-top:0;border-bottom-color:#fff}
   #pc-tutorial .tt-n{font-size:12.5px;font-weight:800;color:#0b63f6;margin-bottom:6px}
   #pc-tutorial .tt-bubble h2{font-size:20px;font-weight:900;margin:0 0 8px}
-  #pc-tutorial .tt-bubble p{font-size:14px;line-height:1.65;color:#40557d;margin:0}
+  #pc-tutorial .tt-bubble p{font-size:14px;line-height:1.65;color:#40557d;margin:0;white-space:pre-line}
   #pc-tutorial .tt-row{display:flex;justify-content:space-between;align-items:center;margin-top:18px}
   #pc-tutorial .tt-dots{display:flex;gap:7px;align-items:center}
   #pc-tutorial .tt-dots i{width:8px;height:8px;border-radius:50%;background:#cfdcf0}
@@ -82,7 +82,8 @@ function el(tag, cls, text) {
 function buildSteps() {
   const visible = (sel) => { const n = document.querySelector(sel); return !!n && n.getBoundingClientRect().width > 0; };
   const steps = [
-    { sel: '.pc-nav-btn[data-pc-tab="map"]', title: '지도 — 핀 색으로 위치 정확도 확인', text: '초록·노랑·빨강 핀은 위치 정확도(정확/중간/낮음)예요. 핀이나 왼쪽 목록을 누르면 오른쪽에 상세 정보가 열려요.' },
+    { sel: '.pc-nav-btn[data-pc-tab="map"]', title: '지도 — 핀 색으로 위치 정확도 확인', text: '핀 색은 사업장의 위험도가 아니라, 지도에 찍힌 위치를 얼마나 믿을 수 있는지를 뜻해요. 초록은 정확, 주황은 중간, 빨강은 낮음이에요. 핀이나 왼쪽 목록을 누르면 오른쪽에 상세 정보가 열려요.' },
+    { sel: '.pc-nav-btn[data-pc-tab="map"]', title: '핀 색, 더 자세히', text: '● 초록(정확): 등록된 주소 그대로 카카오 주소검색에서 바로 찾은 위치예요. 관리자가 직접 보정한 위치도 초록이에요.\n\n● 주황(중간): 주소 그대로는 못 찾아서 주소를 정리하거나(우편번호·상세 표기 제거) 핵심 도로명만 남겨 다시 찾은 위치예요. 대체로 맞지만 건물 위치와 조금 다를 수 있어요.\n\n● 빨강(낮음): 정확한 주소는 못 찾고 같은 도로 위의 대표 위치로 찍은 곳이에요. 실제 사업장과 떨어져 있을 수 있으니 방문 전 확인하세요.\n\n※ 목록에는 있는데 지도에 핀이 없다면 위치를 아예 못 찾은 사업장이에요.' },
     { sel: '#site-filter-row', title: '사업장 필터링 — 원하는 현장만 골라 보기', text: '관할(동)·공사금액·점검·산재표 필터를 조합해 대상 사업장만 추려요. 선택한 필터는 지도 핀과 목록·현장 탭 표에 함께 적용되고, “필터 초기화”로 한 번에 되돌릴 수 있어요.' },
     { sel: '.pc-global-search', title: '일반주소 검색', text: '도로명·지번·건물명을 입력하면 결과가 나와요. 결과를 누르면 지도에 핀이 찍히고, “주소복사”·“길찾기”도 쓸 수 있어요. 사업장 검색은 왼쪽 목록의 검색창에서 해요.', below: true },
     { sel: '.pc-nav-btn[data-pc-tab="site"]', title: '현장 — 표로 조회하고 지도에서 확인', text: '같은 필터·정렬로 사업장을 표로 찾고, 상세의 “지도보기” 버튼을 누르면 지도에서 바로 위치를 볼 수 있어요.' },
