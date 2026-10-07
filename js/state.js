@@ -10,6 +10,7 @@ export const state = {
   searchQuery: '',        // 검색어 (site_name/company_name/address/dong 대상)
   siteSearchMode: 'site', // STEP16.32: 'site'(현장/업체명 — 등록 사업장 검색) | 'address'(주소/장소명 — Kakao 검색). 검색창 맨 앞 토글로 전환.
   sortMode: 'default',    // 'default' | 'name-asc' | 'company-asc' | 'amount-desc' | 'amount-asc'
+  dongDefault: true,       // 관할 필터 '기본'(시작값): true면 검색어가 없을 때 핀/목록을 아무것도 보여주지 않는다. '전체'/동 선택 시 false.
   selectedDongs: [],       // 사용자 요청: "관할" 필터. 복수 선택된 dong 값 배열. 빈 배열=전체(필터 없음).
   amountFilter: 'all',     // 'all' | 'under-5b' | '5b-12b' | 'over-12b' | 'custom' (사용자 요청: 50억/120억 기준 3구간)
   customAmountRange: null, // 사용자 요청(2026-10, PC 전용): amountFilter==='custom'일 때 {min,max}(원 단위). PC "자세히" 입력에서만 설정됨.

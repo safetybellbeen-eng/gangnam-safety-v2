@@ -7,6 +7,8 @@ const NAVER_ANDROID_PKG = 'com.nhn.android.nmap';
 const NAVER_IOS_STORE = 'https://itunes.apple.com/app/id311867728?mt=8';
 const TMAP_ANDROID_PKG = 'com.skt.tmap.ku';
 const TMAP_IOS_STORE = 'https://itunes.apple.com/app/id431589174?mt=8';
+const KAKAO_ANDROID_PKG = 'net.daum.android.map';
+const KAKAO_IOS_STORE = 'https://itunes.apple.com/app/id304608425?mt=8';
 
 // 모바일/TWA(화면 폭 768px 이하)에서만 T맵 항목을 보여준다.
 function isMobileLike() {
@@ -34,38 +36,97 @@ export function stripPostalCode(addr) {
   return t.replace(/\s{2,}/g, ' ').trim();
 }
 
-function openNaver(name, lat, lng, address) {
-  const ua = navigator.userAgent || '';
-  const isAndroid = /Android/i.test(ua);
-  const isIOS = /iPhone|iPad|iPod/i.test(ua);
-  if (isAndroid) {
-    // 인텐트 URL: 앱이 없으면 Google Play로 자동 이동한다.
-    location.href = `intent://route/car?${naverQuery(name, lat, lng)}#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=${NAVER_ANDROID_PKG};end`;
-    return;
-  }
-  if (isIOS) {
-    const clickedAt = Date.now();
-    location.href = `nmap://route/car?${naverQuery(name, lat, lng)}`;
-    // 앱이 열리면 페이지가 백그라운드로 가므로 타이머가 늦게 돈다 — 빨리 돌면 미설치로 보고 App Store로.
-    setTimeout(() => { if (Date.now() - clickedAt < 2000 && !document.hidden) location.href = NAVER_IOS_STORE; }, 1500);
-    return;
-  }
-  // PC: 네이버 지도 웹에서 해당 위치(주소 또는 이름)를 검색해 보여준다.
-  window.open(`https://map.naver.com/p/search/${encodeURIComponent(stripPostalCode(address) || name || '')}`, '_blank', 'noopener,noreferrer');
+// ---- 앱 실행 공통 처리 -------------------------------------------------------------
+// 이전 방식(타이머로 "앱이 안 열렸다"고 추정해 스토어를 자동으로 여는 방식)은 iOS에서 "앱에서 열기"
+// 확인창이 떠 있는 동안에도 스토어가 같이 열리는 문제가 있었다. 지금은 스토어를 자동으로 열지 않는다.
+//  - Android(모바일/TWA): intent URL 한 번. 앱이 있으면 앱만 열리고, 없으면 크롬이 Play 스토어로 보낸다.
+//  - iOS: URL Scheme 한 번. 몇 초 뒤에도 화면이 그대로면 "앱 설치" 안내 버튼만 띄우고, 누를 때만 스토어로 간다.
+function ua() { return navigator.userAgent || ''; }
+const isAndroid = () => /Android/i.test(ua());
+const isIOS = () => /iPhone|iPad|iPod/i.test(ua());
+const isMobileDevice = () => isAndroid() || isIOS();
+
+function showInstallHint(label, storeUrl) {
+  const old = document.getElementById('nc-install-hint');
+  if (old) old.remove();
+  const bar = document.createElement('div');
+  bar.id = 'nc-install-hint';
+  bar.setAttribute('role', 'status');
+  bar.style.cssText = 'position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:10060;display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px);padding:12px 14px;border-radius:14px;background:#0b2358;color:#fff;font:600 14px/1.4 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",Pretendard,"Noto Sans KR",sans-serif;box-shadow:0 10px 30px rgba(8,30,70,.35)';
+  const msg = document.createElement('span');
+  msg.textContent = `${label} 앱이 열리지 않았나요?`;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = '앱 설치';
+  btn.style.cssText = 'flex:none;height:32px;padding:0 12px;border:0;border-radius:8px;background:#fff;color:#0b2358;font:800 13px inherit;cursor:pointer';
+  btn.addEventListener('click', () => { bar.remove(); location.href = storeUrl; });
+  const x = document.createElement('button');
+  x.type = 'button';
+  x.setAttribute('aria-label', '닫기');
+  x.textContent = '✕';
+  x.style.cssText = 'flex:none;border:0;background:transparent;color:#c9d6f2;font-size:14px;cursor:pointer';
+  x.addEventListener('click', () => bar.remove());
+  bar.append(msg, btn, x);
+  document.body.appendChild(bar);
+  setTimeout(() => bar.remove(), 10000);
 }
 
-// T맵: 공식 문서가 없어 널리 쓰이는 형식(tmap://route?goalname&goalx(경도)&goaly(위도))을 쓴다.
-// 안드로이드는 인텐트 URL(앱 없으면 Play 스토어), iOS는 rGo* 형식 + 타이머로 App Store 안내.
-function openTmap(name, lat, lng) {
-  const ua = navigator.userAgent || '';
-  const n = encodeURIComponent(name || '목적지');
-  if (/Android/i.test(ua)) {
-    location.href = `intent://route?goalname=${n}&goalx=${lng}&goaly=${lat}#Intent;scheme=tmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=${TMAP_ANDROID_PKG};end`;
+function launchApp({ androidUrl, iosUrl, storeUrl, label }) {
+  if (isAndroid()) { location.href = androidUrl; return; }
+  let left = false;
+  const mark = () => { left = true; };
+  const onVis = () => { if (document.hidden) mark(); };
+  window.addEventListener('pagehide', mark, { once: true });
+  window.addEventListener('blur', mark, { once: true });
+  document.addEventListener('visibilitychange', onVis);
+  location.href = iosUrl;
+  setTimeout(() => {
+    document.removeEventListener('visibilitychange', onVis);
+    window.removeEventListener('pagehide', mark);
+    window.removeEventListener('blur', mark);
+    if (!left && !document.hidden) showInstallHint(label, storeUrl);
+  }, 2500);
+}
+
+function intentUrl(path, scheme, pkg) {
+  return `intent://${path}#Intent;scheme=${scheme};action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=${pkg};end`;
+}
+
+function openKakao(name, lat, lng) {
+  if (!isMobileDevice()) { window.open(kakaoUrl(name, lat, lng), '_blank', 'noopener,noreferrer'); return; }
+  // 카카오맵 앱 길찾기: kakaomap://route?ep=위도,경도&by=CAR (출발지 생략 = 현재 위치)
+  const q = `ep=${lat},${lng}&by=CAR`;
+  launchApp({
+    androidUrl: intentUrl(`route?${q}`, 'kakaomap', KAKAO_ANDROID_PKG),
+    iosUrl: `kakaomap://route?${q}`,
+    storeUrl: KAKAO_IOS_STORE,
+    label: '카카오맵',
+  });
+}
+
+function openNaver(name, lat, lng, address) {
+  if (!isMobileDevice()) {
+    // PC: 네이버 지도 웹에서 해당 위치(주소 또는 이름)를 검색해 보여준다.
+    window.open(`https://map.naver.com/p/search/${encodeURIComponent(stripPostalCode(address) || name || '')}`, '_blank', 'noopener,noreferrer');
     return;
   }
-  const clickedAt = Date.now();
-  location.href = `tmap://route?rGoName=${n}&rGoX=${lng}&rGoY=${lat}`;
-  setTimeout(() => { if (Date.now() - clickedAt < 2000 && !document.hidden) location.href = TMAP_IOS_STORE; }, 1500);
+  launchApp({
+    androidUrl: intentUrl(`route/car?${naverQuery(name, lat, lng)}`, 'nmap', NAVER_ANDROID_PKG),
+    iosUrl: `nmap://route/car?${naverQuery(name, lat, lng)}`,
+    storeUrl: NAVER_IOS_STORE,
+    label: '네이버지도',
+  });
+}
+
+// T맵: tmap://route?goalname&goalx(경도)&goaly(위도) (Android) / rGoName,rGoX,rGoY (iOS)
+function openTmap(name, lat, lng) {
+  const n = encodeURIComponent(name || '목적지');
+  launchApp({
+    androidUrl: intentUrl(`route?goalname=${n}&goalx=${lng}&goaly=${lat}`, 'tmap', TMAP_ANDROID_PKG),
+    iosUrl: `tmap://route?rGoName=${n}&rGoX=${lng}&rGoY=${lat}`,
+    storeUrl: TMAP_IOS_STORE,
+    label: 'T맵',
+  });
 }
 
 let root = null;
@@ -126,7 +187,7 @@ export function openDirections(name, lat, lng, address) {
     return b;
   };
   if (isMobileLike()) box.appendChild(mk('nc-tmap', 'tmap', 'T맵으로 보기', () => openTmap(name, lat, lng)));
-  box.appendChild(mk('nc-kakao', 'kakaomap', '카카오맵으로 보기', () => window.open(kakaoUrl(name, lat, lng), '_blank', 'noopener,noreferrer')));
+  box.appendChild(mk('nc-kakao', 'kakaomap', '카카오맵으로 보기', () => openKakao(name, lat, lng)));
   box.appendChild(mk('nc-naver', 'naver', '네이버지도로 보기', () => openNaver(name, lat, lng, address)));
   const cancel = document.createElement('button');
   cancel.type = 'button';

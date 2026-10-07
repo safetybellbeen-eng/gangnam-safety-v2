@@ -208,7 +208,7 @@ export function getDongOptions() {
 
 // state.sites를 원본 그대로 두고, 복사본에서 검색 → 관할(동) → 금액 → 점검 → 산재표 →
 // 즐겨찾기 → 정렬을 순서대로 적용해 반환한다. UI/marker는 이 파생 배열만 받아서 렌더한다.
-export function getFilteredSortedSites() {
+export function getFilteredSortedSites(opts = {}) {
   // 사용자 요청: 모바일 "즐겨찾기" 탭은 검색/필터 UI를 전부 없애고, 내부 탭(즐겨찾기 현장/
   // 메모 있는 현장)에 따른 단순 목록만 보여준다. "현장" 탭에 남아있을 수 있는 검색어나
   // 필터가 이 탭의 목록에 영향을 주면 안 되므로, 이 탭일 때는 다른 필터를 전혀 적용하지
@@ -224,6 +224,10 @@ export function getFilteredSortedSites() {
   // js/ui.js renderAddressSearchResults()의 Kakao 주소/장소 검색 쪽으로만 간다) — 사업장 목록/
   // 지도 마커는 검색 전과 동일하게(관할/금액 등 다른 필터만 적용된 채) 그대로 유지된다.
   const query = state.siteSearchMode === 'address' ? '' : (state.searchQuery || '').trim();
+
+  // 관할 '기본'(시작값): 핀이 너무 많아 혼동되므로, 검색어가 없으면 아무것도 보여주지 않는다.
+  // 검색어를 입력하면 그 결과는 보여준다. 경로탭 "전체 현장 핀 표시"는 opts.ignoreDefault로 예외.
+  if (state.dongDefault && !query && !opts.ignoreDefault) return [];
 
   let result = state.sites
     .filter(site => matchesQuery(site, query))

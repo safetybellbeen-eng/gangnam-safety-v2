@@ -365,6 +365,7 @@ function resetClientStateAfterSignOut() {
   state.searchQuery = '';
   state.sortMode = 'default';
   state.selectedDongs = [];
+  state.dongDefault = true;
   state.amountFilter = 'all';
   state.siteInspectionFilter = 'all';
   state.siteAccidentReportFilter = 'all';
@@ -843,7 +844,7 @@ function bindPcWorkspace() {
       // state 값은 그대로 초기화하고, 화면 쪽은 각 필터의 "전체/기본" 라디오에 change 이벤트를
       // 직접 발생시켜(실제 클릭했을 때와 동일하게) 해당 필터가 스스로 라벨/강조를 되돌리게 하고,
       // 체크박스 기반인 관할만 별도로 비운 뒤 updateDongFilterLabel()을 호출한다.
-      state.searchQuery = ''; state.selectedDongs = []; state.amountFilter = 'all'; state.customAmountRange = null;
+      state.searchQuery = ''; state.selectedDongs = []; state.dongDefault = true; state.amountFilter = 'all'; state.customAmountRange = null;
       state.siteInspectionFilter = 'all'; state.siteAccidentReportFilter = 'all'; state.sortMode = 'default';
 
       const target = document.getElementById('site-search-input');

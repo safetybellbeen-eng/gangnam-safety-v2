@@ -1348,7 +1348,7 @@ export function renderPcSiteTable() {
     const tr = document.createElement('tr');
     const td = document.createElement('td');
     td.colSpan = 8;
-    td.textContent = state.sitesLoadError ? '사업장 정보를 불러오지 못했습니다.' : '표시할 사업장이 없습니다.';
+    td.textContent = state.sitesLoadError ? '사업장 정보를 불러오지 못했습니다.' : ((state.dongDefault && !(state.searchQuery || '').trim() && state.mobileActiveTab !== 'favorite' && activeTab !== 'favorite') ? '관할(행정동)을 선택하거나 검색해 주세요.' : '표시할 사업장이 없습니다.');
     td.style.textAlign = 'center'; td.style.color = '#7184a3'; td.style.height = '120px';
     tr.appendChild(td); body.appendChild(tr);
   }
@@ -1445,7 +1445,14 @@ export function renderSiteList(containerId) {
   // PC 전용 오버레이로, index.html에 hidden 속성으로 기본 숨김 처리된 요소의 hidden만 토글한다
   // (지도/마커 렌더링 로직 자체는 건드리지 않음, 모바일은 css/desktop.css 기본 숨김 규칙으로 무관).
   const pcMapEmptyState = document.getElementById('pc-map-empty-state');
-  if (pcMapEmptyState) pcMapEmptyState.hidden = visibleSites.length > 0;
+  if (pcMapEmptyState) {
+    pcMapEmptyState.hidden = visibleSites.length > 0;
+    const isDefaultHint = !!state.dongDefault && !(state.searchQuery || '').trim();
+    const t = pcMapEmptyState.querySelector('.pc-map-empty-state-title');
+    const d = pcMapEmptyState.querySelector('.pc-map-empty-state-desc');
+    if (t) t.textContent = isDefaultHint ? '관할(행정동)을 선택해 주세요' : '표시할 현장이 없습니다';
+    if (d) d.textContent = isDefaultHint ? '상단 관할 필터에서 “전체” 또는 동을 고르거나 현장명을 검색하면 핀이 표시됩니다.' : '검색어나 필터 조건을 확인해 보세요.';
+  }
 
   if (!visibleSites || visibleSites.length === 0) {
     // F2(STEP16.35): 조회 자체가 실패했을 때(state.sitesLoadError)는 "등록된 사업장이 없다"는
@@ -1474,7 +1481,10 @@ export function renderSiteList(containerId) {
       buildFavoriteEmptyState(container, favMode);
     } else {
       const empty = document.createElement('p');
-      empty.textContent = '표시할 사업장이 없습니다.';
+      empty.className = 'site-list-hint';
+      empty.textContent = (state.dongDefault && !(state.searchQuery || '').trim())
+        ? '관할(행정동)을 선택하거나 검색해 주세요.'
+        : '표시할 사업장이 없습니다.';
       container.appendChild(empty);
     }
   } else {
@@ -2974,7 +2984,7 @@ function applyRouteSitePinsVisibility() {
     // 둔 상태였더라도(기본 배율 이상) updateBoundaryDisplayForZoom()의 줌 기준 숨김 로직과
     // 무관하게 항상 보이게 한다(setForcePinsVisible).
     setForcePinsVisible(true);
-    renderMarkers(getFilteredSortedSites(), selectSite);
+    renderMarkers(getFilteredSortedSites({ ignoreDefault: true }), selectSite);
   } else {
     setForcePinsVisible(false);
     clearMarkers();
@@ -4175,17 +4185,19 @@ export function updateDongFilterLabel() {
   const filterEl = document.getElementById('site-dong-filter');
   if (!labelEl) return;
   const selected = state.selectedDongs;
-  if (!selected || selected.length === 0) labelEl.textContent = '관할';
+  const isDefault = !!state.dongDefault;
+  const isAll = !isDefault && (!selected || selected.length === 0);
+  if (isDefault) labelEl.textContent = '관할';
+  else if (isAll) labelEl.textContent = '전체';
   else if (selected.length === 1) labelEl.textContent = selected[0];
   else labelEl.textContent = `${selected[0]} 외 ${selected.length - 1}`;
-  // css/mobile.css의 .site-select-filter[data-active="true"] 강조 스타일용.
-  if (filterEl) filterEl.dataset.active = String(!!(selected && selected.length > 0));
+  // 기본(시작값)이 아닐 때만 강조한다.
+  if (filterEl) filterEl.dataset.active = String(!isDefault);
 
-  // 사용자 피드백: "전체" 버튼도 다른 옵션 행과 동일하게, 아무 동도 선택되지 않았을 때
-  // 체크 표시(✓)가 보이도록 한다(.site-select-filter-option:has(input:checked)와 동일한
-  // 선택 강조를 버튼 쪽은 .is-checked 클래스로 흉내낸다 — <button>은 :checked가 없으므로).
+  const defaultBtn = document.getElementById('site-dong-filter-default');
+  if (defaultBtn) defaultBtn.classList.toggle('is-checked', isDefault);
   const clearBtn = document.getElementById('site-dong-filter-clear');
-  if (clearBtn) clearBtn.classList.toggle('is-checked', !selected || selected.length === 0);
+  if (clearBtn) clearBtn.classList.toggle('is-checked', isAll);
 }
 
 // 사용자 요청: 공사금액/점검/산재표를 관할과 동일한 <details> 커스텀 드롭다운(단일선택 radio)
@@ -4232,6 +4244,20 @@ function bindRadioFilterDetails(detailsId, stateKey, containerId, labels, neutra
       renderSiteList(containerId);
     });
   });
+
+  // '기본' 버튼: 시작값으로 되돌린다(핀/목록 비움, 검색어 입력 시에만 결과 표시).
+  const dongFilterDefaultBtn = document.getElementById('site-dong-filter-default');
+  if (dongFilterDefaultBtn) {
+    dongFilterDefaultBtn.addEventListener('click', () => {
+      state.dongDefault = true;
+      state.selectedDongs = [];
+      document.querySelectorAll('#site-dong-filter-options input[type="checkbox"]')
+        .forEach(cb => { cb.checked = false; });
+      updateDongFilterLabel();
+      const dfEl = document.getElementById('site-dong-filter'); if (dfEl) dfEl.open = false;
+      renderSiteList(containerId);
+    });
+  }
 
   // details/summary는 바깥 클릭 시 자동으로 닫히지 않으므로, 패널 바깥을 클릭하면 닫아준다
   // (관할과 동일한 방식).
@@ -4284,6 +4310,8 @@ export function renderDongOptions() {
       } else {
         state.selectedDongs = state.selectedDongs.filter(d => d !== dong);
       }
+      // 동을 하나라도 고르면 '기본' 해제, 모두 해제하면 '기본'으로 복귀.
+      state.dongDefault = state.selectedDongs.length === 0;
       updateDongFilterLabel();
       renderSiteList('site-list');
     });
@@ -4432,6 +4460,7 @@ export function bindSearchAndSort(containerId) {
   // renderDongOptions()가 각자 바인딩).
   if (dongFilterClearBtn) {
     dongFilterClearBtn.addEventListener('click', () => {
+      state.dongDefault = false;
       state.selectedDongs = [];
       document.querySelectorAll('#site-dong-filter-options input[type="checkbox"]')
         .forEach(cb => { cb.checked = false; });
