@@ -405,6 +405,35 @@
   </section>
 
   <section id="view-signup-done" role="main" style="display:none">
+    <!-- PC 전용 가입 완료 화면(2026-10 시안 확정): 로그인/회원가입과 같은 배경 위에 가운데 카드.
+         모바일 전용 요소는 그대로 두고, 이 블록만 모바일에서 숨긴다(css/mobile.css). 버튼은 기존
+         #signup-done-to-login을 대신 눌러 주므로 이동 동작/핸들러는 하나만 유지된다. -->
+    <div class="pc-auth-bg" aria-hidden="true"></div>
+    <div class="pc-auth-topbar">
+      <img src="assets/icons/moel-ci-cutout.png" alt="">
+      <span class="pc-auth-topbar-text"><strong>고용노동부</strong><em>산업안전 순찰지도</em></span>
+    </div>
+    <div id="pc-signupdone-card">
+      <div class="pc-signupdone-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M7.5 12.5l3 3 6-7"/></svg>
+      </div>
+      <h2 class="pc-signupdone-title">가입 신청이 완료되었습니다</h2>
+      <p class="pc-signupdone-sub">관리자 승인 후 로그인하실 수 있습니다.</p>
+      <dl id="pc-signupdone-recap">
+        <dt>소속</dt><dd id="pc-signupdone-org">-</dd>
+        <dt>이름</dt><dd id="pc-signupdone-name">-</dd>
+        <dt>아이디</dt><dd id="pc-signupdone-id">-</dd>
+      </dl>
+      <div class="pc-signupdone-info">
+        <h3>승인 안내</h3>
+        <ul>
+          <li>관리자의 승인 절차를 거쳐 이용하실 수 있습니다.</li>
+          <li>승인은 <strong>매주 월요일 10시</strong>에 일괄 처리됩니다.</li>
+          <li>승인 전에 로그인하시면 승인 대기 안내 화면이 표시되며, 승인 여부가 자동으로 확인됩니다.</li>
+        </ul>
+      </div>
+      <button type="button" id="pc-signupdone-to-login">로그인 화면으로 이동</button>
+    </div>
     <!-- STEP16.6(승인대기 화면 모바일 UI). PC는 바로 아래 원본 h1/p/button을 그대로 유지한다
          (변경 없음). 모바일 전용 헤더/일러스트/안내박스/하단 skyline은 새로 추가된 요소라
          css/mobile.css 상단 PC-hide 목록에서 기본 숨김 처리하고, 모바일 media query 안에서만

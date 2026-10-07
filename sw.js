@@ -10,7 +10,7 @@
 // 다른 origin/다른 앱의 캐시는 건드리지 않는다(Cache Storage 자체가 origin별로 격리되어 있고,
 // 여기서도 이름 prefix로 한 번 더 스스로 범위를 제한한다).
 const CACHE_PREFIX = 'gnmap-v2-shell-';
-const CACHE_VERSION = 'v66'; // STEP16.22 배포(index.html/js/ui.js/css/mobile.css 변경) 후에도
+const CACHE_VERSION = 'v67'; // STEP16.22 배포(index.html/js/ui.js/css/mobile.css 변경) 후에도
 // "필터가 작동 안 한다" 재발 — STEP16.22를 올리면서 이 값을 v7 그대로 두고 깜빡해, app shell
 // (index.html/css/mobile.css)이 여전히 STEP16.21 버전으로 캐시된 채 최신 js/ui.js와 섞여 로드된
 // 것이 원인으로 추정된다. 앞으로는 index.html/css/*.css 중 하나라도 바뀌는 배포마다 반드시 이
