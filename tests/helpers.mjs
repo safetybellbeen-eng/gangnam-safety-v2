@@ -97,6 +97,7 @@ export async function openLoggedIn(browser, { width = 1400, height = 900, role =
   await page.fill('#login-password', 'Password123!');
   await page.click('#login-form button[type="submit"]');
   await page.waitForSelector('#view-approved', { state: 'visible', timeout: 15000 });
+  await page.waitForLoadState('networkidle').catch(() => {}); // 서버 응답(즐겨찾기/메모 등)이 다 도착한 뒤 테스트가 상태를 바꾸도록 한다.
   await page.waitForTimeout(1500);
   await page.keyboard.press('Escape');
   await page.evaluate(() => { document.getElementById('m-tutorial')?.remove(); document.getElementById('pc-tutorial')?.remove(); });
