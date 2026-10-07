@@ -1,0 +1,17 @@
+name: Auto Test
+# 코드를 올릴 때마다 핵심 화면 동작을 자동 점검한다. (배포 workflow와 별개 — 실패해도 배포는 막지 않음)
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
