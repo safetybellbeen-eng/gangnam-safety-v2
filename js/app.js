@@ -7,7 +7,7 @@ import { bindPcAddressSearch } from './pc_address_search.js';
 import { state } from './state.js';
 import { sb } from './api.js';
 import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, signOutAllDevices, touchLastLogin, verifySignupCode, checkIdExists, checkLoginLock, translateAuthError } from './auth.js';
-import { preloadKakaoSdk, initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites, renderHqMarker, clearRouteSelectionOnMainMap, repaintMainMap, focusSiteOnMap, setForcePinsVisible } from './map.js';
+import { preloadKakaoSdk, initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites, renderHqMarker, clearRouteSelectionOnMainMap, repaintMainMap, focusSiteOnMap, setForcePinsVisible, fitMapToSites } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
@@ -582,8 +582,33 @@ function showPcPageError(tab, err) {
   }
 }
 
-function activatePcTab(tab) {
+// PC 즐겨찾기 탭의 "지도에서 보기": 지도 탭을 크게 열되 즐겨찾기 현장만 보이게 한다(일반 지도 탭 이동과 구분).
+// 다른 탭으로 이동하거나 "전체 현장 보기"를 누르면 원래대로 되돌린다.
+let pcFavMapView = false;
+function exitPcFavMapView() {
+  if (!pcFavMapView) return;
+  pcFavMapView = false;
+  state.favoriteOnly = false;
+  const banner = document.getElementById('pc-fav-map-banner');
+  if (banner) banner.hidden = true;
+  renderSiteList('site-list');
+}
+function enterPcFavMapView() {
+  pcFavMapView = true;
+  state.favoriteOnly = true;
+  const banner = document.getElementById('pc-fav-map-banner');
+  if (banner) banner.hidden = false;
+  renderSiteList('site-list');
+  // 지도 탭 레이아웃이 자리 잡은 뒤 즐겨찾기 현장들이 한 화면에 들어오도록 맞춘다.
+  setTimeout(() => {
+    const favs = state.sites.filter(s => state.favoriteSiteIds.has(s.id));
+    if (favs.length) fitMapToSites(favs);
+  }, 150);
+}
+
+function activatePcTab(tab, opts = {}) {
   if (window.matchMedia('(max-width: 768px)').matches) return;
+  if (pcFavMapView && !(tab === 'map' && opts.keepFavMap)) exitPcFavMapView();
   const appEl = document.getElementById('app');
   // 사업장 데이터 관리에서 저장하지 않은 업로드 파일이 있으면 다른 탭으로 가기 전에 확인한다.
   if (appEl && appEl.dataset.pcTab === 'upload' && tab !== 'upload' && typeof window.__pcUploadDirty === 'function' && window.__pcUploadDirty()) {
@@ -821,7 +846,9 @@ function bindPcWorkspace() {
   // 탭에서 보던 핀들을 지도 탭에서도 계속 즐겨찾기만 볼지는 기존 필터 토글(⭐)로 사용자가 정한다.
   const pcFavoriteMapViewBtn = document.getElementById('pc-favorite-map-view-btn');
   if (pcFavoriteMapViewBtn) {
-    pcFavoriteMapViewBtn.addEventListener('click', () => activatePcTab('map'));
+    pcFavoriteMapViewBtn.addEventListener('click', () => { activatePcTab('map', { keepFavMap: true }); enterPcFavMapView(); });
+    const favBannerExit = document.getElementById('pc-fav-map-banner-exit');
+    if (favBannerExit) favBannerExit.addEventListener('click', exitPcFavMapView);
   }
 
   const pcSiteSearch = document.getElementById('pc-site-table-search-input');
