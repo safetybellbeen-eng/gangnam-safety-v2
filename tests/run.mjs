@@ -107,6 +107,16 @@ try {
       await page.click('label:has(#site-etc-favorite)'); await page.waitForTimeout(400); eq(await items(page), 2, '메모');
       await page.click('label:has(#site-etc-note)'); await page.waitForTimeout(400); eq(await items(page), 0, '해제');
     });
+    await test('모바일: 공사금액 "자세히 설정"으로 억원 범위 직접 입력', async () => {
+      await page.evaluate(() => { window.__st.dongDefault = false; window.__st.selectedDongs = []; });
+      await page.click('#site-amount-filter-label'); await page.click('#site-amount-filter-custom-toggle');
+      ok(await page.isVisible('#site-amount-filter-custom-apply'), '적용 버튼이 화면에 안 보임');
+      await page.fill('#site-amount-filter-min-input', '10'); await page.fill('#site-amount-filter-max-input', '20');
+      await page.click('#site-amount-filter-custom-apply'); await page.waitForTimeout(500);
+      eq(await page.textContent('#site-amount-filter-label'), '10억~20억');
+      eq(await items(page), 12, '10~20억 사업장 수');
+      await page.evaluate(() => { window.__st.dongDefault = true; window.__st.amountFilter = 'all'; });
+    });
     await test('모바일: 사용 가이드가 열린다', async () => {
       await page.evaluate(() => document.dispatchEvent(new CustomEvent('gnmap:mobile-guide')));
       await page.waitForSelector('#m-tutorial', { timeout: 3000 });
