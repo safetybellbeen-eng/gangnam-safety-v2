@@ -1,0 +1,7 @@
+{
+  "name": "gangnam-safety-v2-tests",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node tests/run.mjs" },
+  "devDependencies": { "axe-core": "^4.10.0", "playwright": "^1.48.0" }
+}
