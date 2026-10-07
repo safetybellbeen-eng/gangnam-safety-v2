@@ -4724,3 +4724,34 @@
   .route-nearby-chip:hover{background:#eef4fd}
   .route-nearby-chip.active{background:#1a73e8;border-color:#1a73e8;color:#fff}
 }
+
+/* PC 가입 완료 화면(2026-10 확정 시안): 배경 + 가운데 카드. 모바일은 mobile.css에서 카드 자체를 숨긴다. */
+@media (min-width: 769px) {
+  #app #view-signup-done {
+    position: relative; isolation: isolate; width: 100%; max-width: none; min-height: 100vh; margin: 0; padding: 0;
+    overflow-x: hidden; background: #edf5ff;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Pretendard, "Noto Sans KR", "Segoe UI", sans-serif;
+  }
+  #view-signup-done > h1, #view-signup-done > p, #mobile-signupdone-body, #mobile-signupdone-header { display: none !important; }
+  #view-signup-done .pc-auth-bg { display: block; position: fixed; inset: 0; z-index: -2; background: url('../assets/images/desktop-auth-bg.jpg') center center / cover no-repeat; }
+  #view-signup-done .pc-auth-topbar { display: flex; }
+  #app #pc-signupdone-card {
+    display: block; position: relative; z-index: 2; box-sizing: border-box; width: 520px; max-width: calc(100vw - 48px);
+    margin: 70px auto 40px; padding: 40px 48px 36px; border: 1px solid #dbe6f6; border-radius: 16px;
+    background: rgba(255, 255, 255, 0.965); box-shadow: 0 20px 50px rgba(15, 42, 92, 0.18); color: #0f2a5c;
+  }
+  #pc-signupdone-card *, #pc-signupdone-card *::before { box-sizing: border-box; }
+  .pc-signupdone-icon { width: 76px; height: 76px; margin: 0 auto 18px; border-radius: 50%; background: #e8f7ee; color: #1f9d55; display: grid; place-items: center; }
+  .pc-signupdone-icon svg { width: 40px; height: 40px; }
+  .pc-signupdone-title { margin: 0 0 8px; text-align: center; font-size: 28px; font-weight: 800; line-height: 1.3; color: #0f2a5c; }
+  .pc-signupdone-sub { margin: 0 0 22px; text-align: center; font-size: 15px; line-height: 1.6; color: #51648a; }
+  #pc-signupdone-recap { display: grid; grid-template-columns: 90px 1fr; gap: 8px 12px; margin: 0 0 18px; padding: 16px 18px; border: 1px solid #e1eaf7; border-radius: 12px; background: #f5f8fd; font-size: 14.5px; }
+  #pc-signupdone-recap dt { color: #5a6d93; font-weight: 600; }
+  #pc-signupdone-recap dd { margin: 0; font-weight: 700; word-break: break-all; }
+  .pc-signupdone-info { margin: 0 0 22px; padding: 16px 18px; border: 1px solid #e1eaf7; border-radius: 12px; }
+  .pc-signupdone-info h3 { margin: 0 0 10px; font-size: 15px; color: #12337a; }
+  .pc-signupdone-info ul { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.75; color: #3d5278; }
+  #pc-signupdone-to-login { display: block; width: 100%; height: 50px; border: 0; border-radius: 10px; background: #0b63f6; color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 18px rgba(11, 99, 246, 0.28); }
+  #pc-signupdone-to-login:hover { background: #0a56d6; }
+  #pc-signupdone-to-login:focus-visible { outline: 3px solid #9cc2ff; outline-offset: 2px; }
+}
