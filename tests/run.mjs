@@ -50,8 +50,11 @@ try {
       await page.click('#pc-favorite-map-view-btn'); await page.waitForTimeout(600);
       const s = await page.evaluate(() => ({ tab: document.getElementById('app').dataset.pcTab, fo: window.__st.favoriteOnly, banner: !document.getElementById('pc-fav-map-banner').hidden, n: document.querySelectorAll('#site-list .site-list-item').length }));
       eq(s.tab, 'map'); eq(s.fo, true); eq(s.banner, true); eq(s.n, 3);
+      const big = await page.evaluate(() => Math.max(...(window.__mk || []).slice(-3).map((m) => (m._img && m._img.size ? m._img.size.h : 0))));
+      ok(big >= 46, '보기 모드 핀이 커지지 않음(h=' + big + ')');
       await page.click('#pc-fav-map-banner-exit'); await page.waitForTimeout(400);
       eq(await page.evaluate(() => window.__st.favoriteOnly), false, '종료 후 즐겨찾기만 보기 해제');
+      eq(await page.evaluate(() => !!window.__st.favMapBig), false, '종료 후 핀 크기 복귀');
     });
     await test('PC: 보기 모드에서 다른 탭으로 나가면 모드가 해제된다', async () => {
       await page.click('.pc-nav-btn[data-pc-tab="favorite"]'); await page.waitForTimeout(300);

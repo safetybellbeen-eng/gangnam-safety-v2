@@ -28,15 +28,15 @@ export function FAKE_KAKAO_SDK() {
   window.__markerCount = 0; window.__calls=[];
   window.__hqMarkerCount = 0;
   function Marker(opts) {
-    window.__markerCount++;
+    window.__markerCount++; (window.__mk = window.__mk || []).push(this); this._img = opts && opts.image;
     this.setMap = (m) => { this._onMap = !!m; };
-    this.setImage = () => {}; this.getPosition = () => new LatLng(37.5,127.03); this.setPosition = () => {}; this.setZIndex = () => {};
+    this.setImage = (i) => { this._img = i; }; this.getPosition = () => new LatLng(37.5,127.03); this.setPosition = () => {}; this.setZIndex = () => {};
   }
   function CustomOverlay(opts) {
     if (opts && opts.content && opts.content.className === 'hq-marker-label') window.__hqMarkerCount++;
     this.setMap = () => {}; this.setPosition = () => {}; this.setContent = () => {}; this.setZIndex = () => {};
   }
-  window.kakao = { maps: { LatLng, LatLngBounds: function () { this._points = []; this.extend = (p) => { this._points.push(p); window.__lastBounds = this; }; }, Size: function (w, h) { this.w = w; this.h = h; }, Point: function (x, y) { this.x = x; this.y = y; }, MarkerImage: function () {}, Marker, Circle: function () { this.setMap = () => {}; this.setPosition = () => {}; }, Polygon: function () { this.setMap = () => {}; this.setPath = () => {}; }, CustomOverlay, MarkerClusterer: function () { this.addMarkers = () => {}; this.clear = () => {}; this.addMarker = () => {}; }, Map, event: { addListener: () => {}, trigger: () => {} }, load: (cb) => cb(), services: { Status: { OK: 'OK' }, Geocoder: function () { this.addressSearch = (a, cb) => cb([{ x: '127.03', y: '37.5' }], 'OK'); }, Places: function () { this.keywordSearch = (q, cb) => cb([], 'ZERO_RESULT'); } } } };
+  window.kakao = { maps: { LatLng, LatLngBounds: function () { this._points = []; this.extend = (p) => { this._points.push(p); window.__lastBounds = this; }; }, Size: function (w, h) { this.w = w; this.h = h; }, Point: function (x, y) { this.x = x; this.y = y; }, MarkerImage: function (src, size) { this.size = size; }, Marker, Circle: function () { this.setMap = () => {}; this.setPosition = () => {}; }, Polygon: function () { this.setMap = () => {}; this.setPath = () => {}; }, CustomOverlay, MarkerClusterer: function () { this.addMarkers = () => {}; this.clear = () => {}; this.addMarker = () => {}; }, Map, event: { addListener: () => {}, trigger: () => {} }, load: (cb) => cb(), services: { Status: { OK: 'OK' }, Geocoder: function () { this.addressSearch = (a, cb) => cb([{ x: '127.03', y: '37.5' }], 'OK'); }, Places: function () { this.keywordSearch = (q, cb) => cb([], 'ZERO_RESULT'); } } } };
 }
 export function FAKE_GEOLOCATION() {
   const fakeGeo = {
