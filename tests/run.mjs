@@ -2,7 +2,7 @@
 // 로컬 서버를 띄우고, 가짜 지도/가짜 DB 응답으로 핵심 화면 동작을 점검한다.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
-import { startServer, launch, openLoggedIn } from './helpers.mjs';
+import { startServer, launch, openLoggedIn, BASE, FAKE_KAKAO_SDK } from './helpers.mjs';
 
 const require = createRequire(import.meta.url);
 const results = [];
@@ -129,6 +129,39 @@ try {
     });
     await page.close();
   }
+  // ── 회원가입 완료 화면(PC 카드 / 모바일 기존 화면) ───────────────
+  for (const [w, h, tag] of [[1400, 800, 'PC'], [390, 844, '모바일']]) {
+    await test(`${tag}: 회원가입 신청 후 가입 완료 화면이 정상 표시되고 로그인으로 돌아간다`, async () => {
+      const page = await browser.newPage({ viewport: { width: w, height: h } });
+      const errs = []; page.on('pageerror', (e) => errs.push(e.message));
+      await page.addInitScript(FAKE_KAKAO_SDK);
+      await page.route('https://kuphyemtyamglvyjpvwh.supabase.co/**', (r) => {
+        const p = new URL(r.request().url()).pathname; const J = (o, st = 200) => r.fulfill({ status: st, contentType: 'application/json', body: JSON.stringify(o) });
+        if (p === '/auth/v1/signup') return J({ id: 'u1', email: 'gildong01@x.local', aud: 'authenticated', role: 'authenticated', identities: [{}] });
+        if (p.includes('/rpc/gnmap_v2_verify_signup_code')) return J({ ok: true });
+        if (p.includes('/rpc/gnmap_v2_check_id_exists')) return J(false);
+        if (p.startsWith('/auth/v1/')) return J({}, 401);
+        return J([]);
+      });
+      await page.goto(BASE + '/index.html', { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('#login-email', { state: 'visible' });
+      await page.evaluate(() => { const sp = document.getElementById('mobile-splash'); if (sp) sp.style.display = 'none'; });
+      await page.evaluate(() => { const e = [...document.querySelectorAll('#view-login button, #view-login a')].find((x) => /회원가입/.test(x.textContent) && x.offsetParent); e && e.click(); });
+      await page.waitForSelector('#signup-form', { state: 'visible' });
+      await page.selectOption('#signup-org', '강남지청'); await page.fill('#signup-name', '홍길동'); await page.fill('#signup-email', 'gildong01');
+      await page.fill('#signup-password', 'Abcd1234!x'); await page.fill('#signup-password-confirm', 'Abcd1234!x'); await page.fill('#signup-code', '123456');
+      await page.evaluate(() => { const c = document.getElementById('signup-privacy-agree'); c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); });
+      await page.click('#signup-form button[type="submit"]'); await page.waitForTimeout(1000);
+      const s = await page.evaluate(() => ({ card: document.getElementById('pc-signupdone-card').offsetParent !== null, id: document.getElementById('pc-signupdone-id').textContent, btn: document.getElementById('signup-done-to-login').offsetParent !== null }));
+      eq(s.id, 'gildong01');
+      if (w > 768) eq(s.card, true, 'PC 카드 미표시'); else { eq(s.card, false, '모바일에 PC 카드 노출'); eq(s.btn, true, '모바일 버튼 없음'); }
+      await page.click(w > 768 ? '#pc-signupdone-to-login' : '#signup-done-to-login'); await page.waitForTimeout(400);
+      ok(await page.evaluate(() => getComputedStyle(document.getElementById('view-login')).display !== 'none'), '로그인 화면 복귀 실패');
+      eq(errs.length, 0, errs.join('|'));
+      await page.close();
+    });
+  }
+
 } finally {
   await browser.close(); server.close();
 }
