@@ -1,0 +1,35 @@
+# GitHub Pages 배포 — 앱 실행에 필요한 파일만 사이트에 올린다.
+# supabase/(DB 구조·정책 SQL), CLAUDE.md(내부 지침), .github/ 등은 배포물(웹 주소)에서 제외된다.
+# 사용 전 1회 설정: 저장소 Settings > Pages > Build and deployment > Source 를 "GitHub Actions"로 변경.
+name: Deploy to GitHub Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 배포 대상 파일만 복사
+        run: |
+          mkdir -p _site
+          cp index.html manifest.json sw.js _site/
+          cp -r css js assets vendor _site/
+          touch _site/.nojekyll
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
