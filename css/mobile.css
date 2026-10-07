@@ -4038,7 +4038,7 @@
     margin: 8px 0 0;
     font-size: 12.5px;
     line-height: 1.5;
-    color: #8a93a3;
+    color: #5f6877;
   }
   #mobile-login-remember-group {
     display: flex;
@@ -5373,4 +5373,11 @@
   }
 }
 
-@media (max-width:768px){.site-list-hint{margin:24px 16px;text-align:center;color:#7184a3;font-size:14px;line-height:1.5}}
+@media (max-width:768px){.site-list-hint{margin:24px 16px;text-align:center;color:#56688a;font-size:14px;line-height:1.5}}
+
+/* 필터 줄 한 줄 맞춤: 검색/관할/공사금액/점검/산재표/기타가 360~412px 폭에서 스크롤 없이 모두 보이도록
+   칩 안쪽 여백과 간격만 줄인다(글자 크기·동작은 그대로). 값이 선택돼 라벨이 길어지면 기존처럼 가로 스크롤된다. */
+@media (max-width:768px){
+  #site-filter-row{gap:5px}
+  #site-filter-row .site-select-filter-label{padding:0 8px}
+}
