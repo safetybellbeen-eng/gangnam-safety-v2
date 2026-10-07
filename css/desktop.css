@@ -4694,3 +4694,5 @@
 }
 
 @media (min-width:769px){.site-list-hint{margin:28px 16px;text-align:center;color:#7184a3;font-size:14px;line-height:1.5}}
+
+@media (min-width:769px){#site-etc-filter{display:none!important}}
