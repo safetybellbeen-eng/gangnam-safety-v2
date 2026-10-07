@@ -534,7 +534,16 @@ function showPcPageError(tab, err) {
   console.error('[PC 페이지 렌더 오류]', tab, err);
   const root = document.getElementById(tab === 'supervision' ? 'pc-supervision-page' : tab === 'admin' ? 'pc-admin-page' : tab === 'upload' ? 'pc-upload-page' : 'pc-notes-page');
   if (root && !root.children.length) {
-    root.innerHTML = '<div style="padding:40px;color:#c62828;font-size:15px">화면을 불러오지 못했습니다. 새로고침(Ctrl+F5) 후에도 반복되면 F12 콘솔의 오류를 알려주세요.<br><small>' + String(err && err.message || err).replace(/</g, '&lt;') + '</small></div>';
+    // 오류 메시지는 서버/외부 값이 섞일 수 있으므로 innerHTML이 아니라 textContent로 넣는다(XSS 방지).
+    root.textContent = '';
+    const box = document.createElement('div');
+    box.style.cssText = 'padding:40px;color:#c62828;font-size:15px';
+    box.appendChild(document.createTextNode('화면을 불러오지 못했습니다. 새로고침(Ctrl+F5) 후에도 반복되면 F12 콘솔의 오류를 알려주세요.'));
+    box.appendChild(document.createElement('br'));
+    const small = document.createElement('small');
+    small.textContent = String(err && err.message || err);
+    box.appendChild(small);
+    root.appendChild(box);
   }
 }
 
