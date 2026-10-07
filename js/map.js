@@ -205,7 +205,7 @@ function setClustererShown(shown) {
 // 항상 보여준다(축소해도 사라지지 않음). 필터가 없는 기본 상태에서만 줌 기준 전환을 적용한다.
 function updateBoundaryDisplayForZoom() {
   if (!state.map) return;
-  const filterActive = (Array.isArray(state.selectedDongs) && state.selectedDongs.length > 0) || !!(state.etcFavorite || state.etcNote);
+  const filterActive = (Array.isArray(state.selectedDongs) && state.selectedDongs.length > 0) || !!(state.etcFavorite || state.etcNote) || !!state.favoriteOnly;
   const zoomedOut = !filterActive && !forcePinsVisible && state.map.getLevel() >= PIN_ZOOM_THRESHOLD;
 
   setClustererShown(!zoomedOut);
@@ -368,7 +368,9 @@ function getQualityMarkerImage(locationQuality, favorite) {
   const color = QUALITY_MARKER_COLOR[locationQuality];
   if (!color) return null; // 매핑 없는 값(UNRESOLVED 등)은 커스텀 이미지를 만들지 않고 호출부에서 기본 마커로 폴백한다.
 
-  const cacheKey = color + (favorite ? ':fav' : '');
+  // 즐겨찾기 "지도에서 보기" 모드(PC): 축소해서 넓게 봐도 보이도록 핀을 약 1.55배로 키운다.
+  const big = !!state.favMapBig;
+  const cacheKey = color + (favorite ? ':fav' : '') + (big ? ':big' : '');
   if (markerImageCache.has(cacheKey)) return markerImageCache.get(cacheKey);
 
   const badge = favorite
@@ -383,11 +385,14 @@ function getQualityMarkerImage(locationQuality, favorite) {
     '</g>' +
     badge +
     '</svg>';
-  const src = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+  const W = big ? 40 : 26;
+  const H = big ? 46 : 30;
+  const svgOut = big ? svg.replace('width="26" height="30"', `width="${W}" height="${H}"`) : svg;
+  const src = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgOut);
   const image = new kakao.maps.MarkerImage(
     src,
-    new kakao.maps.Size(26, 30),
-    { offset: new kakao.maps.Point(13, 30) } // 핀 뾰족한 끝(바닥 중앙, 새 크기 기준)이 실제 좌표를 가리키도록 anchor 재조정.
+    new kakao.maps.Size(W, H),
+    { offset: new kakao.maps.Point(Math.round(W / 2), H) } // 핀 뾰족한 끝(바닥 중앙, 새 크기 기준)이 실제 좌표를 가리키도록 anchor 재조정.
   );
   markerImageCache.set(cacheKey, image);
   return image;
@@ -793,7 +798,7 @@ let lastMarkerSignature = null;
 let lastMarkerMap = null;
 
 function markerSignature(sites) {
-  let sig = String(sites.length) + (state.etcFavorite ? 'F' : '') + (state.etcNote ? 'N' : '') + ':' + (state.siteNotes ? state.siteNotes.size : 0);
+  let sig = String(sites.length) + (state.etcFavorite ? 'F' : '') + (state.etcNote ? 'N' : '') + (state.favMapBig ? 'B' : '') + ':' + (state.siteNotes ? state.siteNotes.size : 0);
   for (let i = 0; i < sites.length; i++) {
     const st = sites[i];
     sig += '|' + st.id + ':' + (st.location_quality || '') + (isFavorite(st.id) ? 'f' : '') + ':' + (st.lat == null ? '' : st.lat) + ',' + (st.lng == null ? '' : st.lng);

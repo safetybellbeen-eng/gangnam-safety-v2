@@ -588,6 +588,7 @@ let pcFavMapView = false;
 function exitPcFavMapView() {
   if (!pcFavMapView) return;
   pcFavMapView = false;
+  state.favMapBig = false;
   state.favoriteOnly = false;
   const banner = document.getElementById('pc-fav-map-banner');
   if (banner) banner.hidden = true;
@@ -595,6 +596,7 @@ function exitPcFavMapView() {
 }
 function enterPcFavMapView() {
   pcFavMapView = true;
+  state.favMapBig = true;
   state.favoriteOnly = true;
   const banner = document.getElementById('pc-fav-map-banner');
   if (banner) banner.hidden = false;
