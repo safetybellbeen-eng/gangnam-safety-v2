@@ -4004,6 +4004,7 @@ export function renderMobileMoreMenu(containerId) {
   // 앱 정보 — 버전 정보(실제 CONFIG.APP_VERSION 값) + 로그아웃(기존 그대로).
   addMenuCard(null, [
     { label: '버전 정보', icon: 'info', value: CONFIG.APP_VERSION },
+    { label: '모든 기기에서 로그아웃', icon: 'logout', danger: true, onClick: () => document.dispatchEvent(new CustomEvent('gnmap:logout-all')) },
     { label: '로그아웃', icon: 'logout', danger: true, onClick: () => document.getElementById('logout-approved').click() },
   ]);
 }

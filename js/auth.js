@@ -157,6 +157,27 @@ export async function signOut() {
   state.user = null;
 }
 
+// "모든 기기에서 로그아웃": 이 계정의 로그인 세션(리프레시 토큰)을 서버에서 전부 폐기한다.
+// 다른 기기는 현재 열려 있는 화면의 짧은 인증 토큰이 만료되는 시점(최대 약 1시간)에 로그아웃된다.
+export async function signOutAllDevices() {
+  const { error } = await sb.auth.signOut({ scope: 'global' });
+  state.profile = null;
+  state.user = null;
+  return { ok: !error };
+}
+
+// 마지막 접속 시각 기록(장기 미접속 계정 판정용). 서버 함수가 1시간 이내 중복 갱신은 무시한다.
+// 실패해도 앱 동작에는 영향이 없으므로 결과를 기다리거나 오류를 화면에 띄우지 않는다.
+const TOUCH_KEY = 'gnmap_v2_touch_at';
+export function touchLastLogin() {
+  try {
+    const last = Number(localStorage.getItem(TOUCH_KEY)) || 0;
+    if (Date.now() - last < 30 * 60 * 1000) return;
+    localStorage.setItem(TOUCH_KEY, String(Date.now()));
+  } catch (e) { /* localStorage 불가 환경: 그냥 호출 */ }
+  sb.rpc('gnmap_v2_touch_login').then(() => {}, () => {});
+}
+
 // "자동 로그인" 체크 여부 판단용. Supabase 클라이언트는 기본적으로 세션을 localStorage에
 // 영구 저장하므로, 로그인 시 "자동 로그인"을 체크하지 않았다면 앱 재시작(bootstrap) 시점에
 // 남아있는 세션을 이 함수로 확인한 뒤 로그아웃시켜 로그인 화면부터 다시 시작하게 한다.

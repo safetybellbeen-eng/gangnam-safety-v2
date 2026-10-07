@@ -83,7 +83,28 @@ export async function resetUserPassword(userId) {
     console.error('비밀번호 초기화 응답 이상:', data);
     return { ok: false, message: (data && data.message) || '비밀번호 초기화에 실패했습니다.' };
   }
+  // 감사로그: 비밀번호 초기화는 Edge Function이 처리해 DB 트리거가 없으므로 성공 후 별도로 기록한다(실패해도 무시).
+  const target = (state.adminUsers || []).find(u => u.id === userId);
+  sb.rpc('gnmap_v2_audit_log', { p_action: 'user_password_reset', p_target_id: userId, p_target_name: target ? target.name : null })
+    .then(() => {}, () => {});
   return { ok: true, tempPassword: data.tempPassword };
+}
+
+// 관리자 작업 이력 조회(최신순). RLS가 관리자만 읽도록 막는다. before = 이전 페이지의 마지막 id.
+export async function loadAuditLogs({ before = null, action = '', limit = 50 } = {}) {
+  if (!isAdmin()) return { ok: false, rows: [], message: '관리자만 조회할 수 있습니다.' };
+  let q = sb.from('gnmap_v2_audit_logs')
+    .select('id, created_at, actor_name, action, target_name, detail')
+    .order('id', { ascending: false })
+    .limit(limit);
+  if (before) q = q.lt('id', before);
+  if (action) q = q.eq('action', action);
+  const { data, error } = await q;
+  if (error) {
+    console.error('작업 이력 조회 실패:', error);
+    return { ok: false, rows: [], message: '작업 이력을 불러오지 못했습니다.' };
+  }
+  return { ok: true, rows: data || [] };
 }
 
 // STEP16.5 추가: "완전 삭제" 액션 — 승인거절(rejected)/휴면(disabled) 상태 회원만 대상. 새 RPC

@@ -9,7 +9,7 @@
 // DB(gnmap_v2_profiles)에는 소속/연락처/직급 컬럼이 없으므로 시안의 해당 항목은 임의 값을 만들지 않고 뺐다.
 import { state } from './state.js';
 import { isAdmin, isMaster } from './auth.js';
-import { loadUsers, setUserStatus, setUserRole, resetUserPassword, deleteRejectedProfile } from './admin.js';
+import { loadUsers, setUserStatus, setUserRole, resetUserPassword, deleteRejectedProfile, loadAuditLogs } from './admin.js';
 import { showToast } from './ui.js';
 
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -274,6 +274,82 @@ function actionsFor(u) {
   return [];
 }
 
+// ---------- 관리자 작업 이력(감사로그) ----------
+const AUDIT_ACTIONS = [
+  ['', '전체 작업'],
+  ['user_status_change', '회원 상태 변경'],
+  ['user_role_change', '권한 변경'],
+  ['user_delete', '회원 삭제'],
+  ['user_password_reset', '비밀번호 초기화'],
+  ['sites_import', '사업장 데이터 업로드'],
+];
+function auditDetailText(r) {
+  const d = r.detail || {};
+  switch (r.action) {
+    case 'user_status_change': return `${(STATUS_META[d.from] || {}).label || d.from} → ${(STATUS_META[d.to] || {}).label || d.to}`;
+    case 'user_role_change': return `${ROLE_LABEL[d.from] || d.from} → ${ROLE_LABEL[d.to] || d.to}`;
+    case 'user_delete': return `삭제 당시 상태: ${(STATUS_META[d.status] || {}).label || d.status || '-'}`;
+    case 'sites_import': return `전체 ${d.total_rows ?? '-'}행 · 확정 ${d.confirmed_rows ?? '-'} · 검토 ${d.review_rows ?? '-'}`;
+    default: return '';
+  }
+}
+function openAuditModal() {
+  const wrap = el('div', 'pc-modal-body pc-audit');
+  const head = el('div', 'pc-modal-head');
+  head.appendChild(el('h3', '', '관리자 작업 이력'));
+  wrap.appendChild(head);
+  wrap.appendChild(el('p', 'pc-audit-note', '회원 승인·상태/권한 변경·삭제·비밀번호 초기화와 사업장 데이터 업로드가 최신순으로 기록됩니다. 관리자만 볼 수 있고 수정·삭제할 수 없습니다.'));
+  const bar = el('div', 'pc-audit-bar');
+  const sel = el('select', 'pc-audit-select');
+  AUDIT_ACTIONS.forEach(([v, label]) => { const o = el('option', '', label); o.value = v; sel.appendChild(o); });
+  bar.appendChild(sel);
+  wrap.appendChild(bar);
+  const box = el('div', 'pc-audit-list');
+  wrap.appendChild(box);
+  const more = el('button', 'pc-sv-secondary-btn is-small pc-audit-more', '더 보기');
+  more.type = 'button';
+  more.hidden = true;
+  wrap.appendChild(more);
+  const actions = el('div', 'pc-modal-actions');
+  const closeBtn = el('button', 'pc-sv-primary-btn', '닫기');
+  closeBtn.type = 'button';
+  actions.appendChild(closeBtn);
+  wrap.appendChild(actions);
+  const { close } = openModal(wrap);
+  closeBtn.addEventListener('click', close);
+
+  let lastId = null;
+  let loading = false;
+  async function load(reset) {
+    if (loading) return;
+    loading = true;
+    if (reset) { box.textContent = ''; lastId = null; }
+    more.hidden = true;
+    const res = await loadAuditLogs({ before: lastId, action: sel.value, limit: 50 });
+    loading = false;
+    if (!res.ok) { box.appendChild(el('p', 'pc-audit-empty', res.message || '불러오지 못했습니다.')); return; }
+    if (!res.rows.length && !lastId) { box.appendChild(el('p', 'pc-audit-empty', '기록이 없습니다.')); return; }
+    res.rows.forEach((r) => {
+      const row = el('div', 'pc-audit-row');
+      row.appendChild(el('span', 'pc-audit-time', fmtDateTime(r.created_at)));
+      const label = (AUDIT_ACTIONS.find(a => a[0] === r.action) || [0, r.action])[1];
+      row.appendChild(el('span', 'pc-audit-act', label));
+      const who = el('span', 'pc-audit-who');
+      who.appendChild(document.createTextNode(`수행: ${r.actor_name || '-'}`));
+      if (r.target_name) who.appendChild(document.createTextNode(` → 대상: ${r.target_name}`));
+      row.appendChild(who);
+      const det = auditDetailText(r);
+      if (det) row.appendChild(el('span', 'pc-audit-det', det));
+      box.appendChild(row);
+    });
+    if (res.rows.length) lastId = res.rows[res.rows.length - 1].id;
+    more.hidden = res.rows.length < 50;
+  }
+  sel.addEventListener('change', () => load(true));
+  more.addEventListener('click', () => load(false));
+  load(true);
+}
+
 let undoTimer = null;
 function showUndo(message, onUndo) {
   const old = document.querySelector('.pc-ad-undo');
@@ -528,6 +604,20 @@ function paint() {
     rst.addEventListener('click', () => { resetFilters(); paint(); });
     frow.appendChild(rst);
   }
+  if (AD.dormant && dormantCount > 0) {
+    const selAll = el('button', 'pc-ad-reset', `장기 미접속 ${dormantCount}명 전체 선택`);
+    selAll.type = 'button';
+    selAll.title = '선택 후 아래 "일괄 휴면 전환"으로 한 번에 정리할 수 있습니다(본인 제외).';
+    selAll.addEventListener('click', () => {
+      AD.checked = new Set(all.filter(u => isDormant(u) && u.id !== currentUserId()).map(u => u.id));
+      paint();
+    });
+    frow.appendChild(selAll);
+  }
+  const auditBtn = el('button', 'pc-sv-secondary-btn is-small pc-ad-audit-btn', '작업 이력');
+  auditBtn.type = 'button';
+  auditBtn.addEventListener('click', openAuditModal);
+  frow.appendChild(auditBtn);
   main.appendChild(frow);
 
   // ---- 표

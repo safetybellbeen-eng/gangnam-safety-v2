@@ -5,13 +5,14 @@ import { maybeStartTutorial, startTutorial } from './pc_tutorial.js';
 import { bindPcAddressSearch } from './pc_address_search.js';
 import { state } from './state.js';
 import { sb } from './api.js';
-import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, verifySignupCode, checkIdExists, checkLoginLock, translateAuthError } from './auth.js';
+import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, signOutAllDevices, touchLastLogin, verifySignupCode, checkIdExists, checkLoginLock, translateAuthError } from './auth.js';
 import { preloadKakaoSdk, initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites, renderHqMarker, clearRouteSelectionOnMainMap, repaintMainMap, focusSiteOnMap, setForcePinsVisible } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
 import { renderSiteList, renderPcSiteTable, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, redrawRouteSelectionOnMainMap, renderAccountInfoPanel, renderPasswordChangePanel, renderNotificationSettingsPanel, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView, renderHeaderUploadDate, setSiteSearchMode, renderSiteNotesPanel, renderAppSettingsPanel, restorePcSiteFiltersToRow, updateDongFilterLabel } from './ui.js';
 import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
+import { startIdleGuard, stopIdleGuard, markAutoLoginNow, clearAutoLoginMark, isAutoLoginExpired, AUTO_LOGIN_MAX_DAYS } from './session_guard.js';
 
 const VIEWS = [
   'view-login', 'view-signup', 'view-signup-done',
@@ -276,6 +277,8 @@ function routeByProfile() {
       // 감독일정 상황판은 approved 전체가 볼 수 있다(등록/수정/삭제만 admin — renderSupervisionPanel 내부에서 분기).
       document.getElementById('btn-supervision-panel').style.display = 'inline-block';
       showView('view-approved');
+      touchLastLogin(); // 마지막 접속 시각 기록(장기 미접속 계정 정리용)
+      startIdleGuard(handleIdleTimeout); // 미사용 자동 로그아웃(PC 30분 / 모바일 4시간)
       // STEP16.28: 상단 헤더의 "가장 최근 엑셀 업로드 일시" 배지 — 지도/사업장 로딩과 무관한
       // 부가 정보라 await 없이 별도로 요청한다(실패해도 헤더 배지만 숨겨질 뿐 나머지 화면에
       // 영향 없음, renderHeaderUploadDate 내부에서 에러를 흡수).
@@ -353,6 +356,7 @@ function routeByProfile() {
 // 리스너가 감지하는 "세션 만료로 인한 자동 로그아웃" 양쪽에서 공통으로 필요한 화면/상태
 // 초기화. 기존 handleLogout() 본문을 그대로 옮긴 것으로, 동작 변경은 없다.
 function resetClientStateAfterSignOut() {
+  stopIdleGuard();
   clearMarkers(); // 지도가 폐기되기 전에 마커를 먼저 정리
   clearCurrentLocationMarker();
   closeDetail();
@@ -465,6 +469,32 @@ async function handleLogout() {
   await signOut();
   resetClientStateAfterSignOut();
 }
+
+function showLoginNotice(msg) {
+  const el = document.getElementById('login-error');
+  if (el) el.textContent = msg;
+}
+
+// 미사용 자동 로그아웃: 확인창 없이 바로 로그아웃하고 로그인 화면에 사유를 안내한다.
+async function handleIdleTimeout() {
+  if (!state.user) return;
+  manualSignOut = true;
+  await signOut();
+  resetClientStateAfterSignOut();
+  showLoginNotice('장시간 사용하지 않아 보안을 위해 자동 로그아웃되었습니다. 다시 로그인해 주세요.');
+}
+
+// "모든 기기에서 로그아웃": 이 계정의 모든 로그인 세션을 서버에서 폐기한다(분실/도용 대비).
+async function handleLogoutAllDevices() {
+  if (!window.confirm('이 계정으로 로그인된 모든 기기(PC·휴대폰 포함, 지금 기기도 포함)에서 로그아웃합니다. 계속하시겠습니까?')) return;
+  manualSignOut = true;
+  const res = await signOutAllDevices();
+  localStorage.removeItem(AUTO_LOGIN_KEY);
+  clearAutoLoginMark();
+  resetClientStateAfterSignOut();
+  showLoginNotice(res.ok ? '모든 기기에서 로그아웃되었습니다.' : '로그아웃 처리 중 오류가 있었습니다. 다른 기기가 남아 있을 수 있으니 비밀번호 변경을 권장합니다.');
+}
+document.addEventListener('gnmap:logout-all', handleLogoutAllDevices);
 
 // S2(STEP16.35, 세션 만료 감지): 리프레시 토큰 만료 등으로 Supabase가 서버/SDK 차원에서
 // 세션을 강제로 끊으면, 기존에는 이후 API 호출이 전부 실패해도 화면에는 "표시할 사업장이
@@ -736,6 +766,7 @@ function bindPcWorkspace() {
       ver.innerHTML = '<span>버전 정보</span><span></span>';
       ver.lastChild.textContent = CONFIG.APP_VERSION || '-';
       menu.appendChild(ver);
+      item('모든 기기에서 로그아웃', () => { closePcUserMenu(); handleLogoutAllDevices(); }, 'is-danger');
       item('로그아웃', () => { closePcUserMenu(); document.getElementById('logout-approved')?.click(); }, 'is-danger');
       document.body.appendChild(menu);
     });
@@ -1071,8 +1102,8 @@ function bindEvents() {
       await signIn(email, password);
       if (remember) localStorage.setItem(REMEMBER_EMAIL_KEY, email);
       else localStorage.removeItem(REMEMBER_EMAIL_KEY);
-      if (autoLogin) localStorage.setItem(AUTO_LOGIN_KEY, '1');
-      else localStorage.removeItem(AUTO_LOGIN_KEY);
+      if (autoLogin) { localStorage.setItem(AUTO_LOGIN_KEY, '1'); markAutoLoginNow(); }
+      else { localStorage.removeItem(AUTO_LOGIN_KEY); clearAutoLoginMark(); }
       routeByProfile();
     } catch (err) {
       const lockInfo = err && err.lockInfo;
@@ -1355,11 +1386,19 @@ async function bootstrap() {
     bindEvents();
     // "자동 로그인"을 체크하지 않고 로그인했던 경우, Supabase가 기본적으로 남겨둔 세션이
     // 있어도 앱 재시작 시 로그아웃시켜 로그인 화면부터 다시 시작하게 한다.
+    let loginNotice = '';
     if (localStorage.getItem(AUTO_LOGIN_KEY) !== '1' && (await hasActiveSession())) {
       await signOut();
+    } else if (localStorage.getItem(AUTO_LOGIN_KEY) === '1' && isAutoLoginExpired() && (await hasActiveSession())) {
+      // 자동 로그인 30일 만료: 분실/방치된 기기의 장기 로그인 유지를 막는다.
+      await signOut();
+      localStorage.removeItem(AUTO_LOGIN_KEY);
+      clearAutoLoginMark();
+      loginNotice = `자동 로그인 기간(${AUTO_LOGIN_MAX_DAYS}일)이 지나 다시 로그인이 필요합니다.`;
     }
     await loadCurrentProfile();
     routeByProfile();
+    if (loginNotice) showLoginNotice(loginNotice);
   } finally {
     const elapsed = Date.now() - splashStartedAt;
     setTimeout(hideSplash, Math.max(0, SPLASH_MIN_MS - elapsed));
