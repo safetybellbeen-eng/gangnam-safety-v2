@@ -11,7 +11,7 @@ import { preloadKakaoSdk, initMap, clearMarkers, renderGangnamBoundaries, assign
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
-import { renderSiteList, renderPcSiteTable, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, redrawRouteSelectionOnMainMap, renderAccountInfoPanel, renderPasswordChangePanel, renderNotificationSettingsPanel, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView, renderHeaderUploadDate, setSiteSearchMode, renderSiteNotesPanel, renderAppSettingsPanel, restorePcSiteFiltersToRow, updateDongFilterLabel } from './ui.js';
+import { renderSiteList, renderPcSiteTable, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, redrawRouteSelectionOnMainMap, renderAccountInfoPanel, renderPasswordChangePanel, renderNotificationSettingsPanel, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView, renderHeaderUploadDate, setSiteSearchMode, renderSiteNotesPanel, renderAppSettingsPanel, restorePcSiteFiltersToRow, updateDongFilterLabel, updateEtcFilterLabel } from './ui.js';
 import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
 import { startIdleGuard, stopIdleGuard, markAutoLoginNow, clearAutoLoginMark, isAutoLoginExpired, AUTO_LOGIN_MAX_DAYS } from './session_guard.js';
 
@@ -367,6 +367,7 @@ function resetClientStateAfterSignOut() {
   state.searchQuery = '';
   state.sortMode = 'default';
   state.selectedDongs = [];
+  state.etcFavorite = false; state.etcNote = false;
   state.dongDefault = true;
   state.amountFilter = 'all';
   state.siteInspectionFilter = 'all';
@@ -847,7 +848,7 @@ function bindPcWorkspace() {
       // state 값은 그대로 초기화하고, 화면 쪽은 각 필터의 "전체/기본" 라디오에 change 이벤트를
       // 직접 발생시켜(실제 클릭했을 때와 동일하게) 해당 필터가 스스로 라벨/강조를 되돌리게 하고,
       // 체크박스 기반인 관할만 별도로 비운 뒤 updateDongFilterLabel()을 호출한다.
-      state.searchQuery = ''; state.selectedDongs = []; state.dongDefault = true; state.amountFilter = 'all'; state.customAmountRange = null;
+      state.searchQuery = ''; state.selectedDongs = []; state.dongDefault = true; state.etcFavorite = false; state.etcNote = false; state.amountFilter = 'all'; state.customAmountRange = null;
       state.siteInspectionFilter = 'all'; state.siteAccidentReportFilter = 'all'; state.sortMode = 'default';
 
       const target = document.getElementById('site-search-input');
@@ -856,7 +857,7 @@ function bindPcWorkspace() {
 
       // 관할: 체크박스 다중선택이라 라디오 change로 흉내낼 수 없어 직접 비운다.
       document.querySelectorAll('#site-dong-filter-options input[type="checkbox"]').forEach(el => { el.checked = false; });
-      updateDongFilterLabel();
+      updateDongFilterLabel(); updateEtcFilterLabel();
 
       // 공사금액/점검/산재표/기본순서: "전체"/"기본순서" 라디오를 체크하고 change를 발생시켜
       // js/ui.js bindRadioFilterDetails의 기존 로직(라벨/강조/정렬 재적용)을 그대로 재사용한다.

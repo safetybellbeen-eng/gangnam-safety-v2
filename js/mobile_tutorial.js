@@ -12,8 +12,10 @@ const isDone = () => { try { return localStorage.getItem(KEY_PREFIX + uid()) ===
 const markDone = () => { try { localStorage.setItem(KEY_PREFIX + uid(), '1'); } catch (e) { /* 저장 불가 시 다음에 다시 표시될 뿐 */ } };
 
 const STEPS = [
-  { sel: '#site-search-input', title: '현장 검색', text: '현장명·업체명·주소·동으로 바로 찾을 수 있어요.', pos: 'below' },
+  { sel: '#site-search-input', title: '현장 검색', text: '현장명·업체명·주소·동으로 바로 찾을 수 있어요. 무엇을 찾을지는 바로 아래 “검색모드”로 정해요.', pos: 'below' },
+  { sel: '#site-search-mode-filter', title: '검색모드 — 꼭 확인하세요', text: '“현장/업체명”은 등록된 사업장을 찾고, “주소/장소명”은 카카오 지도에서 일반 주소·건물을 찾아 지도에 표시해요. 원하는 결과가 안 나오면 검색모드부터 확인하세요.', pos: 'below' },
   { sel: '#site-dong-filter', title: '관할(행정동) 선택', text: '처음에는 핀이 보이지 않아요. 관할에서 “전체” 또는 원하는 동을 고르면 핀과 목록이 나타나요. 공사금액·점검·산재표 필터도 함께 쓸 수 있어요.', pos: 'below' },
+  { sel: '#site-etc-filter', title: '기타 — 즐겨찾기·메모만 보기', text: '“기타”에서 즐겨찾기나 메모를 체크하면 해당 사업장만 따로 보여요. 지도에는 일반 핀 대신 즐겨찾기는 별표, 메모는 메모 표시로 나타나고, 둘 다 있으면 둘 다 표시돼요.', pos: 'below' },
   { sel: '#mobile-map-legend', title: '핀 색 = 위치 정확도', text: '초록은 정확, 주황은 중간, 빨강은 낮음이에요. 핀을 누르면 현장 상세가 열리고 길찾기·즐겨찾기·메모를 쓸 수 있어요.', pos: 'below' },
   { sel: '#mobile-bottom-nav', title: '아래 탭으로 이동', text: '지도 · 현장(목록) · 경로(여러 현장 순서 짜기) · 즐겨찾기 · 더보기로 화면을 옮겨 다녀요.', pos: 'above' },
   { sel: '.mobile-tab-btn[data-tab="more"]', title: '가이드는 다시 볼 수 있어요', text: '더보기 > “사용 가이드 다시 보기”에서 언제든 이 안내를 다시 볼 수 있어요.', pos: 'above' },
@@ -67,6 +69,8 @@ function render() {
   if (!root) return;
   root.textContent = '';
   const step = steps[idx];
+  // 가로 스크롤되는 필터 줄에서 화면 밖에 있는 항목(예: 기타)은 먼저 화면 안으로 옮긴다.
+  try { const t = document.querySelector(step.sel); if (t && step.sel.startsWith('#site-')) t.scrollIntoView({ inline: 'center', block: 'nearest' }); } catch (e) { /* 무시 */ }
   const r = visibleRect(step.sel);
   const pad = 6;
   const vh = window.innerHeight;

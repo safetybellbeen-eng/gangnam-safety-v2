@@ -205,7 +205,7 @@ function setClustererShown(shown) {
 // 항상 보여준다(축소해도 사라지지 않음). 필터가 없는 기본 상태에서만 줌 기준 전환을 적용한다.
 function updateBoundaryDisplayForZoom() {
   if (!state.map) return;
-  const filterActive = Array.isArray(state.selectedDongs) && state.selectedDongs.length > 0;
+  const filterActive = (Array.isArray(state.selectedDongs) && state.selectedDongs.length > 0) || !!(state.etcFavorite || state.etcNote);
   const zoomedOut = !filterActive && !forcePinsVisible && state.map.getLevel() >= PIN_ZOOM_THRESHOLD;
 
   setClustererShown(!zoomedOut);
@@ -330,6 +330,40 @@ const markerImageCache = new Map();
 // 별 배지를 얹는다. 캔버스를 22→26폭으로 넓혀 배지가 핀 몸통과 겹치지 않게 하고, 그만큼
 // anchor(offset.x)도 11→13으로 다시 계산해 핀 끝(바닥 중앙)이 실제 좌표를 계속 정확히
 // 가리키게 한다(핀 자체 모양/크기는 기존과 동일, 좌우 여백만 추가됨).
+// 모바일 '기타' 필터(즐겨찾기/메모)가 켜져 있을 때는 일반 핀 대신 별표/메모 표시 핀을 쓴다.
+// 사업장이 즐겨찾기이고 메모도 있으면(둘 다 체크된 경우) 별표와 메모 표시를 나란히 보여준다.
+function etcModeOn() { return !!(state.etcFavorite || state.etcNote); }
+const etcMarkerImageCache = new Map();
+function getEtcMarkerImage(siteId) {
+  const fav = !!state.etcFavorite && isFavorite(siteId);
+  const note = !!state.etcNote && state.siteNotes.has(siteId);
+  if (!fav && !note) return null;
+  const key = (fav ? 'f' : '') + (note ? 'n' : '');
+  if (etcMarkerImageCache.has(key)) return etcMarkerImageCache.get(key);
+  const star = (cx) => '<path transform="translate(' + (cx - 12) + ',0)" d="M12 2.2l2.9 6.1 6.7.8-4.9 4.6 1.3 6.6L12 17l-6 3.3 1.3-6.6L2.4 9.1l6.7-.8L12 2.2z" fill="#ffc21a" stroke="#c77700" stroke-width="1.4" stroke-linejoin="round"/>';
+  const memo = (cx) => '<g transform="translate(' + (cx - 11) + ',1)"><path d="M3 1.5h12l5 5V20a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 2 20V3A1.5 1.5 0 0 1 3.5 1.5z" fill="#fff" stroke="#16326b" stroke-width="1.5" stroke-linejoin="round"/><path d="M15 1.5v5h5" fill="#cfe0ff" stroke="#16326b" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 11h11M6 14.5h11M6 18h7" stroke="#0b5ee5" stroke-width="1.6" stroke-linecap="round"/></g>';
+  const both = fav && note;
+  const W = both ? 52 : 28;
+  const H = 28;
+  const inner = both ? star(14) + memo(38) : (fav ? star(14) : memo(14));
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' + inner + '</svg>';
+  const image = new kakao.maps.MarkerImage(
+    'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+    new kakao.maps.Size(W, H),
+    { offset: new kakao.maps.Point(Math.round(W / 2), Math.round(H / 2)) } // 아이콘 중앙이 좌표를 가리킨다.
+  );
+  etcMarkerImageCache.set(key, image);
+  return image;
+}
+// 기타 필터가 꺼져 있으면 기존 품질색 핀, 켜져 있으면 별표/메모 핀.
+function getNormalMarkerImage(site) {
+  if (etcModeOn()) {
+    const etc = getEtcMarkerImage(site.id);
+    if (etc) return etc;
+  }
+  return getQualityMarkerImage(site ? site.location_quality : null, isFavorite(site.id));
+}
+
 function getQualityMarkerImage(locationQuality, favorite) {
   const color = QUALITY_MARKER_COLOR[locationQuality];
   if (!color) return null; // 매핑 없는 값(UNRESOLVED 등)은 커스텀 이미지를 만들지 않고 호출부에서 기본 마커로 폴백한다.
@@ -453,7 +487,7 @@ export function refreshFavoriteMarker(siteId) {
     return;
   }
   const site = state.sites.find(s => s.id === siteId);
-  const image = getQualityMarkerImage(site ? site.location_quality : null, favorite);
+  const image = site ? getNormalMarkerImage(site) : getQualityMarkerImage(null, favorite);
   if (image) marker.setImage(image);
 }
 
@@ -465,7 +499,7 @@ export function clearMarkerHighlight(siteId) {
   const marker = state.siteMarkers.get(siteId);
   if (!marker || typeof marker.setImage !== 'function') return;
   const site = state.sites.find(s => s.id === siteId);
-  const image = getQualityMarkerImage(site ? site.location_quality : null, isFavorite(siteId));
+  const image = site ? getNormalMarkerImage(site) : getQualityMarkerImage(null, isFavorite(siteId));
   if (image) marker.setImage(image);
   if (typeof marker.setZIndex === 'function') marker.setZIndex(0);
 }
@@ -759,7 +793,7 @@ let lastMarkerSignature = null;
 let lastMarkerMap = null;
 
 function markerSignature(sites) {
-  let sig = String(sites.length);
+  let sig = String(sites.length) + (state.etcFavorite ? 'F' : '') + (state.etcNote ? 'N' : '') + ':' + (state.siteNotes ? state.siteNotes.size : 0);
   for (let i = 0; i < sites.length; i++) {
     const st = sites[i];
     sig += '|' + st.id + ':' + (st.location_quality || '') + (isFavorite(st.id) ? 'f' : '') + ':' + (st.lat == null ? '' : st.lat) + ',' + (st.lng == null ? '' : st.lng);
@@ -795,7 +829,7 @@ export function renderMarkers(sites, onMarkerClick) {
     // STEP15-E.1-2: location_quality에 매핑된 색이 있으면 커스텀 핀 이미지를 쓰고,
     // 없으면(이론상 도달하지 않음) 기존 기본 파란 마커로 안전하게 폴백한다.
     const markerOptions = { position: new kakao.maps.LatLng(lat, lng) };
-    const qualityImage = getQualityMarkerImage(site.location_quality, isFavorite(site.id));
+    const qualityImage = getNormalMarkerImage(site);
     if (qualityImage) markerOptions.image = qualityImage;
 
     const marker = new kakao.maps.Marker(markerOptions);
@@ -837,6 +871,10 @@ export function renderMarkers(sites, onMarkerClick) {
 
 export function clearMarkers() {
   lastMarkerSignature = null;
+  // 선택 현장명 라벨(CustomOverlay)은 마커 배열과 별개라, 마커를 비워도 지도에 남아 경로탭 등
+  // 다른 탭에서 '추가하지 않은 현장'이 떠 있는 것처럼 보였다 — 마커와 함께 제거한다.
+  // (renderMarkers가 다시 그릴 때는 highlightSelectedMarker가 필요하면 라벨을 새로 만든다.)
+  removeSelectedSiteLabel();
   if (clusterer) {
     clusterer.clear();
   }

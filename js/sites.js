@@ -227,7 +227,9 @@ export function getFilteredSortedSites(opts = {}) {
 
   // 관할 '기본'(시작값): 핀이 너무 많아 혼동되므로, 검색어가 없으면 아무것도 보여주지 않는다.
   // 검색어를 입력하면 그 결과는 보여준다. 경로탭 "전체 현장 핀 표시"는 opts.ignoreDefault로 예외.
-  if (state.dongDefault && !query && !opts.ignoreDefault) return [];
+  // '기타' 필터(즐겨찾기/메모)를 하나라도 켰다면 사용자가 명시적으로 보려는 것이므로 기본 비움을 적용하지 않는다.
+  const etcOn = !!(state.etcFavorite || state.etcNote);
+  if (state.dongDefault && !query && !opts.ignoreDefault && !etcOn) return [];
 
   let result = state.sites
     .filter(site => matchesQuery(site, query))
@@ -235,7 +237,9 @@ export function getFilteredSortedSites(opts = {}) {
     .filter(site => matchesAmount(site, state.amountFilter))
     .filter(site => matchesInspectionFilter(site, state.siteInspectionFilter))
     .filter(site => matchesAccidentReportFilter(site, state.siteAccidentReportFilter))
-    .filter(site => !state.favoriteOnly || state.favoriteSiteIds.has(site.id));
+    .filter(site => !state.favoriteOnly || state.favoriteSiteIds.has(site.id))
+    // 기타 필터: 체크한 항목 중 하나라도 해당하면 표시(즐겨찾기 또는 메모).
+    .filter(site => !etcOn || (state.etcFavorite && state.favoriteSiteIds.has(site.id)) || (state.etcNote && state.siteNotes.has(site.id)));
 
   if (state.sortMode === 'default') return result;
 

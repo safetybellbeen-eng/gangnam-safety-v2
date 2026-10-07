@@ -4283,6 +4283,52 @@ function bindRadioFilterDetails(detailsId, stateKey, containerId, labels, neutra
   updateLabel();
 }
 
+// 모바일/TWA 전용 "기타" 필터(즐겨찾기/메모 복수 선택). 체크하면 해당 사업장만 목록/지도에 남고
+// 지도 핀은 별표/메모표시로 바뀐다(js/map.js getEtcMarkerImage). 라벨은 선택에 따라 바뀐다.
+export function updateEtcFilterLabel() {
+  const labelEl = document.getElementById('site-etc-filter-label');
+  const detailsEl = document.getElementById('site-etc-filter');
+  if (!labelEl) return;
+  const parts = [];
+  if (state.etcFavorite) parts.push('즐겨찾기');
+  if (state.etcNote) parts.push('메모');
+  labelEl.textContent = parts.length ? `기타 · ${parts.join('+')}` : '기타';
+  if (detailsEl) detailsEl.dataset.active = String(parts.length > 0);
+  const fav = document.getElementById('site-etc-favorite');
+  const note = document.getElementById('site-etc-note');
+  if (fav) fav.checked = !!state.etcFavorite;
+  if (note) note.checked = !!state.etcNote;
+}
+
+function bindEtcFilter(containerId) {
+  const detailsEl = document.getElementById('site-etc-filter');
+  const labelEl = document.getElementById('site-etc-filter-label');
+  const panel = document.getElementById('site-etc-filter-panel');
+  if (!detailsEl || !labelEl || detailsEl.dataset.bound === '1') return;
+  detailsEl.dataset.bound = '1';
+  labelEl.addEventListener('click', (e) => { e.preventDefault(); detailsEl.open = !detailsEl.open; });
+  const fav = document.getElementById('site-etc-favorite');
+  const note = document.getElementById('site-etc-note');
+  const onChange = () => {
+    state.etcFavorite = !!(fav && fav.checked);
+    state.etcNote = !!(note && note.checked);
+    updateEtcFilterLabel();
+    renderSiteList(containerId);
+  };
+  if (fav) fav.addEventListener('change', onChange);
+  if (note) note.addEventListener('change', onChange);
+  document.addEventListener('click', (e) => { if (detailsEl.open && !detailsEl.contains(e.target)) detailsEl.open = false; });
+  if (panel) {
+    detailsEl.addEventListener('toggle', () => {
+      if (!detailsEl.open) return;
+      const rect = detailsEl.getBoundingClientRect();
+      panel.style.top = `${Math.round(rect.bottom + 6)}px`;
+      panel.style.left = `${Math.max(8, Math.min(Math.round(rect.left), window.innerWidth - 190))}px`;
+    });
+  }
+  updateEtcFilterLabel();
+}
+
 // 사용자 요청: "관할" 필터를 복수 선택 checkbox 패널로 구성한다. state.sites가 갱신될 때마다
 // 호출 가능하도록 매번 옵션을 새로 생성한다(중복 누적 없음). 기존 함수명(renderDongOptions)은
 // app.js 호출부와의 호환을 위해 그대로 유지한다.
@@ -4588,6 +4634,8 @@ export function bindSearchAndSort(containerId) {
     deadline: '공사기간 임박순',
     favorite: '즐겨찾기 우선',
   }, 'default');
+
+  bindEtcFilter(containerId);
 
   // STEP14.5-B. "즐겨찾기만 보기" — 토글형 버튼. 다시 누르면 해제되어 기존 필터 결과로 복귀.
   if (favoriteFilterBtn) {
