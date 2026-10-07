@@ -500,7 +500,7 @@
   .site-select-filter[data-active="true"] .site-select-filter-label {
     border-color: var(--gnmap-blue);
     background: var(--gnmap-blue-light);
-    color: var(--gnmap-blue);
+    color: #1560c8; /* 대비 4.5:1 확보(접근성) */
     font-weight: var(--gnmap-fw-semibold);
   }
   /* 사용자 요청: 필터를 펼치면 목록이 뜨는 팝오버. 가로 스크롤 필터 줄(A) 레이아웃이
@@ -5384,3 +5384,18 @@
 
 /* 경로 탭 주변 사업장 핀 카드는 PC 전용(모바일 경로 탭에는 메인 지도가 없음) */
 @media (max-width:768px){.route-nearby-card{display:none!important}}
+
+/* 모바일/TWA: 공사금액 "자세히 설정"(억원 직접 입력) — 웹과 동일 기능. JS/마크업은 공용, 보이기만 모바일용으로 켠다. */
+@media (max-width:768px){
+  #app #site-amount-filter-panel{max-width:260px;max-height:min(470px,calc(100vh - 230px))}
+  #app .site-amount-filter-custom{display:block!important;margin:6px 0 0;padding:8px 4px 2px;border-top:1px solid #edf2f8}
+  #app .site-amount-filter-custom-toggle{display:block;width:100%;min-height:36px;border:0;background:transparent;color:#2f5fb3;font-size:13px;font-weight:700;text-align:left;padding:0 8px;cursor:pointer}
+  #app .site-amount-filter-custom-body{display:block;margin-top:4px;padding:10px;border-radius:10px;background:#f4f8fe}
+  #app .site-amount-filter-custom-body[hidden]{display:none!important}
+  #app .site-amount-filter-custom-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  #app .site-amount-filter-custom-tag{flex:0 0 auto;width:32px;font-size:13px;font-weight:700;color:#3f5478}
+  #app .site-amount-filter-custom-input{flex:0 0 96px;width:96px;height:38px;padding:0 10px;border:1px solid #c9d9ef;border-radius:8px;background:#fff;font-size:16px;color:#173467;box-sizing:border-box}
+  #app .site-amount-filter-custom-input.is-invalid{border-color:#e5484d;background:#fff5f5}
+  #app .site-amount-filter-custom-unit{flex:1 1 auto;font-size:13px;color:#53668a;white-space:nowrap}
+  #app .site-amount-filter-custom-apply{display:block;width:100%;min-height:40px;border:0;border-radius:10px;background:#0b63f6;color:#fff;font-size:14px;font-weight:750;cursor:pointer}
+}
