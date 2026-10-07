@@ -4675,3 +4675,20 @@
 .pc-addr-actions{display:flex;gap:6px;flex:none}
 .pc-addr-actions button{height:28px;padding:0 10px;border:1px solid #d1deef;border-radius:7px;background:#fff;color:#36547f;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
 .pc-addr-actions button.primary{background:#1f5eff;border-color:#1f5eff;color:#fff}
+
+@media (min-width:769px){
+  .pc-ad-audit-btn{margin-left:auto}
+  .pc-modal:has(.pc-audit){width:min(720px,100%)}
+  .pc-audit{width:100%;box-sizing:border-box}
+  .pc-audit-note{margin:0 0 12px;font-size:13px;color:#61779c;line-height:1.5}
+  .pc-audit-bar{margin-bottom:10px}
+  .pc-audit-select{height:36px;padding:0 10px;border:1px solid #cfdcf0;border-radius:8px;font-size:14px;color:#0b2358;background:#fff}
+  .pc-audit-list{max-height:52vh;overflow:auto;border:1px solid #e1e8f3;border-radius:10px}
+  .pc-audit-row{display:grid;grid-template-columns:132px 130px 1fr;gap:4px 12px;padding:10px 14px;border-bottom:1px solid #eef2f9;font-size:13px;color:#16233b}
+  .pc-audit-row:last-child{border-bottom:0}
+  .pc-audit-time{color:#61779c;font-variant-numeric:tabular-nums}
+  .pc-audit-act{font-weight:800;color:#0b2358}
+  .pc-audit-det{grid-column:3;color:#61779c}
+  .pc-audit-empty{margin:0;padding:24px;text-align:center;color:#61779c;font-size:14px}
+  .pc-audit-more{margin-top:10px}
+}
