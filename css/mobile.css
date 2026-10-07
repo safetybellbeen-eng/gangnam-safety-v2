@@ -5381,3 +5381,6 @@
   #site-filter-row{gap:5px}
   #site-filter-row .site-select-filter-label{padding:0 8px}
 }
+
+/* 경로 탭 주변 사업장 핀 카드는 PC 전용(모바일 경로 탭에는 메인 지도가 없음) */
+@media (max-width:768px){.route-nearby-card{display:none!important}}
