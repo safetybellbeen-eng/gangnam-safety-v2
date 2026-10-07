@@ -746,7 +746,32 @@ export function clearAddressSearchPin() {
 // 재호출해도 리스너가 누적되지 않는다. onMarkerClick은 ui.js의 selectSite를 주입받는다.
 // STEP14.5-B 2차: 마커를 지도에 직접 붙이지 않고 클러스터러에 addMarkers로 붙인다.
 // 클릭 리스너/state.markers/state.siteMarkers 등 기존 동작은 그대로 유지한다.
+// 성능: 탭을 오갈 때마다 같은 사업장 목록으로 마커 2천 개를 지우고 다시 만들던 것을 막는다.
+// "표시할 사업장 id 목록 + 품질/즐겨찾기 색"이 직전과 같고 마커도 그대로 살아 있으면 새로 만들지 않는다.
+// clearMarkers()가 호출되면(경로 탭 등) 서명을 지워 다음 호출 때는 반드시 다시 그린다.
+let lastMarkerSignature = null;
+let lastMarkerMap = null;
+
+function markerSignature(sites) {
+  let sig = String(sites.length);
+  for (let i = 0; i < sites.length; i++) {
+    const st = sites[i];
+    sig += '|' + st.id + ':' + (st.location_quality || '') + (isFavorite(st.id) ? 'f' : '') + ':' + (st.lat == null ? '' : st.lat) + ',' + (st.lng == null ? '' : st.lng);
+  }
+  return sig;
+}
+
 export function renderMarkers(sites, onMarkerClick) {
+  if (state.map && sites && sites.length > 0 && lastMarkerSignature !== null
+      && lastMarkerMap === state.map && state.markers.length > 0) {
+    const sig = markerSignature(sites);
+    if (sig === lastMarkerSignature) {
+      highlightSelectedMarker();
+      updateDongCounts(sites);
+      updateBoundaryDisplayForZoom();
+      return;
+    }
+  }
   clearMarkers();
 
   if (!state.map || !sites || sites.length === 0) return;
@@ -782,6 +807,8 @@ export function renderMarkers(sites, onMarkerClick) {
   // clustererShown을 일단 false로 맞춰두고, lastValidMarkers를 최신 목록으로 갱신한 뒤
   // updateBoundaryDisplayForZoom()이 현재 줌/필터 상태에 맞게 다시 채울지 말지 결정하게 한다.
   lastValidMarkers = validMarkers;
+  lastMarkerSignature = markerSignature(sites);
+  lastMarkerMap = state.map;
   clustererShown = false;
   if (!clusterer) {
     // clusterer가 아직 없는 예외 상황(이론상 initMap 이후에는 항상 존재) 대비 폴백.
@@ -803,6 +830,7 @@ export function renderMarkers(sites, onMarkerClick) {
 }
 
 export function clearMarkers() {
+  lastMarkerSignature = null;
   if (clusterer) {
     clusterer.clear();
   }

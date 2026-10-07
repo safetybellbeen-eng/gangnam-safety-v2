@@ -1418,6 +1418,8 @@ export function renderPcSiteTable() {
 export function renderSiteList(containerId) {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
+  if (siteListLazy && siteListLazy.observer) siteListLazy.observer.disconnect();
+  if (siteListLazy && siteListLazy.container === container) siteListLazy = null;
 
   const visibleSites = getFilteredSortedSites();
 
@@ -1476,7 +1478,7 @@ export function renderSiteList(containerId) {
       container.appendChild(empty);
     }
   } else {
-    visibleSites.forEach(site => {
+    const buildSiteListItem = (site) => {
       const item = document.createElement('div');
       item.className = 'site-list-item';
       item.dataset.siteId = site.id;
@@ -1616,8 +1618,14 @@ export function renderSiteList(containerId) {
 
       item.addEventListener('click', () => selectSite(site.id));
 
-      container.appendChild(item);
-    });
+      return item;
+    };
+
+    // 성능: 사업장이 2천 건 가까이 되면 카드 2천 개(DOM 6만 개)를 한 번에 만들어 탭 전환/검색 때 화면이
+    // 멈춘다. 처음 한 묶음(LIST_FIRST_CHUNK)만 그리고, 목록 끝에 가까워지면 다음 묶음을 이어 붙인다.
+    // 지도 마커 클릭 등으로 아직 안 그려진 항목을 보여야 하면 ensureListItemRendered()가 거기까지 그린다.
+    siteListLazy = { container, sites: visibleSites, next: 0, build: buildSiteListItem, observer: null, sentinel: null };
+    appendSiteListChunk(LIST_FIRST_CHUNK);
 
     updateListActiveState();
   }
@@ -1643,6 +1651,48 @@ export function renderSiteList(containerId) {
   }
 }
 
+
+// ---- 목록 지연(청크) 렌더링 ----
+const LIST_FIRST_CHUNK = 40;
+const LIST_NEXT_CHUNK = 60;
+let siteListLazy = null;
+
+function appendSiteListChunk(count) {
+  const st = siteListLazy;
+  if (!st) return;
+  if (st.sentinel && st.sentinel.parentNode) st.sentinel.remove();
+  const end = Math.min(st.next + count, st.sites.length);
+  const frag = document.createDocumentFragment();
+  for (; st.next < end; st.next++) frag.appendChild(st.build(st.sites[st.next]));
+  st.container.appendChild(frag);
+  if (st.next < st.sites.length) {
+    if (!st.sentinel) {
+      st.sentinel = document.createElement('div');
+      st.sentinel.className = 'site-list-sentinel';
+      st.sentinel.style.cssText = 'height:1px;width:100%;pointer-events:none;';
+    }
+    st.container.appendChild(st.sentinel);
+    if (!st.observer && typeof IntersectionObserver !== 'undefined') {
+      st.observer = new IntersectionObserver((entries) => {
+        if (entries.some(e => e.isIntersecting) && siteListLazy === st) appendSiteListChunk(LIST_NEXT_CHUNK);
+      }, { rootMargin: '800px 0px' });
+    }
+    if (st.observer) { st.observer.disconnect(); st.observer.observe(st.sentinel); }
+  } else if (st.observer) {
+    st.observer.disconnect();
+  }
+  updateListActiveState();
+}
+
+// 해당 사업장 카드가 아직 그려지지 않았다면 그 카드까지 이어서 그린다.
+function ensureListItemRendered(siteId) {
+  const st = siteListLazy;
+  if (!st || st.next >= st.sites.length) return;
+  if (document.querySelector(`.site-list-item[data-site-id="${siteId}"]`)) return;
+  const idx = st.sites.findIndex(s => String(s.id) === String(siteId));
+  if (idx >= st.next) appendSiteListChunk(idx - st.next + 1 + 5);
+}
+
 function updateListActiveState() {
   document.querySelectorAll('.site-list-item').forEach(el => {
     const isActive = String(state.selectedSiteId) === el.dataset.siteId;
@@ -1651,6 +1701,7 @@ function updateListActiveState() {
 }
 
 function scrollListItemIntoView(siteId) {
+  ensureListItemRendered(siteId);
   const el = document.querySelector(`.site-list-item[data-site-id="${siteId}"]`);
   if (el) el.scrollIntoView({ block: 'nearest' });
 }

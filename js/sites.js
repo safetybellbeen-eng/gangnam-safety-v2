@@ -20,8 +20,12 @@ export async function loadActiveSites() {
 
   const allSites = [];
 
+  // 성능: 500건씩 순서대로(직렬) 받으면 네트워크 왕복이 쌓여 첫 화면이 느리다. 한 번에 4페이지를
+  // 병렬로 요청하고, 결과는 페이지 순서대로 합친다(order('id') 고정이라 순서·내용은 직렬과 동일).
+  // 어느 한 페이지라도 실패하면 기존처럼 전체를 실패 처리한다.
+  const PARALLEL = 4;
   try {
-    for (let from = 0; from < SITE_FETCH_SAFETY_MAX; from += SITE_FETCH_PAGE_SIZE) {
+    const fetchPage = async (from) => {
       const to = Math.min(from + SITE_FETCH_PAGE_SIZE - 1, SITE_FETCH_SAFETY_MAX - 1);
       const { data, error } = await sb
         .from('gnmap_v2_sites')
@@ -29,19 +33,28 @@ export async function loadActiveSites() {
         .eq('is_active', true)
         .order('id', { ascending: true })
         .range(from, to);
-
       if (error) {
         console.error(`사업장 조회 실패 (${from}~${to}):`, error);
+        return null;
+      }
+      return data || [];
+    };
+
+    for (let from = 0; from < SITE_FETCH_SAFETY_MAX; from += SITE_FETCH_PAGE_SIZE * PARALLEL) {
+      const starts = [];
+      for (let k = 0; k < PARALLEL; k++) {
+        const f = from + k * SITE_FETCH_PAGE_SIZE;
+        if (f < SITE_FETCH_SAFETY_MAX) starts.push(f);
+      }
+      const pages = await Promise.all(starts.map(fetchPage));
+      if (pages.some(pg => pg === null)) {
         state.sitesLoadError = true;
         return [];
       }
-
-      const page = data || [];
-      allSites.push(...page);
-
-      // 마지막 페이지: 요청 크기보다 적게 왔으면 더 이상 조회할 행이 없다.
-      if (page.length < SITE_FETCH_PAGE_SIZE) {
-        return allSites;
+      for (const pg of pages) {
+        allSites.push(...pg);
+        // 요청 크기보다 적게 온 페이지가 마지막 페이지다(뒤 페이지는 비어 있어 무해).
+        if (pg.length < SITE_FETCH_PAGE_SIZE) return allSites;
       }
     }
 

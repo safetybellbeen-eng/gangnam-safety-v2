@@ -5,6 +5,13 @@
 
 const NAVER_ANDROID_PKG = 'com.nhn.android.nmap';
 const NAVER_IOS_STORE = 'https://itunes.apple.com/app/id311867728?mt=8';
+const TMAP_ANDROID_PKG = 'com.skt.tmap.ku';
+const TMAP_IOS_STORE = 'https://itunes.apple.com/app/id431589174?mt=8';
+
+// 모바일/TWA(화면 폭 768px 이하)에서만 T맵 항목을 보여준다.
+function isMobileLike() {
+  return window.innerWidth <= 768;
+}
 
 function kakaoUrl(name, lat, lng) {
   return `https://map.kakao.com/link/to/${encodeURIComponent(name || '목적지')},${lat},${lng}`;
@@ -47,6 +54,20 @@ function openNaver(name, lat, lng, address) {
   window.open(`https://map.naver.com/p/search/${encodeURIComponent(stripPostalCode(address) || name || '')}`, '_blank', 'noopener,noreferrer');
 }
 
+// T맵: 공식 문서가 없어 널리 쓰이는 형식(tmap://route?goalname&goalx(경도)&goaly(위도))을 쓴다.
+// 안드로이드는 인텐트 URL(앱 없으면 Play 스토어), iOS는 rGo* 형식 + 타이머로 App Store 안내.
+function openTmap(name, lat, lng) {
+  const ua = navigator.userAgent || '';
+  const n = encodeURIComponent(name || '목적지');
+  if (/Android/i.test(ua)) {
+    location.href = `intent://route?goalname=${n}&goalx=${lng}&goaly=${lat}#Intent;scheme=tmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=${TMAP_ANDROID_PKG};end`;
+    return;
+  }
+  const clickedAt = Date.now();
+  location.href = `tmap://route?rGoName=${n}&rGoX=${lng}&rGoY=${lat}`;
+  setTimeout(() => { if (Date.now() - clickedAt < 2000 && !document.hidden) location.href = TMAP_IOS_STORE; }, 1500);
+}
+
 let root = null;
 
 function ensureUi() {
@@ -62,6 +83,7 @@ function ensureUi() {
 .nc-opt{display:flex;align-items:center;gap:12px;width:100%;height:56px;margin:0 0 10px;padding:0 16px;border:1px solid #dbe5f3;border-radius:14px;background:#fff;font-family:inherit;font-size:16px;font-weight:700;color:#16233b;cursor:pointer;text-align:left}
 .nc-opt:hover{background:#f5f9ff}
 .nc-badge{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;flex:none}
+.nc-tmap .nc-badge{background:#ef3340;color:#fff}
 .nc-kakao .nc-badge{background:#fee500;color:#3b1e1e}
 .nc-naver .nc-badge{background:#03c75a;color:#fff}
 .nc-cancel{display:block;width:100%;height:42px;border:0;background:transparent;color:#7b889c;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
@@ -101,6 +123,7 @@ export function openDirections(name, lat, lng, address) {
     b.addEventListener('click', () => { close(); fn(); });
     return b;
   };
+  if (isMobileLike()) box.appendChild(mk('nc-tmap', 'T', 'T맵으로 보기', () => openTmap(name, lat, lng)));
   box.appendChild(mk('nc-kakao', 'K', '카카오맵으로 보기', () => window.open(kakaoUrl(name, lat, lng), '_blank', 'noopener,noreferrer')));
   box.appendChild(mk('nc-naver', 'N', '네이버지도로 보기', () => openNaver(name, lat, lng, address)));
   const cancel = document.createElement('button');
