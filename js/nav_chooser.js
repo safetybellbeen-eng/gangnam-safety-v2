@@ -82,10 +82,12 @@ function ensureUi() {
 .nc-dest{margin:0 0 16px;font-size:13px;color:#61779c;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nc-opt{display:flex;align-items:center;gap:12px;width:100%;height:56px;margin:0 0 10px;padding:0 16px;border:1px solid #dbe5f3;border-radius:14px;background:#fff;font-family:inherit;font-size:16px;font-weight:700;color:#16233b;cursor:pointer;text-align:left}
 .nc-opt:hover{background:#f5f9ff}
-.nc-badge{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;flex:none}
-.nc-tmap .nc-badge{background:#ef3340;color:#fff}
-.nc-kakao .nc-badge{background:#fee500;color:#3b1e1e}
-.nc-naver .nc-badge{background:#03c75a;color:#fff}
+.nc-badge{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden;box-sizing:border-box}
+.nc-badge img{display:block;object-fit:contain}
+.nc-kakao .nc-badge img{width:40px;height:40px}
+.nc-tmap .nc-badge,.nc-naver .nc-badge{background:#fff;border:1px solid #e1e8f3}
+.nc-tmap .nc-badge img{width:24px;height:24px}
+.nc-naver .nc-badge img{width:28px;height:28px}
 .nc-cancel{display:block;width:100%;height:42px;border:0;background:transparent;color:#7b889c;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
 @media (max-width:768px){
   #nav-chooser{align-items:flex-end}
@@ -119,13 +121,13 @@ export function openDirections(name, lat, lng, address) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = `nc-opt ${cls}`;
-    b.innerHTML = `<span class="nc-badge">${badge}</span><span>${label}</span>`;
+    b.innerHTML = `<span class="nc-badge"><img src="./assets/navicons/${badge}.png" alt="" width="40" height="40" decoding="async"></span><span>${label}</span>`;
     b.addEventListener('click', () => { close(); fn(); });
     return b;
   };
-  if (isMobileLike()) box.appendChild(mk('nc-tmap', 'T', 'T맵으로 보기', () => openTmap(name, lat, lng)));
-  box.appendChild(mk('nc-kakao', 'K', '카카오맵으로 보기', () => window.open(kakaoUrl(name, lat, lng), '_blank', 'noopener,noreferrer')));
-  box.appendChild(mk('nc-naver', 'N', '네이버지도로 보기', () => openNaver(name, lat, lng, address)));
+  if (isMobileLike()) box.appendChild(mk('nc-tmap', 'tmap', 'T맵으로 보기', () => openTmap(name, lat, lng)));
+  box.appendChild(mk('nc-kakao', 'kakaomap', '카카오맵으로 보기', () => window.open(kakaoUrl(name, lat, lng), '_blank', 'noopener,noreferrer')));
+  box.appendChild(mk('nc-naver', 'naver', '네이버지도로 보기', () => openNaver(name, lat, lng, address)));
   const cancel = document.createElement('button');
   cancel.type = 'button';
   cancel.className = 'nc-cancel';
