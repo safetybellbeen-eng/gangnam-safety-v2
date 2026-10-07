@@ -2,6 +2,7 @@
 // 지도/사업장 등 실제 기능은 이후 STEP에서 추가한다 (CLAUDE.md 12절: 대규모 UI 금지).
 import { CONFIG } from './config.js';
 import { maybeStartTutorial, startTutorial } from './pc_tutorial.js';
+import { maybeStartMobileTutorial, startMobileTutorial } from './mobile_tutorial.js';
 import { bindPcAddressSearch } from './pc_address_search.js';
 import { state } from './state.js';
 import { sb } from './api.js';
@@ -284,6 +285,7 @@ function routeByProfile() {
       // 영향 없음, renderHeaderUploadDate 내부에서 에러를 흡수).
       renderHeaderUploadDate();
       maybeStartTutorial(); // PC 첫 로그인 튜토리얼(모바일에서는 동작 안 함)
+      maybeStartMobileTutorial(); // 모바일/TWA 첫 로그인 코치마크 가이드(PC에서는 동작 안 함)
       // STEP15-C.2: initMap()보다 먼저 data-mobile-tab을 적용해, 모바일에서 Kakao 지도가
       // display:none인 #map-container(크기 0) 위에 생성되지 않도록 한다(흰 화면의 실제 원인 — 아래 보고 참고).
       // PC에서는 이 속성이 어떤 CSS에도 영향을 주지 않으므로 PC 동작은 그대로다.
@@ -496,6 +498,7 @@ async function handleLogoutAllDevices() {
   showLoginNotice(res.ok ? '모든 기기에서 로그아웃되었습니다.' : '로그아웃 처리 중 오류가 있었습니다. 다른 기기가 남아 있을 수 있으니 비밀번호 변경을 권장합니다.');
 }
 document.addEventListener('gnmap:logout-all', handleLogoutAllDevices);
+document.addEventListener('gnmap:mobile-guide', () => startMobileTutorial());
 
 // S2(STEP16.35, 세션 만료 감지): 리프레시 토큰 만료 등으로 Supabase가 서버/SDK 차원에서
 // 세션을 강제로 끊으면, 기존에는 이후 API 호출이 전부 실패해도 화면에는 "표시할 사업장이

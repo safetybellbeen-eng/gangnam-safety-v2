@@ -4000,6 +4000,7 @@ export function renderMobileMoreMenu(containerId) {
     renderFn(panelId);
   }
   addMenuCard('기타 설정', [
+    { label: '사용 가이드 다시 보기', icon: 'doc', onClick: () => document.dispatchEvent(new CustomEvent('gnmap:mobile-guide')) },
     { label: '앱 설정', icon: 'gear', onClick: () => openMobileOnlyPanel('app-settings-panel', renderAppSettingsPanel) },
     { label: '비밀번호 변경', icon: 'lock', onClick: () => openMobileOnlyPanel('password-change-panel', renderPasswordChangePanel) },
     { label: '알림 설정', icon: 'bell', onClick: () => openMobileOnlyPanel('notification-settings-panel', renderNotificationSettingsPanel) },
