@@ -920,6 +920,17 @@
               </div>
             </div>
           </details>
+          <!-- 모바일/TWA 전용 "기타" 필터: 즐겨찾기/메모 사업장만 따로 모아 별표/메모표시 핀으로 본다(복수 선택).
+               PC(769px 이상)에서는 css/desktop.css가 숨긴다. -->
+          <details id="site-etc-filter" class="site-select-filter">
+            <summary id="site-etc-filter-label" class="site-select-filter-label">기타</summary>
+            <div id="site-etc-filter-panel" class="site-select-filter-panel">
+              <div class="site-select-filter-options">
+                <label class="site-select-filter-option"><input type="checkbox" id="site-etc-favorite" value="favorite"><span>★ 즐겨찾기</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+                <label class="site-select-filter-option"><input type="checkbox" id="site-etc-note" value="note"><span>메모</span><span class="site-select-filter-check" aria-hidden="true">✓</span></label>
+              </div>
+            </div>
+          </details>
           <!-- STEP16.32: 사용자 요청으로 현장 탭의 "★ 즐겨찾기" 필터 토글 버튼을 제거했다.
                (참고) 즐겨찾기 사업장만 모아보는 기능 자체는 하단 "즐겨찾기" 탭으로 별도 존재하며
                그 탭은 app.js가 state.favoriteOnly를 직접 제어하므로 이 버튼 제거와 무관하게
