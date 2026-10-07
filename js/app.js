@@ -6,7 +6,7 @@ import { bindPcAddressSearch } from './pc_address_search.js';
 import { state } from './state.js';
 import { sb } from './api.js';
 import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, verifySignupCode, checkIdExists, checkLoginLock, translateAuthError } from './auth.js';
-import { initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites, renderHqMarker, clearRouteSelectionOnMainMap, repaintMainMap, focusSiteOnMap, setForcePinsVisible } from './map.js';
+import { preloadKakaoSdk, initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites, renderHqMarker, clearRouteSelectionOnMainMap, repaintMainMap, focusSiteOnMap, setForcePinsVisible } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
 import { loadNotes } from './notes.js';
@@ -293,6 +293,11 @@ function routeByProfile() {
       // STEP16.6(모바일 앱 설정 "지도 시작 위치"): 설정이 'current'일 때만 initMap 전에 짧게
       // (최대 4초) 위치를 시도해 그 좌표를 초기 중심으로 넘긴다 — 실패/시간초과해도 기존처럼
       // GANGNAM_CENTER로 자동 폴백하므로 지도 초기화 자체가 지연/실패하지 않는다.
+      // 성능: 사업장/즐겨찾기/메모 조회는 지도 SDK 로드·지도 생성과 서로 의존하지 않으므로 지금 바로
+      // 병렬로 시작한다(예전에는 지도가 다 만들어진 뒤에야 조회를 시작해 그만큼 첫 화면이 늦었다).
+      preloadKakaoSdk();
+      const earlyDataPromise = Promise.all([loadActiveSites(), loadFavorites(), loadNotes()]);
+      earlyDataPromise.catch(() => {}); // 실패 처리는 아래 체인에서 한다(미처리 거부 경고만 막음).
       resolvePreferredMapStartCenter()
         .then((startCenter) => initMap('map-container', startCenter))
         // STEP16.28: 지도 초기화 직후 "커맨드센터"(강남지청) 고정 마커를 1회 요청한다. 내부에서
@@ -302,8 +307,8 @@ function routeByProfile() {
         // STEP16.20: renderGangnamBoundaries()(경계선 그리기, 내부에서 경계 GeoJSON을 fetch)를
         // 사업장 조회와 병렬로 실행한다 — 서로 의존하지 않고, 둘 다 끝난 뒤 assignDongToSites()가
         // 이미 로드된 경계 데이터를 재사용(캐시된 Promise)해 즉시 판정할 수 있게 하기 위함이다.
-        .then(() => Promise.all([loadActiveSites(), loadFavorites(), loadNotes(), renderGangnamBoundaries()]))
-        .then(async ([sites]) => {
+        .then(() => Promise.all([earlyDataPromise, renderGangnamBoundaries()]))
+        .then(async ([[sites]]) => {
           state.sites = sites;
           // STEP16.20: gnmap_v2_sites.dong이 전부 NULL이라(§map.js 상단 설명), 좌표 기준으로
           // 강남구 14개 법정동에 배정한다. 이 값으로 기존 "관할" 체크박스 필터(renderDongOptions/
@@ -1323,7 +1328,7 @@ if ('serviceWorker' in navigator) {
 // 보여줄지 결정된 뒤) 최소 노출 시간(너무 빨리 깜빡이며 사라지지 않도록)만큼 기다렸다가
 // 페이드아웃한다. bootstrap()이 실패하거나 오래 걸려도 화면이 영원히 스플래시에 갇히지
 // 않도록 별도의 최대 대기시간(SPLASH_MAX_MS) 안전장치를 둔다.
-const SPLASH_MIN_MS = 900;
+const SPLASH_MIN_MS = 500; // 성능: 900ms → 500ms(로딩이 빨라도 억지로 오래 붙잡아 두지 않음)
 const SPLASH_MAX_MS = 4000;
 let splashHidden = false;
 function hideSplash() {
@@ -1335,6 +1340,7 @@ function hideSplash() {
 
 async function bootstrap() {
   const splashStartedAt = Date.now();
+  preloadKakaoSdk(); // 인증/프로필 확인과 병렬로 지도 SDK를 미리 받는다.
   setTimeout(hideSplash, SPLASH_MAX_MS);
   try {
     bindEvents();

@@ -498,6 +498,12 @@ function loadKakaoSdk() {
   return sdkLoadPromise;
 }
 
+// 성능: 로그인 화면이 떠 있는 동안(또는 승인 직후 바로) 지도 SDK 다운로드를 미리 시작한다.
+// 실패해도 조용히 넘어가고(나중에 initMap이 다시 시도하지 않고 같은 Promise를 쓰므로 실패 시 initMap에서 오류 처리).
+export function preloadKakaoSdk() {
+  try { loadKakaoSdk().catch(() => { sdkLoadPromise = null; }); } catch (e) { sdkLoadPromise = null; }
+}
+
 // approved 사용자에게만 호출되어야 한다 (app.js에서 상태 분기 후 호출).
 // state.map이 이미 있으면 재생성하지 않는다 (중복 초기화 방지).
 // startCenter: STEP16.6(모바일 앱 설정 "지도 시작 위치"). { lat, lng }가 주어지면 강남구 기본
