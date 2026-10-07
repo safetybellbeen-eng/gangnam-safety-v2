@@ -10,7 +10,7 @@
 // 다른 origin/다른 앱의 캐시는 건드리지 않는다(Cache Storage 자체가 origin별로 격리되어 있고,
 // 여기서도 이름 prefix로 한 번 더 스스로 범위를 제한한다).
 const CACHE_PREFIX = 'gnmap-v2-shell-';
-const CACHE_VERSION = 'v52'; // STEP16.22 배포(index.html/js/ui.js/css/mobile.css 변경) 후에도
+const CACHE_VERSION = 'v53'; // STEP16.22 배포(index.html/js/ui.js/css/mobile.css 변경) 후에도
 // "필터가 작동 안 한다" 재발 — STEP16.22를 올리면서 이 값을 v7 그대로 두고 깜빡해, app shell
 // (index.html/css/mobile.css)이 여전히 STEP16.21 버전으로 캐시된 채 최신 js/ui.js와 섞여 로드된
 // 것이 원인으로 추정된다. 앞으로는 index.html/css/*.css 중 하나라도 바뀌는 배포마다 반드시 이
@@ -78,7 +78,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
 
   // 같은 origin이 아니면(Kakao Maps SDK/API, Supabase REST/Auth/RPC/Edge Function,
-  // jsdelivr CDN의 supabase-js/xlsx 등) 이 Service Worker는 아예 관여하지 않는다.
+  // 외부 CDN 등) 이 Service Worker는 아예 관여하지 않는다.
   // → 브라우저 기본 네트워크 동작 그대로, Cache Storage에도 저장하지 않는다.
   if (url.origin !== self.location.origin) return;
 
