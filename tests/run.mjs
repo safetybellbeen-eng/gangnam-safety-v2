@@ -62,6 +62,17 @@ try {
       await page.click('.pc-nav-btn[data-pc-tab="site"]'); await page.waitForTimeout(400);
       eq(await page.evaluate(() => window.__st.favoriteOnly), false);
     });
+    await test('PC: 경로 탭 "주변 사업장 핀 보기"는 기본 꺼짐, 켜면 관할별로 표시', async () => {
+      await page.click('.pc-nav-btn[data-pc-tab="route"]'); await page.waitForTimeout(600);
+      eq(await page.evaluate(() => !!window.__st.routeNearbyPins), false, '기본값');
+      eq(await page.textContent('.route-nearby-count'), '꺼짐');
+      await page.click('label.route-nearby-head'); await page.waitForTimeout(400);
+      eq(await page.textContent('.route-nearby-count'), '29곳');
+      await page.click('.route-nearby-chip[data-dong="역삼동"]'); await page.waitForTimeout(300);
+      eq(await page.textContent('.route-nearby-count'), '14곳');
+      await page.click('label.route-nearby-head'); await page.waitForTimeout(300);
+      eq(await page.textContent('.route-nearby-count'), '꺼짐');
+    });
     await test('PC: 접근성(axe) serious/critical 위반 없음', async () => {
       await page.click('.pc-nav-btn[data-pc-tab="map"]'); await page.waitForTimeout(400);
       const v = await page.evaluate(async () => (await axe.run(document, { resultTypes: ['violations'], rules: { 'meta-viewport': { enabled: false } } })).violations.filter((x) => ['serious', 'critical'].includes(x.impact)).map((x) => x.id + ':' + x.nodes.map((n) => n.target.join(' ')).slice(0, 3).join(',')));
