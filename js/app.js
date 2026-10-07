@@ -972,6 +972,7 @@ function bindEvents() {
     });
   }
   document.getElementById('signup-done-to-login').addEventListener('click', () => showView('view-login'));
+  document.getElementById('pc-signupdone-to-login')?.addEventListener('click', () => document.getElementById('signup-done-to-login').click());
 
   // STEP16.6(승인대기 화면 모바일 뒤로가기). 새 로직을 만들지 않고 기존 "로그인으로 이동"
   // 버튼의 클릭을 그대로 위임한다(#mobile-signup-back과 동일한 원칙).
@@ -1236,6 +1237,9 @@ function bindEvents() {
       // STEP16.8(가입 신청 상태확인 수단). 방금 신청한 소속/아이디를 완료 화면에 그대로 보여준다.
       const recapEl = document.getElementById('signup-done-recap');
       if (recapEl) recapEl.textContent = `${org} · 아이디: ${email}`;
+      // PC 가입 완료 카드(소속/이름/아이디). textContent로만 넣어 입력값이 HTML로 해석되지 않는다.
+      const setText = (id, v) => { const n = document.getElementById(id); if (n) n.textContent = v || '-'; };
+      setText('pc-signupdone-org', org); setText('pc-signupdone-name', name); setText('pc-signupdone-id', email);
       showView('view-signup-done');
     } catch (err) {
       errorEl.textContent = translateAuthError(err, '회원가입에 실패했습니다.');
