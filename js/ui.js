@@ -4018,7 +4018,6 @@ export function renderMobileMoreMenu(containerId) {
   addMenuCard('관리자 메뉴', admin ? [
     { label: '회원관리', icon: 'user', onClick: () => document.getElementById('btn-admin-panel').click() },
     { label: '사업장 데이터 관리', icon: 'upload', onClick: () => document.getElementById('btn-upload-panel').click() },
-    { label: '2단계 인증 설정', icon: 'lock', onClick: () => document.dispatchEvent(new CustomEvent('gnmap:mfa-settings')) },
   ] : []);
 
   // 앱 정보 — 버전 정보(실제 CONFIG.APP_VERSION 값) + 로그아웃(기존 그대로).
