@@ -23,6 +23,29 @@ if(p.length)Promise.all(p).then(function(){location.reload();}).catch(function()
 <!-- favicon.ico가 없어 브라우저가 자동으로 /favicon.ico를 요청해 404가 발생하던 것을 방지.
      새 파일을 만들지 않고 이미 존재하는 PWA 아이콘(icon-192.png)을 그대로 favicon으로 지정한다. -->
 <link rel="icon" type="image/png" href="assets/icons/icon-192.png">
+<!-- 성능: 외부 서버 연결을 미리 열고, 앱 모듈을 한꺼번에 병렬로 내려받는다(import 체인을 따라 하나씩 받던 지연 제거). -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://dapi.kakao.com" crossorigin>
+<link rel="preconnect" href="https://kuphyemtyamglvyjpvwh.supabase.co" crossorigin>
+<link rel="modulepreload" href="js/app.js">
+<link rel="modulepreload" href="js/config.js">
+<link rel="modulepreload" href="js/state.js">
+<link rel="modulepreload" href="js/api.js">
+<link rel="modulepreload" href="js/auth.js">
+<link rel="modulepreload" href="js/map.js">
+<link rel="modulepreload" href="js/sites.js">
+<link rel="modulepreload" href="js/favorites.js">
+<link rel="modulepreload" href="js/notes.js">
+<link rel="modulepreload" href="js/ui.js">
+<link rel="modulepreload" href="js/location.js">
+<link rel="modulepreload" href="js/admin.js">
+<link rel="modulepreload" href="js/excel.js">
+<link rel="modulepreload" href="js/geocoding.js">
+<link rel="modulepreload" href="js/import.js">
+<link rel="modulepreload" href="js/supervision.js">
+<link rel="modulepreload" href="js/pc_tutorial.js">
+<link rel="modulepreload" href="js/pc_address_search.js">
+<link rel="modulepreload" href="js/nav_chooser.js">
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/layout.css">
 <link rel="stylesheet" href="css/components.css">
@@ -1111,7 +1134,8 @@ if(p.length)Promise.all(p).then(function(){location.reload();}).catch(function()
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- xlsx(약 1MB)는 엑셀 업로드/내보내기 때만 쓰므로 앱 시작을 막지 않게 async로 받는다. -->
+<script async src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>
