@@ -5372,3 +5372,5 @@
     accent-color: #1f5eff;
   }
 }
+
+@media (max-width:768px){.site-list-hint{margin:24px 16px;text-align:center;color:#7184a3;font-size:14px;line-height:1.5}}

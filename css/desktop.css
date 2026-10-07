@@ -4692,3 +4692,5 @@
   .pc-audit-empty{margin:0;padding:24px;text-align:center;color:#61779c;font-size:14px}
   .pc-audit-more{margin-top:10px}
 }
+
+@media (min-width:769px){.site-list-hint{margin:28px 16px;text-align:center;color:#7184a3;font-size:14px;line-height:1.5}}
