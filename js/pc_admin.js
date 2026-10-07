@@ -282,6 +282,7 @@ const AUDIT_ACTIONS = [
   ['user_delete', '회원 삭제'],
   ['user_password_reset', '비밀번호 초기화'],
   ['sites_import', '사업장 데이터 업로드'],
+  ['sites_export', '사업장 엑셀 내보내기'],
 ];
 function auditDetailText(r) {
   const d = r.detail || {};
@@ -290,6 +291,7 @@ function auditDetailText(r) {
     case 'user_role_change': return `${ROLE_LABEL[d.from] || d.from} → ${ROLE_LABEL[d.to] || d.to}`;
     case 'user_delete': return `삭제 당시 상태: ${(STATUS_META[d.status] || {}).label || d.status || '-'}`;
     case 'sites_import': return `전체 ${d.total_rows ?? '-'}행 · 확정 ${d.confirmed_rows ?? '-'} · 검토 ${d.review_rows ?? '-'}`;
+    case 'sites_export': return `${d.count ?? '-'}건 내보냄`;
     default: return '';
   }
 }

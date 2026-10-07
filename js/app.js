@@ -3,6 +3,7 @@
 import { CONFIG } from './config.js';
 import { maybeStartTutorial, startTutorial } from './pc_tutorial.js';
 import { maybeStartMobileTutorial, startMobileTutorial } from './mobile_tutorial.js';
+import { runAdminMfaGate, openMfaSettings } from './mfa.js';
 import { bindPcAddressSearch } from './pc_address_search.js';
 import { state } from './state.js';
 import { sb } from './api.js';
@@ -259,6 +260,18 @@ function routeByProfile() {
 
   switch (profile.status) {
     case 'approved':
+      // 관리자 2단계 인증(MFA): 등록한 관리자는 코드 인증 후에만 앱에 들어온다(서버도 동일하게 제한).
+      if (isAdmin() && state.mfaGate !== 'passed') {
+        if (state.mfaGate === 'running') return;
+        state.mfaGate = 'running';
+        runAdminMfaGate().then((ok) => {
+          if (ok) { state.mfaGate = 'passed'; routeByProfile(); return; }
+          state.mfaGate = null;
+          manualSignOut = true;
+          signOut().then(() => { resetClientStateAfterSignOut(); });
+        });
+        return;
+      }
       if (profile.name && document.getElementById('pc-user-name')) document.getElementById('pc-user-name').textContent = `${profile.name} 감독관`;
       document.getElementById('approved-role-badge').textContent =
         isAdmin() ? '관리자 계정입니다.' : '';
@@ -358,6 +371,7 @@ function routeByProfile() {
 // 리스너가 감지하는 "세션 만료로 인한 자동 로그아웃" 양쪽에서 공통으로 필요한 화면/상태
 // 초기화. 기존 handleLogout() 본문을 그대로 옮긴 것으로, 동작 변경은 없다.
 function resetClientStateAfterSignOut() {
+  state.mfaGate = null;
   stopIdleGuard();
   clearMarkers(); // 지도가 폐기되기 전에 마커를 먼저 정리
   clearCurrentLocationMarker();
@@ -500,6 +514,7 @@ async function handleLogoutAllDevices() {
 }
 document.addEventListener('gnmap:logout-all', handleLogoutAllDevices);
 document.addEventListener('gnmap:mobile-guide', () => startMobileTutorial());
+document.addEventListener('gnmap:mfa-settings', () => openMfaSettings());
 
 // S2(STEP16.35, 세션 만료 감지): 리프레시 토큰 만료 등으로 Supabase가 서버/SDK 차원에서
 // 세션을 강제로 끊으면, 기존에는 이후 API 호출이 전부 실패해도 화면에는 "표시할 사업장이
@@ -771,6 +786,7 @@ function bindPcWorkspace() {
       ver.innerHTML = '<span>버전 정보</span><span></span>';
       ver.lastChild.textContent = CONFIG.APP_VERSION || '-';
       menu.appendChild(ver);
+      if (isAdmin()) item('관리자 2단계 인증 설정', () => { closePcUserMenu(); openMfaSettings(); });
       item('모든 기기에서 로그아웃', () => { closePcUserMenu(); handleLogoutAllDevices(); }, 'is-danger');
       item('로그아웃', () => { closePcUserMenu(); document.getElementById('logout-approved')?.click(); }, 'is-danger');
       document.body.appendChild(menu);

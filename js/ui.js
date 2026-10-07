@@ -6,7 +6,7 @@ import { panToSite, renderMarkers, clearMarkers, fitMapToSites, setForcePinsVisi
 import { getFilteredSortedSites, getDongOptions, loadActiveSites } from './sites.js';
 import { isFavorite, toggleFavorite, loadFavorites, addFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote, loadNotes } from './notes.js';
-import { loadUsers, setUserStatus, setUserRole, resetUserPassword, deleteRejectedProfile } from './admin.js';
+import { loadUsers, setUserStatus, setUserRole, resetUserPassword, deleteRejectedProfile, logSitesExport } from './admin.js';
 import { parseExcelFile } from './excel.js';
 import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, buildLotQueries, runJusoNormalize, buildJusoQuery, runKakaoJusoRecovery, runRoadApproximateRecovery, extractApproximateStructure, reverseGeocode, geocodeKeyword } from './geocoding.js';
 import { importSitesToDatabase, previewImportImpact, loadUploadHistory, loadLastUploadAt } from './import.js';
@@ -1301,8 +1301,15 @@ async function bulkAddFavorites(ids) {
   alert(`${okCount}건을 즐겨찾기에 추가했습니다.`);
 }
 
+// 일반 사용자의 1회 내보내기 상한(건). 관리자는 제한이 없지만 모든 내보내기는 작업 이력에 기록된다.
+const EXPORT_MAX_ROWS_USER = 100;
+
 function exportSelectedSitesToExcel(sites) {
   if (!sites.length) return;
+  if (!isAdmin() && sites.length > EXPORT_MAX_ROWS_USER) {
+    alert(`한 번에 최대 ${EXPORT_MAX_ROWS_USER}건까지 내보낼 수 있습니다. (선택 ${sites.length}건) 선택을 줄여 다시 시도해 주세요.`);
+    return;
+  }
   if (typeof window.XLSX === 'undefined' || !window.XLSX.utils) {
     alert('엑셀 내보내기 기능을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
     return;
@@ -1320,6 +1327,7 @@ function exportSelectedSitesToExcel(sites) {
   window.XLSX.utils.book_append_sheet(book, sheet, '사업장 목록');
   const today = new Date().toISOString().slice(0, 10);
   window.XLSX.writeFile(book, `사업장_목록_${today}.xlsx`);
+  logSitesExport(sites.length, '현장 탭 선택 내보내기');
 }
 
 export function renderPcSiteTable() {
@@ -4010,6 +4018,7 @@ export function renderMobileMoreMenu(containerId) {
   addMenuCard('관리자 메뉴', admin ? [
     { label: '회원관리', icon: 'user', onClick: () => document.getElementById('btn-admin-panel').click() },
     { label: '사업장 데이터 관리', icon: 'upload', onClick: () => document.getElementById('btn-upload-panel').click() },
+    { label: '2단계 인증 설정', icon: 'lock', onClick: () => document.dispatchEvent(new CustomEvent('gnmap:mfa-settings')) },
   ] : []);
 
   // 앱 정보 — 버전 정보(실제 CONFIG.APP_VERSION 값) + 로그아웃(기존 그대로).

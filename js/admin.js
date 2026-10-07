@@ -144,3 +144,10 @@ export async function setUserRole(userId, role) {
   if (row) row.role = role;
   return { ok: true, message: '변경 완료' };
 }
+
+// 엑셀 내보내기 이력: 누가 몇 건을 내보냈는지 감사로그에 남긴다(실패해도 내보내기 자체는 막지 않음).
+export function logSitesExport(count, scope) {
+  try {
+    sb.rpc('gnmap_v2_log_export', { p_count: count, p_scope: scope }).then(() => {}, () => {});
+  } catch (e) { /* 이력 기록 실패는 무시 */ }
+}
