@@ -1818,7 +1818,7 @@
     border-radius: 2px;
     background: var(--gnmap-blue);
   }
-  .sv-mobile-day-bar.sv-type-supervision { background: var(--gnmap-amber); }
+  .sv-mobile-day-bar.sv-type-supervision { background: #c2255c; }
   .sv-mobile-day-bar.sv-type-inspection { background: var(--gnmap-blue); }
   .sv-mobile-day-bar.sv-type-none { background: var(--gnmap-gray); }
   .sv-mobile-day-bar.sv-status-done { background: var(--gnmap-green); }
@@ -1843,7 +1843,7 @@
     border-radius: 50%;
   }
   .sv-mobile-legend-dot.sv-type-inspection { background: var(--gnmap-blue); }
-  .sv-mobile-legend-dot.sv-type-supervision { background: var(--gnmap-amber); }
+  .sv-mobile-legend-dot.sv-type-supervision { background: #c2255c; }
   .sv-mobile-legend-dot.sv-status-done { background: var(--gnmap-green); }
 
   /* 필터 chip (전체/점검/감독/완료) */
@@ -1953,7 +1953,7 @@
     color: #fff;
   }
   .sv-mobile-badge.sv-type-inspection { background: var(--gnmap-blue); }
-  .sv-mobile-badge.sv-type-supervision { background: var(--gnmap-amber); }
+  .sv-mobile-badge.sv-type-supervision { background: #c2255c; }
   .sv-mobile-badge.sv-type-none { background: var(--gnmap-gray); }
   .sv-mobile-badge-status {
     color: #fff;
