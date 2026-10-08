@@ -139,8 +139,30 @@ function svRows() {
   }
   return SV.rows.filter(sv => (sv.manager_name || '') === SV.manager);
 }
-function svDotClass(sv) {
-  return 'pc-sv-dot' + (sv.supervision_type === 'inspection' ? ' is-ring' : '');
+// 감독/점검 구분: supervision_type 이 'inspection' 이면 점검, 그 외(감독 또는 미지정)는 감독으로 본다.
+function svKind(sv) { return sv.supervision_type === 'inspection' ? 'ins' : 'sup'; }
+const SV_KIND_LABEL = { sup: '감독', ins: '점검' };
+function svDotClass(sv) { return 'pc-sv-dot is-kind-' + svKind(sv); }
+
+// 30일 이상 이어지는 장기 일정은 달력 칸을 차지하지 않고 위쪽 띠로 보여준다.
+const SV_LONG_DAYS = 30;
+function svIsLong(sv) { return (parseYMD(sv.end_date) - parseYMD(sv.start_date)) / 86400000 >= SV_LONG_DAYS; }
+
+// 담당 감독관 이니셜/색(이름 순서대로 고정 배정)
+const SV_MGR_COLORS = ['#6a3fb5', '#0b7a6b', '#a35a14', '#4b5563', '#a3338c', '#2a7a2a', '#8a6d00', '#1c6fa8'];
+function svMgrNames() {
+  return Array.from(new Set(SV.rows.map(sv => (sv.manager_name || '').trim()).filter(Boolean))).sort();
+}
+function svMgrInitial(name) { const t = (name || '').trim(); return t ? Array.from(t)[0] : ''; }
+function svMgrColor(name) {
+  const i = svMgrNames().indexOf((name || '').trim());
+  return SV_MGR_COLORS[(i < 0 ? 0 : i) % SV_MGR_COLORS.length];
+}
+function buildAvatar(name) {
+  const a = el('span', 'pc-sv-av', svMgrInitial(name));
+  a.style.setProperty('--mc', svMgrColor(name));
+  a.setAttribute('aria-hidden', 'true');
+  return a;
 }
 
 function svTone(sv) {
@@ -229,6 +251,7 @@ function paintSupervisionPage() {
   const root = document.getElementById('pc-supervision-page');
   if (!root) return;
   closeDayPopover();
+  closeSvTip();
   root.innerHTML = '';
 
   const admin = isAdmin();
@@ -278,16 +301,19 @@ function paintSupervisionPage() {
   // ---- 통계 카드 + 기간 이동/보기 전환 툴바
   const [mStart, mEnd] = monthRange(SV.anchor);
   const monthRows = svRows().filter(sv => svOverlapsRange(sv, mStart, mEnd));
-  const countBy = (st) => monthRows.filter(sv => computeSupervisionStatus(sv.start_date, sv.end_date) === st).length;
+  const rowsOf = (st) => st === 'total' ? monthRows : monthRows.filter(sv => computeSupervisionStatus(sv.start_date, sv.end_date) === st);
 
   const topLine = el('div', 'pc-sv-topline');
   const stats = el('div', 'pc-sv-stats');
   [
-    ['total', 'calendar', '전체 일정', monthRows.length],
-    ['scheduled', 'clock', '예정', countBy('scheduled')],
-    ['ongoing', 'play', '진행', countBy('ongoing')],
-    ['done', 'check', '완료', countBy('done')],
-  ].forEach(([key, ic, label, count]) => {
+    ['total', 'calendar', '전체 일정'],
+    ['scheduled', 'clock', '예정'],
+    ['ongoing', 'play', '진행'],
+    ['done', 'check', '완료'],
+  ].forEach(([key, ic, label]) => {
+    const list = rowsOf(key);
+    const count = list.length;
+    const supN = list.filter(sv => svKind(sv) === 'sup').length;
     const card = el('div', `pc-sv-stat pc-sv-stat-${key}`);
     const iconBox = el('span', 'pc-sv-stat-icon');
     iconBox.appendChild(icon(ic, key === 'total' ? 26 : 30));
@@ -298,6 +324,11 @@ function paintSupervisionPage() {
     num.appendChild(document.createTextNode(String(count)));
     num.appendChild(el('small', '', '건'));
     text.appendChild(num);
+    const sub = el('span', 'pc-sv-stat-sub');
+    sub.appendChild(el('b', 'is-sup', `감독 ${supN}`));
+    sub.appendChild(document.createTextNode(' · '));
+    sub.appendChild(el('b', 'is-ins', `점검 ${count - supN}`));
+    text.appendChild(sub);
     card.appendChild(text);
     stats.appendChild(card);
   });
@@ -342,6 +373,8 @@ function paintSupervisionPage() {
   toolbar.appendChild(seg);
   topLine.appendChild(toolbar);
   root.appendChild(topLine);
+  const subRow = buildSvSubRow();
+  if (subRow) root.appendChild(subRow);
 
   // ---- 본문: 좌측(달력/주/일/목록) + 우측(선택 날짜 일정 / 다른 날짜 일정)
   const body = el('div', 'pc-sv-body');
@@ -358,20 +391,89 @@ function paintSupervisionPage() {
 
 function buildLegend() {
   const legend = el('div', 'pc-sv-legend');
-  [['scheduled', '예정'], ['ongoing', '진행'], ['done', '완료'], ['period', '기간 일정']].forEach(([tone, label]) => {
+  [['sup', '감독'], ['ins', '점검']].forEach(([k, label]) => {
     const item = el('span', 'pc-sv-legend-item');
-    item.appendChild(el('i', `pc-sv-dot pc-tone-${tone}`));
+    item.appendChild(el('i', `pc-sv-swatch is-kind-${k}`));
     item.appendChild(document.createTextNode(label));
     legend.appendChild(item);
   });
   legend.appendChild(el('span', 'pc-sv-legend-sep'));
-  [['', '감독'], [' is-ring', '점검']].forEach(([ring, label]) => {
-    const item = el('span', 'pc-sv-legend-item');
-    item.appendChild(el('i', 'pc-sv-dot is-neutral' + ring));
-    item.appendChild(document.createTextNode(label));
-    legend.appendChild(item);
-  });
+  const done = el('span', 'pc-sv-legend-item');
+  done.appendChild(el('i', 'pc-sv-swatch is-kind-sup is-faded'));
+  done.appendChild(document.createTextNode('흐림 = 완료'));
+  legend.appendChild(done);
+  const av = el('span', 'pc-sv-legend-item');
+  const sample = el('span', 'pc-sv-av', '김');
+  sample.style.setProperty('--mc', SV_MGR_COLORS[0]);
+  av.appendChild(sample);
+  av.appendChild(document.createTextNode('담당 감독관'));
+  legend.appendChild(av);
+  const dd = el('span', 'pc-sv-legend-item');
+  dd.appendChild(el('span', 'pc-sv-dday', 'D-3'));
+  dd.appendChild(document.createTextNode('곧 시작'));
+  legend.appendChild(dd);
+  const tl = el('span', 'pc-sv-legend-item');
+  tl.appendChild(el('i', 'pc-sv-legend-todayline'));
+  tl.appendChild(document.createTextNode('오늘'));
+  legend.appendChild(tl);
   return legend;
+}
+
+// 달력 위 한 줄: 담당자 필터 + 장기 일정 띠(월 보기에서만)
+function buildSvSubRow() {
+  const row = el('div', 'pc-sv-subrow');
+  const names = svMgrNames();
+  if (names.length) {
+    const box = el('div', 'pc-sv-mgrbox');
+    box.appendChild(el('b', 'pc-sv-subrow-label', '담당자'));
+    const me = ((state.profile && state.profile.name) || '').trim();
+    names.forEach(n => {
+      const on = SV.manager === 'all' || SV.manager === n || (SV.manager === 'mine' && me && n.includes(me));
+      const chip = el('button', 'pc-sv-mgrchip' + (on ? ' is-on' : ''));
+      chip.type = 'button';
+      chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+      chip.style.setProperty('--mc', svMgrColor(n));
+      chip.appendChild(buildAvatar(n));
+      chip.appendChild(document.createTextNode(n));
+      chip.addEventListener('click', () => { SV.manager = SV.manager === n ? 'all' : n; rerenderSv(); });
+      box.appendChild(chip);
+    });
+    row.appendChild(box);
+  }
+  if (SV.view === 'month') {
+    const [ms, me2] = monthRange(SV.anchor);
+    const longs = sortEvents(svRows().filter(sv => svIsLong(sv) && svOverlapsRange(sv, ms, me2)));
+    if (longs.length) {
+      const box = el('div', 'pc-sv-longbox');
+      box.appendChild(el('b', 'pc-sv-subrow-label', '장기 일정'));
+      const today = todayDateString();
+      longs.forEach(sv => {
+        const total = Math.max(1, (parseYMD(sv.end_date) - parseYMD(sv.start_date)) / 86400000);
+        const pct = Math.round(Math.min(1, Math.max(0, (parseYMD(today) - parseYMD(sv.start_date)) / 86400000 / total)) * 100);
+        const chip = el('button', `pc-sv-longchip is-kind-${svKind(sv)}`);
+        chip.type = 'button';
+        chip.appendChild(el('span', 'pc-sv-bar-tag', SV_KIND_LABEL[svKind(sv)]));
+        chip.appendChild(buildAvatar(sv.manager_name));
+        chip.appendChild(el('span', 'pc-sv-longchip-title', sv.title));
+        const pg = el('span', 'pc-sv-longchip-pg');
+        const fill = el('i');
+        fill.style.width = `${pct}%`;
+        pg.appendChild(fill);
+        chip.appendChild(pg);
+        chip.appendChild(el('small', '', `${fmtMD(sv.start_date)} ~ ${fmtMD(sv.end_date)} · ${pct}%`));
+        chip.addEventListener('click', () => {
+          const lo = sv.start_date > ms ? sv.start_date : ms;
+          const hi = sv.end_date < me2 ? sv.end_date : me2;
+          SV.selected = today < lo ? lo : today > hi ? hi : today;
+          rerenderSv();
+        });
+        attachSvTip(chip, sv);
+        box.appendChild(chip);
+      });
+      row.appendChild(box);
+    }
+  }
+  return row.childNodes.length ? row : null;
 }
 
 // ---- 월 보기
@@ -391,11 +493,11 @@ function buildMonthView(host) {
   host.appendChild(grid);
 }
 
-function layoutWeek(days) {
+function layoutWeek(days, skipLong) {
   const ws = days[0];
   const we = days[6];
   const segs = svRows()
-    .filter(sv => svOverlapsRange(sv, ws, we))
+    .filter(sv => svOverlapsRange(sv, ws, we) && !(skipLong && svIsLong(sv)))
     .map(sv => {
       const s = sv.start_date < ws ? ws : sv.start_date;
       const t = sv.end_date > we ? we : sv.end_date;
@@ -420,6 +522,7 @@ function buildWeekRow(days, anchorMonth, today) {
       + (date.getMonth() !== anchorMonth ? ' is-outside' : '')
       + (col === 0 ? ' is-sun' : col === 6 ? ' is-sat' : '')
       + (d === today ? ' is-today' : '')
+      + (d < today ? ' is-past' : '')
       + (d === SV.selected ? ' is-selected' : ''));
     cell.type = 'button';
     cell.setAttribute('aria-label', fmtDot(d));
@@ -432,18 +535,23 @@ function buildWeekRow(days, anchorMonth, today) {
     row.appendChild(cell);
   });
 
-  const segs = layoutWeek(days);
+  const segs = layoutWeek(days, true);
   const layer = el('div', 'pc-sv-week-events');
   segs.forEach(sg => {
     if (sg.lane >= MAX_BAR_LANES) return;
     layer.appendChild(buildBar(sg, days));
   });
-  // 칸이 모자라 가려진 일정 수를 날짜별로 "+N" 으로 알려준다.
+  // 칸이 모자라 가려진 일정은 날짜별로 "감독 N / 점검 N" 으로 알려준다.
   for (let col = 0; col < 7; col++) {
-    const hidden = segs.filter(sg => sg.lane >= MAX_BAR_LANES && sg.c0 <= col && sg.c1 >= col).length;
-    if (hidden > 0) {
-      const more = el('button', 'pc-sv-more', `+${hidden}건`);
+    const hiddenSegs = segs.filter(sg => sg.lane >= MAX_BAR_LANES && sg.c0 <= col && sg.c1 >= col);
+    if (hiddenSegs.length > 0) {
+      const supN = hiddenSegs.filter(sg => svKind(sg.sv) === 'sup').length;
+      const insN = hiddenSegs.length - supN;
+      const more = el('button', 'pc-sv-more');
       more.type = 'button';
+      more.setAttribute('aria-label', `숨은 일정 ${hiddenSegs.length}건 보기`);
+      if (supN) more.appendChild(el('span', 'pc-sv-more-badge is-sup', `감독 ${supN}`));
+      if (insN) more.appendChild(el('span', 'pc-sv-more-badge is-ins', `점검 ${insN}`));
       more.style.gridColumn = String(col + 1);
       more.style.gridRow = String(MAX_BAR_LANES + 1);
       more.addEventListener('click', (e) => {
@@ -453,6 +561,13 @@ function buildWeekRow(days, anchorMonth, today) {
       });
       layer.appendChild(more);
     }
+  }
+  // 오늘 세로선
+  const tcol = days.indexOf(today);
+  if (tcol >= 0) {
+    const line = el('i', 'pc-sv-todayline');
+    line.style.left = `${(tcol / 7) * 100}%`;
+    row.appendChild(line);
   }
   row.appendChild(layer);
   return row;
@@ -471,7 +586,7 @@ function openDayPopover(anchorEl, dateStr) {
   items.forEach(sv => {
     const b = el('button', 'pc-sv-popover-item');
     b.type = 'button';
-    b.appendChild(el('i', `${svDotClass(sv)} pc-tone-${svTone(sv)}`));
+    b.appendChild(el('i', svDotClass(sv)));
     const t = el('span', 'pc-sv-popover-text');
     t.appendChild(el('strong', '', sv.title));
     t.appendChild(el('small', '', sv.start_date === sv.end_date ? fmtMD(sv.start_date) : `${fmtMD(sv.start_date)} ~ ${fmtMD(sv.end_date)}`));
@@ -495,21 +610,63 @@ function openDayPopover(anchorEl, dateStr) {
   };
 }
 
+let svTipEl = null;
+function closeSvTip() { if (svTipEl) { svTipEl.remove(); svTipEl = null; } }
+// 막대/띠에 마우스를 올리거나 키보드로 포커스하면 상세 미리보기를 띄운다.
+function openSvTip(anchorEl, sv) {
+  closeSvTip();
+  const kind = svKind(sv);
+  const status = computeSupervisionStatus(sv.start_date, sv.end_date);
+  const tip = el('div', 'pc-sv-tip');
+  tip.setAttribute('role', 'tooltip');
+  tip.appendChild(el('strong', 'pc-sv-tip-title', sv.title));
+  [
+    ['구분', `${SV_KIND_LABEL[kind]} · ${STATUS_LABEL[status]}`],
+    ['기간', sv.start_date === sv.end_date ? fmtMD(sv.start_date) : `${fmtMD(sv.start_date)} ~ ${fmtMD(sv.end_date)}`],
+    ['담당', sv.manager_name || '-'],
+  ].forEach(([k, v]) => {
+    const r = el('div', 'pc-sv-tip-row');
+    r.appendChild(el('span', '', k));
+    r.appendChild(el('span', '', v));
+    tip.appendChild(r);
+  });
+  document.body.appendChild(tip);
+  svTipEl = tip;
+  const r0 = anchorEl.getBoundingClientRect();
+  const pw = tip.offsetWidth, ph = tip.offsetHeight;
+  tip.style.left = `${Math.max(8, Math.min(window.innerWidth - pw - 8, r0.left + 16))}px`;
+  tip.style.top = `${r0.bottom + ph + 10 > window.innerHeight ? Math.max(8, r0.top - ph - 6) : r0.bottom + 6}px`;
+}
+function attachSvTip(node, sv) {
+  node.addEventListener('mouseenter', () => openSvTip(node, sv));
+  node.addEventListener('mouseleave', closeSvTip);
+  node.addEventListener('focus', () => openSvTip(node, sv));
+  node.addEventListener('blur', closeSvTip);
+  node.addEventListener('click', closeSvTip);
+}
+
 function buildBar(sg, days) {
   const { sv } = sg;
-  const tone = svTone(sv);
-  const bar = el('button', `pc-sv-bar pc-tone-${tone}`
+  const kind = svKind(sv);
+  const status = computeSupervisionStatus(sv.start_date, sv.end_date);
+  const bar = el('button', `pc-sv-bar is-kind-${kind}` + (status === 'done' ? ' is-done' : '')
     + (sg.contL ? ' cont-left' : '') + (sg.contR ? ' cont-right' : '')
     + (SV.selected && svOverlapsDate(sv, SV.selected) ? ' is-active' : ''));
   bar.type = 'button';
   bar.style.gridColumn = `${sg.c0 + 1} / ${sg.c1 + 2}`;
   bar.style.gridRow = String(sg.lane + 1);
-  bar.title = `${sv.title} (${fmtMD(sv.start_date)} ~ ${fmtMD(sv.end_date)})`;
-  bar.appendChild(el('i', svDotClass(sv)));
+  bar.setAttribute('aria-label', `${SV_KIND_LABEL[kind]} ${sv.title} (${fmtMD(sv.start_date)} ~ ${fmtMD(sv.end_date)}) ${STATUS_LABEL[status]}${sv.manager_name ? ' 담당 ' + sv.manager_name : ''}`);
+  bar.appendChild(el('span', 'pc-sv-bar-tag', SV_KIND_LABEL[kind]));
+  if ((sv.manager_name || '').trim()) bar.appendChild(buildAvatar(sv.manager_name));
   const multi = sv.start_date !== sv.end_date;
-  const text = el('span', 'pc-sv-bar-title', sv.title);
-  bar.appendChild(text);
-  if (multi) bar.appendChild(el('span', 'pc-sv-bar-range', `(${fmtMD(sv.start_date)} ~ ${fmtMD(sv.end_date)})`));
+  bar.appendChild(el('span', 'pc-sv-bar-title', sv.title));
+  const dday = status === 'scheduled' ? Math.round((parseYMD(sv.start_date) - parseYMD(todayDateString())) / 86400000) : -1;
+  if (dday >= 1 && dday <= 3) bar.appendChild(el('span', 'pc-sv-dday', `D-${dday}`));
+  // 칸이 좁으면 기간 글자는 빼고(툴팁/상세에서 확인), 하루짜리는 상태 글자도 뺀다.
+  const span = sg.c1 - sg.c0 + 1;
+  if (multi && span >= 4) bar.appendChild(el('span', 'pc-sv-bar-range', `(${fmtMD(sv.start_date)} ~ ${fmtMD(sv.end_date)})`));
+  if (multi && span >= 2) bar.appendChild(el('span', 'pc-sv-bar-st', STATUS_LABEL[status]));
+  attachSvTip(bar, sv);
   bar.addEventListener('click', (e) => {
     e.stopPropagation();
     // 막대가 여러 날에 걸쳐 있어 클릭한 칸을 알기 어려우므로, 이 주에서 보이는 첫 날을 선택한다.
@@ -701,7 +858,7 @@ function buildSidePanel() {
       const st = computeSupervisionStatus(sv.start_date, sv.end_date);
       const item = el('button', 'pc-sv-mini');
       item.type = 'button';
-      item.appendChild(el('i', `${svDotClass(sv)} pc-tone-${svTone(sv)}`));
+      item.appendChild(el('i', svDotClass(sv)));
       const info = el('div', 'pc-sv-mini-info');
       info.appendChild(el('strong', '', sv.title));
       info.appendChild(el('span', '', fmtRangeDot(sv.start_date, sv.end_date)));
