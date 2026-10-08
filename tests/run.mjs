@@ -52,13 +52,12 @@ try {
     });
     await test('PC: 즐겨찾기 "지도에서 보기"는 즐겨찾기 현장만 지도에 크게 보여준다', async () => {
       await page.waitForLoadState('networkidle').catch(() => {});
-      await page.evaluate(() => { window.__st.favoriteSiteIds = new Set(['1', '2', '3']); });
       await page.click('.pc-nav-btn[data-pc-tab="favorite"]'); await page.waitForTimeout(500);
-      await page.evaluate(() => { window.__st.favoriteSiteIds = new Set(['1', '2', '3']); }); // 늦게 도착한 응답이 덮어썼을 경우 대비
       await page.click('#pc-favorite-map-view-btn');
       await page.waitForFunction(() => document.querySelectorAll('#site-list .site-list-item').length === 3, null, { timeout: 5000 }).catch(() => {});
       const s = await page.evaluate(() => ({ tab: document.getElementById('app').dataset.pcTab, fo: window.__st.favoriteOnly, banner: !document.getElementById('pc-fav-map-banner').hidden, n: document.querySelectorAll('#site-list .site-list-item').length }));
-      eq(s.tab, 'map'); eq(s.fo, true); eq(s.banner, true); eq(s.n, 3);
+      const diag = await page.evaluate(() => `favs=${window.__st.favoriteSiteIds.size} tab=${document.getElementById('app').dataset.pcTab} dongDefault=${window.__st.dongDefault}`);
+      eq(s.tab, 'map'); eq(s.fo, true); eq(s.banner, true); eq(s.n, 3, diag + ' 목록 수');
       const big = await page.evaluate(() => Math.max(...(window.__mk || []).slice(-3).map((m) => (m._img && m._img.size ? m._img.size.h : 0))));
       ok(big >= 46, '보기 모드 핀이 커지지 않음(h=' + big + ')');
       await page.click('#pc-fav-map-banner-exit'); await page.waitForTimeout(400);
@@ -94,7 +93,6 @@ try {
   {
     const { page, errors } = await openLoggedIn(browser, { width: 390, height: 800 });
     await test('모바일: 로그인 후 JS 오류/CSP 위반 없음', async () => { eq(errors.length, 0, errors.join(' | ')); });
-    await page.evaluate(() => { window.__st.favoriteSiteIds = new Set(['1', '2', '3']); window.__st.siteNotes = new Map([['3', { content: 'a' }], ['4', { content: 'b' }]]); });
     await page.click('[data-tab="map"]').catch(() => {}); await page.waitForTimeout(500);
     await test('모바일: 필터 줄이 한 줄에 들어오고 검색모드 라벨은 "검색"', async () => {
       const r = await page.evaluate(() => {
@@ -169,6 +167,51 @@ try {
       eq(errs.length, 0, errs.join('|'));
       await page.close();
     });
+  }
+
+  // ── 감독일정 달력(PC): 감독/점검 색 구분, 담당자 이니셜, 장기 일정 띠, 미리보기 ──
+  {
+    const { page, errors } = await openLoggedIn(browser, { width: 1400, height: 900 });
+    const ymd = (o) => { const d = new Date(); d.setDate(d.getDate() + o); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    const row = (id, ty, a, b, m) => ({ id, title: id, supervision_type: ty, start_date: ymd(a), end_date: ymd(b), manager_name: m, status: 'scheduled' });
+    const rows = [row('장기점검', 'inspection', -40, 40, '김지훈'), row('집중감독', 'supervision', 0, 2, '최영호'), row('현장점검', 'inspection', 0, 0, '박세진')];
+    await page.route('https://kuphyemtyamglvyjpvwh.supabase.co/rest/v1/gnmap_v2_supervisions*', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows) }));
+    await page.click('.pc-nav-btn[data-pc-tab="supervision"]');
+    await page.waitForSelector('.pc-sv-bar', { timeout: 10000 });
+    await test('감독일정 달력: 감독/점검 색이 다르고 라벨이 있다', async () => {
+      const c = await page.evaluate(() => ({
+        sup: getComputedStyle(document.querySelector('.pc-sv-bar.is-kind-sup')).backgroundColor,
+        ins: getComputedStyle(document.querySelector('.pc-sv-bar.is-kind-ins')).backgroundColor,
+        tags: [...document.querySelectorAll('.pc-sv-bar .pc-sv-bar-tag')].map((x) => x.textContent),
+      }));
+      ok(c.sup !== c.ins, '감독/점검 색이 같다');
+      ok(c.tags.includes('감독') && c.tags.includes('점검'), '라벨 누락');
+    });
+    await test('감독일정 달력: 담당자 이니셜, 장기 일정 띠, 감독/점검 건수', async () => {
+      const r = await page.evaluate(() => ({
+        av: [...document.querySelectorAll('.pc-sv-bar .pc-sv-av')].map((x) => x.textContent),
+        longChips: document.querySelectorAll('.pc-sv-longchip').length,
+        longInGrid: [...document.querySelectorAll('.pc-sv-bar .pc-sv-bar-title')].some((x) => x.textContent === '장기점검'),
+        stat: document.querySelector('.pc-sv-stat-total .pc-sv-stat-sub')?.textContent || '',
+      }));
+      ok(r.av.includes('최') && r.av.includes('박'), '이니셜 누락 ' + r.av);
+      eq(r.longChips, 1, '장기 일정 띠');
+      eq(r.longInGrid, false, '장기 일정이 달력 칸에도 그려짐');
+      ok(/감독 1 · 점검 2/.test(r.stat), '건수 표시 ' + r.stat);
+    });
+    await test('감독일정 달력: 막대에 마우스를 올리면 미리보기가 뜨고 벗어나면 사라진다', async () => {
+      await page.hover('.pc-sv-bar.is-kind-sup'); await page.waitForTimeout(150);
+      ok(await page.evaluate(() => /집중감독/.test(document.querySelector('.pc-sv-tip')?.textContent || '')), '미리보기 없음');
+      await page.mouse.move(5, 5); await page.waitForTimeout(150);
+      eq(await page.locator('.pc-sv-tip').count(), 0, '미리보기 잔존');
+    });
+    await test('감독일정 달력: 담당자 칩으로 필터된다', async () => {
+      await page.click('.pc-sv-mgrchip:has-text("최영호")'); await page.waitForTimeout(200);
+      const t = await page.evaluate(() => [...document.querySelectorAll('.pc-sv-bar .pc-sv-bar-title')].map((x) => x.textContent));
+      ok(t.length === 1 && t[0] === '집중감독', '필터 결과 ' + t);
+    });
+    eq(errors.length, 0, errors.join(' | '));
+    await page.close();
   }
 
 } finally {
