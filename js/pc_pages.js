@@ -127,7 +127,6 @@ const SV = {
   rows: [],
   loadError: false,
   manager: 'all',           // 'all' | 'mine' | 담당 감독관 이름
-  otherMode: 'upcoming',    // 우측 '다른 날짜 일정': 'upcoming'(오늘 이후) | 'past'(오늘 이전)
 };
 
 // 담당 감독관 필터가 적용된 일정 목록
@@ -146,6 +145,7 @@ function svDotClass(sv) { return 'pc-sv-dot is-kind-' + svKind(sv); }
 
 // 30일 이상 이어지는 장기 일정은 달력 칸을 차지하지 않고 위쪽 띠로 보여준다.
 const SV_LONG_DAYS = 30;
+const SV_EXPIRE_DAYS = 5; // 우측 '만료 예정' 기준(종료까지 남은 일수)
 function svIsLong(sv) { return (parseYMD(sv.end_date) - parseYMD(sv.start_date)) / 86400000 >= SV_LONG_DAYS; }
 
 // 담당 감독관 이니셜/색(이름 순서대로 고정 배정)
@@ -153,7 +153,9 @@ const SV_MGR_COLORS = ['#6a3fb5', '#0b7a6b', '#a35a14', '#4b5563', '#a3338c', '#
 function svMgrNames() {
   return Array.from(new Set(SV.rows.map(sv => (sv.manager_name || '').trim()).filter(Boolean))).sort();
 }
-function svMgrInitial(name) { const t = (name || '').trim(); return t ? Array.from(t)[0] : ''; }
+// 담당자 표시: "강남지청 유호정" → 이름 "유호정", 아바타에는 성을 뺀 "호정"을 쓴다.
+function svMgrShort(name) { const t = (name || '').trim().split(/\s+/); return t[t.length - 1] || ''; }
+function svMgrInitial(name) { const c = Array.from(svMgrShort(name)); return (c.length >= 3 ? c.slice(1) : c).join(''); }
 function svMgrColor(name) {
   const i = svMgrNames().indexOf((name || '').trim());
   return SV_MGR_COLORS[(i < 0 ? 0 : i) % SV_MGR_COLORS.length];
@@ -402,12 +404,6 @@ function buildLegend() {
   done.appendChild(el('i', 'pc-sv-swatch is-kind-sup is-faded'));
   done.appendChild(document.createTextNode('흐림 = 완료'));
   legend.appendChild(done);
-  const av = el('span', 'pc-sv-legend-item');
-  const sample = el('span', 'pc-sv-av', '김');
-  sample.style.setProperty('--mc', SV_MGR_COLORS[0]);
-  av.appendChild(sample);
-  av.appendChild(document.createTextNode('담당 감독관'));
-  legend.appendChild(av);
   const dd = el('span', 'pc-sv-legend-item');
   dd.appendChild(el('span', 'pc-sv-dday', 'D-3'));
   dd.appendChild(document.createTextNode('곧 시작'));
@@ -433,8 +429,7 @@ function buildSvSubRow() {
       chip.type = 'button';
       chip.setAttribute('aria-pressed', on ? 'true' : 'false');
       chip.style.setProperty('--mc', svMgrColor(n));
-      chip.appendChild(buildAvatar(n));
-      chip.appendChild(document.createTextNode(n));
+      chip.appendChild(document.createTextNode(svMgrShort(n)));
       chip.addEventListener('click', () => { SV.manager = SV.manager === n ? 'all' : n; rerenderSv(); });
       box.appendChild(chip);
     });
@@ -453,7 +448,6 @@ function buildSvSubRow() {
         const chip = el('button', `pc-sv-longchip is-kind-${svKind(sv)}`);
         chip.type = 'button';
         chip.appendChild(el('span', 'pc-sv-bar-tag', SV_KIND_LABEL[svKind(sv)]));
-        chip.appendChild(buildAvatar(sv.manager_name));
         chip.appendChild(el('span', 'pc-sv-longchip-title', sv.title));
         const pg = el('span', 'pc-sv-longchip-pg');
         const fill = el('i');
@@ -657,7 +651,6 @@ function buildBar(sg, days) {
   bar.style.gridRow = String(sg.lane + 1);
   bar.setAttribute('aria-label', `${SV_KIND_LABEL[kind]} ${sv.title} (${fmtMD(sv.start_date)} ~ ${fmtMD(sv.end_date)}) ${STATUS_LABEL[status]}${sv.manager_name ? ' 담당 ' + sv.manager_name : ''}`);
   bar.appendChild(el('span', 'pc-sv-bar-tag', SV_KIND_LABEL[kind]));
-  if ((sv.manager_name || '').trim()) bar.appendChild(buildAvatar(sv.manager_name));
   const multi = sv.start_date !== sv.end_date;
   bar.appendChild(el('span', 'pc-sv-bar-title', sv.title));
   const dday = status === 'scheduled' ? Math.round((parseYMD(sv.start_date) - parseYMD(todayDateString())) / 86400000) : -1;
@@ -786,6 +779,33 @@ function buildEmpty(message) {
 }
 
 // ---- 우측 패널
+// 선택 날짜 일정: 감독/점검으로 묶어 한 줄씩 보여주고, 누르면 상세 팝업을 연다.
+function buildDayGroups(rows) {
+  const box = el('div', 'pc-sv-dgroups');
+  [['sup', '감독'], ['ins', '점검']].forEach(([k, label]) => {
+    const items = rows.filter(sv => svKind(sv) === k);
+    if (!items.length) return;
+    const g = el('div', `pc-sv-dgroup is-${k}`);
+    g.appendChild(el('div', 'pc-sv-dgroup-head', `${label} ${items.length}건`));
+    items.forEach(sv => {
+      const st = computeSupervisionStatus(sv.start_date, sv.end_date);
+      const r = el('button', 'pc-sv-drow');
+      r.type = 'button';
+      r.setAttribute('aria-label', `${label} ${sv.title} 상세보기`);
+      r.title = sv.title;
+      r.appendChild(el('span', 'pc-sv-drow-title', sv.title));
+      const range = sv.start_date === sv.end_date ? fmtMD(sv.start_date) : `${fmtMD(sv.start_date)}~${fmtMD(sv.end_date)}`;
+      r.appendChild(el('span', 'pc-sv-drow-range', svIsLong(sv) ? `${range} · 장기` : range));
+      if ((sv.manager_name || '').trim()) r.appendChild(buildAvatar(sv.manager_name));
+      r.appendChild(el('span', `pc-sv-dst pc-status-${st}`, STATUS_LABEL[st]));
+      r.addEventListener('click', () => openSvDetailModal(sv));
+      g.appendChild(r);
+    });
+    box.appendChild(g);
+  });
+  return box;
+}
+
 function buildSidePanel() {
   const side = el('div', 'pc-sv-side');
   const admin = isAdmin();
@@ -809,7 +829,15 @@ function buildSidePanel() {
   selHead.appendChild(el('strong', '', '선택 날짜 일정'));
   selHead.appendChild(el('span', 'pc-sv-side-date', `${parseYMD(SV.selected).getFullYear()}년 ${parseYMD(SV.selected).getMonth() + 1}월 ${parseYMD(SV.selected).getDate()}일 (${WEEKDAYS[parseYMD(SV.selected).getDay()]})`));
   const dayRows = sortEvents(svRows().filter(sv => svOverlapsDate(sv, SV.selected)));
-  selHead.appendChild(el('span', 'pc-sv-count-badge', `${dayRows.length}건`));
+  if (dayRows.length === 0) {
+    selHead.appendChild(el('span', 'pc-sv-count-badge', '0건'));
+  } else {
+    const sum = el('span', 'pc-sv-daysum');
+    const supN = dayRows.filter(sv => svKind(sv) === 'sup').length;
+    sum.appendChild(el('b', 'pc-sv-daysum-pill is-sup', `감독 ${supN}`));
+    sum.appendChild(el('b', 'pc-sv-daysum-pill is-ins', `점검 ${dayRows.length - supN}`));
+    selHead.appendChild(sum);
+  }
   sel.appendChild(selHead);
   if (dayRows.length === 0) {
     const empty = buildEmpty('선택한 날짜에 등록된 감독일정이 없습니다.');
@@ -821,55 +849,38 @@ function buildSidePanel() {
     }
     sel.appendChild(empty);
   } else {
-    dayRows.forEach(sv => sel.appendChild(buildEventCard(sv)));
+    sel.appendChild(buildDayGroups(dayRows));
   }
   side.appendChild(sel);
 
-  // 다른 날짜 일정(오늘 이후, 선택한 날짜와 겹치지 않는 것) — 가까운 순 3건.
+  // 만료 예정: 진행 중이면서 종료일까지 SV_EXPIRE_DAYS일 이내로 남은 일정(완료 건은 보여주지 않는다).
   const today = todayDateString();
-  const isPast = SV.otherMode === 'past';
-  const upcoming = isPast
-    ? svRows().filter(sv => sv.end_date < today && !svOverlapsDate(sv, SV.selected)).sort((a, b) => b.end_date.localeCompare(a.end_date)).slice(0, 3)
-    : sortEvents(svRows().filter(sv => sv.end_date >= today && !svOverlapsDate(sv, SV.selected))).slice(0, 3);
-  const other = el('div', 'pc-sv-side-card is-other-card');
+  const limit = addDays(today, SV_EXPIRE_DAYS);
+  const expiring = svRows()
+    .filter(sv => computeSupervisionStatus(sv.start_date, sv.end_date) === 'ongoing' && sv.end_date >= today && sv.end_date <= limit)
+    .sort((a, b) => a.end_date.localeCompare(b.end_date) || (a.title || '').localeCompare(b.title || ''));
+  const other = el('div', 'pc-sv-side-card is-expire-card');
   const otherHead = el('div', 'pc-sv-side-head');
-  const otherTitle = el('strong', '', '다른 날짜 일정');
-  otherHead.appendChild(otherTitle);
-  otherHead.appendChild(el('span', 'pc-sv-side-date is-plain', isPast ? '(오늘 이전)' : '(오늘 이후)'));
-  const modeToggle = el('div', 'pc-sv-mode-toggle');
-  [['upcoming', '예정'], ['past', '지난']].forEach(([key, label]) => {
-    const mb = el('button', 'pc-sv-mode-btn' + (SV.otherMode === key ? ' active' : ''), label);
-    mb.type = 'button';
-    mb.addEventListener('click', () => { SV.otherMode = key; rerenderSv(); });
-    modeToggle.appendChild(mb);
-  });
-  otherHead.appendChild(modeToggle);
-  const more = el('button', 'pc-sv-more-link');
-  more.type = 'button';
-  more.appendChild(document.createTextNode('더보기'));
-  more.appendChild(icon('chevronRight', 14));
-  more.addEventListener('click', () => { SV.view = 'list'; rerenderSv(); });
-  otherHead.appendChild(more);
+  otherHead.appendChild(el('strong', '', '만료 예정'));
+  otherHead.appendChild(el('span', 'pc-sv-side-date is-plain', `(종료까지 ${SV_EXPIRE_DAYS}일 이내)`));
+  otherHead.appendChild(el('span', 'pc-sv-count-badge', `${expiring.length}건`));
   other.appendChild(otherHead);
-  if (upcoming.length === 0) {
-    other.appendChild(el('p', 'pc-sv-side-empty', isPast ? '지난 일정이 없습니다.' : '예정된 다른 일정이 없습니다.'));
+  if (expiring.length === 0) {
+    other.appendChild(el('p', 'pc-sv-side-empty', `${SV_EXPIRE_DAYS}일 이내에 끝나는 진행 중 일정이 없습니다.`));
   } else {
-    upcoming.forEach(sv => {
-      const st = computeSupervisionStatus(sv.start_date, sv.end_date);
-      const item = el('button', 'pc-sv-mini');
-      item.type = 'button';
-      item.appendChild(el('i', svDotClass(sv)));
-      const info = el('div', 'pc-sv-mini-info');
-      info.appendChild(el('strong', '', sv.title));
-      info.appendChild(el('span', '', fmtRangeDot(sv.start_date, sv.end_date)));
-      item.appendChild(info);
-      item.appendChild(el('span', `pc-sv-badge pc-status-${st}`, STATUS_LABEL[st]));
-      item.addEventListener('click', () => {
-        SV.selected = (!isPast && sv.start_date < today) ? today : sv.start_date;
-        SV.anchor = SV.selected;
-        rerenderSv();
-      });
-      other.appendChild(item);
+    expiring.forEach(sv => {
+      const kind = svKind(sv);
+      const left = Math.round((parseYMD(sv.end_date) - parseYMD(today)) / 86400000);
+      const r = el('button', 'pc-sv-drow pc-sv-exprow');
+      r.type = 'button';
+      r.title = sv.title;
+      r.setAttribute('aria-label', `${SV_KIND_LABEL[kind]} ${sv.title} 상세보기, ${left === 0 ? '오늘 종료' : `종료까지 ${left}일`}`);
+      r.appendChild(el('span', `pc-sv-ktag is-${kind}`, SV_KIND_LABEL[kind]));
+      r.appendChild(el('span', 'pc-sv-drow-title', sv.title));
+      r.appendChild(el('span', 'pc-sv-drow-range', `~${fmtMD(sv.end_date)}`));
+      r.appendChild(el('span', 'pc-sv-expbadge' + (left <= 1 ? ' is-urgent' : ''), left === 0 ? '오늘 종료' : `D-${left}`));
+      r.addEventListener('click', () => openSvDetailModal(sv));
+      other.appendChild(r);
     });
   }
   side.appendChild(other);
