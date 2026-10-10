@@ -174,7 +174,7 @@ try {
     const { page, errors } = await openLoggedIn(browser, { width: 1400, height: 900 });
     const ymd = (o) => { const d = new Date(); d.setDate(d.getDate() + o); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
     const row = (id, ty, a, b, m) => ({ id, title: id, supervision_type: ty, start_date: ymd(a), end_date: ymd(b), manager_name: m, status: 'scheduled' });
-    const rows = [row('장기점검', 'inspection', -40, 40, '김지훈'), row('집중감독', 'supervision', 0, 2, '최영호'), row('현장점검', 'inspection', 0, 0, '박세진')];
+    const rows = [row('장기점검', 'inspection', -40, 40, '강남지청 김지훈'), row('집중감독', 'supervision', 0, 2, '강남지청 최영호'), row('현장점검', 'inspection', 0, 0, '강남지청 박세진')];
     await page.route('https://kuphyemtyamglvyjpvwh.supabase.co/rest/v1/gnmap_v2_supervisions*', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows) }));
     await page.click('.pc-nav-btn[data-pc-tab="supervision"]');
     await page.waitForSelector('.pc-sv-bar', { timeout: 10000 });
@@ -189,12 +189,14 @@ try {
     });
     await test('감독일정 달력: 담당자 이니셜, 장기 일정 띠, 감독/점검 건수', async () => {
       const r = await page.evaluate(() => ({
-        av: [...document.querySelectorAll('.pc-sv-bar .pc-sv-av')].map((x) => x.textContent),
+        av: document.querySelectorAll('.pc-sv-bar .pc-sv-av, .pc-sv-longchip .pc-sv-av').length,
+        panelNames: [...document.querySelectorAll('.pc-sv-drow .pc-sv-av')].map((x) => x.textContent),
         longChips: document.querySelectorAll('.pc-sv-longchip').length,
         longInGrid: [...document.querySelectorAll('.pc-sv-bar .pc-sv-bar-title')].some((x) => x.textContent === '장기점검'),
         stat: document.querySelector('.pc-sv-stat-total .pc-sv-stat-sub')?.textContent || '',
       }));
-      ok(r.av.includes('최') && r.av.includes('박'), '이니셜 누락 ' + r.av);
+      eq(r.av, 0, '달력 막대/띠에 담당자 이름이 표시됨');
+      ok(r.panelNames.includes('영호') && r.panelNames.includes('세진'), '선택 날짜 패널 담당자 이름 누락 ' + r.panelNames);
       eq(r.longChips, 1, '장기 일정 띠');
       eq(r.longInGrid, false, '장기 일정이 달력 칸에도 그려짐');
       ok(/감독 1 · 점검 2/.test(r.stat), '건수 표시 ' + r.stat);
@@ -205,10 +207,22 @@ try {
       await page.mouse.move(5, 5); await page.waitForTimeout(150);
       eq(await page.locator('.pc-sv-tip').count(), 0, '미리보기 잔존');
     });
+    await test('감독일정 달력: 선택 날짜 패널은 감독/점검으로 묶고, 일정을 누르면 상세 팝업이 열린다', async () => {
+      const g = await page.evaluate(() => [...document.querySelectorAll('.pc-sv-dgroup-head')].map((x) => x.textContent));
+      ok(g.some((x) => /^감독/.test(x)) && g.some((x) => /^점검/.test(x)), '묶음 제목 ' + g);
+      await page.click('.pc-sv-drow:has-text("집중감독")'); await page.waitForTimeout(200);
+      ok(await page.evaluate(() => /감독일정 상세/.test(document.querySelector('.pc-modal')?.textContent || '')), '상세 팝업 없음');
+      await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+    });
+    await test('감독일정 달력: 우측에 "다른 날짜 일정"은 없고 "만료 예정"(5일 이내 진행 중)만 보인다', async () => {
+      const r = await page.evaluate(() => ({ other: !!document.querySelector('.is-other-card'), exp: [...document.querySelectorAll('.pc-sv-exprow .pc-sv-drow-title')].map((x) => x.textContent), badge: document.querySelector('.pc-sv-expbadge')?.textContent || '' }));
+      eq(r.other, false, '다른 날짜 일정 카드가 남아 있음');
+      ok(r.exp.includes('집중감독') && r.exp.includes('현장점검') && !r.exp.includes('장기점검'), '만료 예정 목록 ' + r.exp); // 오늘 끝나는 일정도 포함, 40일 뒤 끝나는 장기 일정은 제외
+    });
     await test('감독일정 달력: 담당자 칩으로 필터된다', async () => {
       await page.click('.pc-sv-mgrchip:has-text("최영호")'); await page.waitForTimeout(200);
       const t = await page.evaluate(() => [...document.querySelectorAll('.pc-sv-bar .pc-sv-bar-title')].map((x) => x.textContent));
-      ok(t.length === 1 && t[0] === '집중감독', '필터 결과 ' + t);
+      ok(new Set(t).size === 1 && t[0] === '집중감독', '필터 결과 ' + t); // 주를 넘어가는 일정은 막대가 두 개로 나뉘므로 제목 종류로 비교한다.
     });
     eq(errors.length, 0, errors.join(' | '));
     await page.close();
