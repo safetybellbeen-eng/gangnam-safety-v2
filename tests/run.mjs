@@ -197,13 +197,17 @@ try {
         av: document.querySelectorAll('.pc-sv-bar .pc-sv-av, .pc-sv-longchip .pc-sv-av').length,
         panelNames: [...document.querySelectorAll('.pc-sv-drow .pc-sv-av')].map((x) => x.textContent),
         longChips: document.querySelectorAll('.pc-sv-longchip').length,
-        longInGrid: [...document.querySelectorAll('.pc-sv-bar .pc-sv-bar-title')].some((x) => x.textContent === '장기점검'),
+        longInGrid: [...document.querySelectorAll('.pc-sv-bar.is-slim .pc-sv-bar-title')].some((x) => x.textContent === '장기점검'),
+        slimLabel: document.querySelector('.pc-sv-bar.is-slim .pc-sv-bar-long')?.textContent || '',
+        slimNotSolid: [...document.querySelectorAll('.pc-sv-bar:not(.is-slim) .pc-sv-bar-title')].every((x) => x.textContent !== '장기점검'),
         stat: document.querySelector('.pc-sv-stat-total .pc-sv-stat-sub')?.textContent || '',
       }));
       eq(r.av, 0, '달력 막대/띠에 담당자 이름이 표시됨');
       ok(r.panelNames.includes('영호') && r.panelNames.includes('세진'), '선택 날짜 패널 담당자 이름 누락 ' + r.panelNames);
       eq(r.longChips, 1, '장기 일정 띠');
-      eq(r.longInGrid, false, '장기 일정이 달력 칸에도 그려짐');
+      eq(r.longInGrid, true, '장기 일정이 달력 칸에 연한 띠로 표시되어야 함');
+      ok(/장기/.test(r.slimLabel), '장기 띠 표시 글자 ' + r.slimLabel);
+      ok(r.slimNotSolid, '장기 일정이 진한 막대로 그려짐');
       ok(/감독 1 · 점검 2/.test(r.stat), '건수 표시 ' + r.stat);
     });
     await test('감독일정 달력: 막대에 마우스를 올리면 미리보기가 뜨고 벗어나면 사라진다', async () => {
