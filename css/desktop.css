@@ -4817,3 +4817,20 @@
   #pc-signupdone-to-login:hover { background: #0a56d6; }
   #pc-signupdone-to-login:focus-visible { outline: 3px solid #9cc2ff; outline-offset: 2px; }
 }
+
+@media (min-width:769px){
+  /* A안: 월 달력에 장기 일정을 연한 슬림 띠로 표시 */
+  .pc-sv-bar.is-slim{height:20px;gap:5px;padding:0 8px;font-size:12px;font-weight:700;border:1px solid;border-left-width:3px;border-radius:4px}
+  .pc-sv-bar.is-slim.is-kind-sup{background:#fde8f0;border-color:#e8a3bf;border-left-color:#c2255c;color:#8f1a42}
+  .pc-sv-bar.is-slim.is-kind-ins{background:#e6f0ff;border-color:#a9c7f5;border-left-color:#1f6fdc;color:#154a99}
+  .pc-sv-bar.is-slim.cont-left{border-left-width:1px;margin-left:0}
+  .pc-sv-bar-long{flex:0 0 auto;font-weight:600;opacity:.75;font-size:11.5px}
+  .pc-sv-swatch.is-long{background:#e6f0ff;border:1px solid #a9c7f5;border-left:3px solid #1f6fdc;box-sizing:border-box}
+  /* 장기 띠가 늘어 달력이 화면보다 커지면 달력 안에서 스크롤 */
+  .pc-sv-body .pc-sv-main.is-month{overflow-y:auto;overflow-x:hidden}
+  .pc-sv-main.is-month .pc-sv-grid{flex:1 0 auto}
+  .pc-sv-main.is-month .pc-sv-weekdays{position:sticky;top:0;z-index:6}
+}
+@media (min-width:769px){
+  .pc-sv-bar.is-slim.is-active{box-shadow:none}
+}
