@@ -146,7 +146,8 @@ export async function signIn(id, password) {
     if (lockInfo) error.lockInfo = lockInfo;
     throw error;
   }
-  try { await recordLoginResult(id, true); } catch (e) { /* 무시 — 다음 로그인 때 다시 리셋 시도 */ }
+  // 속도: 실패 횟수 초기화는 로그인 진행을 기다리게 하지 않고 백그라운드로 처리한다.
+  Promise.resolve().then(() => recordLoginResult(id, true)).catch(() => { /* 무시 — 다음 로그인 때 다시 리셋 시도 */ });
   await loadCurrentProfile();
   return data;
 }
@@ -190,14 +191,24 @@ export async function hasActiveSession() {
 // pending/rejected/disabled 사용자는 로그인 자체(auth)는 성공하지만
 // 앱 데이터 접근은 RLS(is_gnmap_v2_approved())가 차단하므로,
 // 프론트는 이 상태를 보고 "승인 대기 화면"으로 안내만 한다 (보안 처리를 프론트가 대신하지 않음).
+// 속도: 사용자 확인이 끝나는 즉시(프로필 조회 전) 호출되는 훅. app.js가 사업장/즐겨찾기/메모 조회를
+// 프로필 조회와 동시에 시작하는 데 쓴다(서버 왕복을 겹쳐서 로그인 후 목록이 뜨는 시간을 줄인다).
+let userReadyHook = null;
+export function setUserReadyHook(fn) { userReadyHook = typeof fn === 'function' ? fn : null; }
+
 export async function loadCurrentProfile() {
-  const { data: { user } } = await sb.auth.getUser();
+  // 속도: auth.getUser()는 매번 서버에 한 번 더 물어보므로(왕복 1회), 기기에 저장된 세션의 사용자 정보를 쓴다.
+  // 세션이 만료되었거나 폐기된 경우에는 아래 프로필 조회가 RLS로 막혀 profile이 null이 되어 로그인 화면으로 돌아간다
+  // (실제 접근 권한은 항상 서버가 JWT로 다시 검사한다).
+  const { data: { session } } = await sb.auth.getSession();
+  const user = session && session.user;
   if (!user) {
     state.user = null;
     state.profile = null;
     return null;
   }
   state.user = user;
+  if (userReadyHook) { try { userReadyHook(); } catch (e) { /* 미리 받기 실패는 무시 */ } }
 
   const { data: profile, error } = await sb
     .from('gnmap_v2_profiles')

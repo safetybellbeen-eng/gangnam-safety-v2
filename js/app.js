@@ -7,7 +7,7 @@ import { maybeStartMobileTutorial, startMobileTutorial } from './mobile_tutorial
 import { bindPcAddressSearch } from './pc_address_search.js';
 import { state } from './state.js';
 import { sb } from './api.js';
-import { signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, signOutAllDevices, touchLastLogin, verifySignupCode, checkIdExists, checkLoginLock, translateAuthError } from './auth.js';
+import { setUserReadyHook, signUp, signIn, signOut, loadCurrentProfile, isApproved, isAdmin, hasActiveSession, signOutAllDevices, touchLastLogin, verifySignupCode, checkIdExists, checkLoginLock, translateAuthError } from './auth.js';
 import { preloadKakaoSdk, initMap, clearMarkers, renderGangnamBoundaries, assignDongToSites, renderHqMarker, clearRouteSelectionOnMainMap, repaintMainMap, focusSiteOnMap, setForcePinsVisible, fitMapToSites } from './map.js';
 import { loadActiveSites } from './sites.js';
 import { loadFavorites } from './favorites.js';
@@ -15,6 +15,21 @@ import { loadNotes } from './notes.js';
 import { renderSiteList, renderPcSiteTable, selectSite, closeDetail, bindSearchAndSort, renderDongOptions, renderAdminPanel, handleExcelFileSelect, renderUploadHistoryPanel, renderUploadMobileHost, renderSupervisionPanel, renderSupervisionMobileHost, renderMobileRouteView, redrawRouteSelectionOnMainMap, renderAccountInfoPanel, renderPasswordChangePanel, renderNotificationSettingsPanel, renderMobileMoreMenu, getAppSettings, restoreRoutePlanFromStorage, setFavoriteTabView, renderHeaderUploadDate, setSiteSearchMode, renderSiteNotesPanel, renderAppSettingsPanel, restorePcSiteFiltersToRow, updateDongFilterLabel, updateEtcFilterLabel } from './ui.js';
 import { requestCurrentLocation, clearCurrentLocationMarker } from './location.js';
 import { startIdleGuard, stopIdleGuard, markAutoLoginNow, clearAutoLoginMark, isAutoLoginExpired, AUTO_LOGIN_MAX_DAYS } from './session_guard.js';
+
+// 속도: 사용자 확인 직후(프로필 조회와 동시에) 사업장/즐겨찾기/메모 조회를 미리 시작해 둔다.
+// 승인된 사용자의 지도 초기화가 이 결과를 이어받는다(60초 안에 한 번만). 이어받지 못하면 기존처럼 새로 조회한다.
+let prefetchedData = null;
+function startDataPrefetch() {
+  const p = Promise.all([loadActiveSites(), loadFavorites(), loadNotes()]);
+  p.catch(() => {});
+  prefetchedData = { t: Date.now(), p };
+}
+function takePrefetchedData() {
+  const x = prefetchedData;
+  prefetchedData = null;
+  return x && Date.now() - x.t < 60000 ? x.p : null;
+}
+setUserReadyHook(startDataPrefetch);
 
 const VIEWS = [
   'view-login', 'view-signup', 'view-signup-done',
@@ -303,7 +318,7 @@ function routeByProfile() {
       // 성능: 사업장/즐겨찾기/메모 조회는 지도 SDK 로드·지도 생성과 서로 의존하지 않으므로 지금 바로
       // 병렬로 시작한다(예전에는 지도가 다 만들어진 뒤에야 조회를 시작해 그만큼 첫 화면이 늦었다).
       preloadKakaoSdk();
-      const earlyDataPromise = Promise.all([loadActiveSites(), loadFavorites(), loadNotes()]);
+      const earlyDataPromise = takePrefetchedData() || Promise.all([loadActiveSites(), loadFavorites(), loadNotes()]);
       earlyDataPromise.then(() => perfMark('사업장·즐겨찾기·메모 받기 끝'), () => {});
       earlyDataPromise.catch(() => {}); // 실패 처리는 아래 체인에서 한다(미처리 거부 경고만 막음).
       resolvePreferredMapStartCenter()
@@ -1402,10 +1417,13 @@ function bindEvents() {
 // 브라우저, 권한 문제 등) catch로 흡수해 console.warn만 남긴다 — 로그인/지도 등 앱의 핵심
 // 기능은 Service Worker 등록 성공 여부와 무관하게 항상 정상 동작해야 한다.
 if ('serviceWorker' in navigator) {
+  // 속도: SW 설치 때 새 버전 파일 50여 개를 한꺼번에 받으므로, 첫 화면 로딩과 겹치지 않게 load 후 3초 뒤에 등록한다.
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch((err) => {
-      console.warn('Service Worker 등록 실패(앱 기능에는 영향 없음):', err);
-    });
+    setTimeout(() => {
+      navigator.serviceWorker.register('./sw.js').catch((err) => {
+        console.warn('Service Worker 등록 실패(앱 기능에는 영향 없음):', err);
+      });
+    }, 3000);
   });
 }
 
