@@ -65,8 +65,9 @@ export async function installMocks(page, role = 'admin') {
     if (path === '/auth/v1/token') return route.fulfill(json(FAKE_SESSION));
     if (path === '/auth/v1/user') return route.fulfill(json(FAKE_USER));
     if (path.startsWith('/rest/v1/gnmap_v2_profiles')) return route.fulfill(json({ id: FAKE_USER_ID, name: 'x', email: 'tester@example.com', role, status: 'approved' }));
-    if (path.startsWith('/rest/v1/gnmap_v2_site_notes')) return route.fulfill(json([]));
-    if (path.startsWith('/rest/v1/gnmap_v2_favorites')) return route.fulfill(json([]));
+    if (path.startsWith('/rest/v1/gnmap_v2_shared_notes')) { if (req.method() === 'GET') return route.fulfill(json([{ id: 's1', site_id: '3', author_id: 'other-user', author_name: '강남지청 유호정', content: '공유 테스트', created_at: '2026-10-12T01:00:00Z', updated_at: '2026-10-12T01:00:00Z' }])); return route.fulfill(json({ id: 's9', site_id: '3', author_id: FAKE_USER_ID, author_name: 'x', content: '새 공유', created_at: '2026-10-12T02:00:00Z', updated_at: '2026-10-12T02:00:00Z' })); }
+    if (path.startsWith('/rest/v1/gnmap_v2_site_notes')) return route.fulfill(json([{ id: 'n3', site_id: '3', content: 'a' }, { id: 'n4', site_id: '4', content: 'b' }])); // 메모: 사업장 3, 4
+    if (path.startsWith('/rest/v1/gnmap_v2_favorites')) return route.fulfill(json([{ id: 'f1', site_id: '1' }, { id: 'f2', site_id: '2' }, { id: 'f3', site_id: '3' }])); // 즐겨찾기: 사업장 1, 2, 3 (서버 응답으로 제공해 타이밍 문제를 없앤다)
     if (path.startsWith('/rest/v1/gnmap_v2_sites')) { const range = req.headers()['range']; if (range && !range.startsWith('0-')) return route.fulfill(json([])); return route.fulfill(json(SAMPLE_SITES)); }
     if (path.startsWith('/rest/v1/rpc/')) return route.fulfill(json(null));
     if (path.startsWith('/functions/v1/')) {

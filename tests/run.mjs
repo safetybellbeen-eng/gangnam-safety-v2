@@ -245,6 +245,36 @@ try {
       await page.click('.pc-sv-mav[title="강남지청 최영호"]'); await page.waitForTimeout(200);
       eq(await page.locator('.pc-sv-bar.is-dim').count(), 0, '다시 누르면 전체로 돌아와야 함');
     });
+    await test('공유 메모(PC): 현장 표에 👥 배지, 배지를 누르면 상세에 공유 메모 탭이 열리고 등록·건수 갱신', async () => {
+      await page.click('.pc-nav-btn[data-pc-tab="site"]'); await page.waitForTimeout(600);
+      await page.click('#site-dong-filter-label'); await page.click('#site-dong-filter-clear'); await page.waitForTimeout(600);
+      eq(await page.locator('.pc-table-shared:not([hidden])').count(), 1, '배지 수(사업장 3만)');
+      await page.click('.pc-table-shared:not([hidden])'); await page.waitForTimeout(500);
+      const t = await page.evaluate(() => ({
+        active: document.querySelector('#site-detail-panel .sn-tab.is-active')?.dataset.tab,
+        warn: !!document.querySelector('#site-detail-panel .sn-warning'),
+        text: document.querySelector('#site-detail-panel .sn-content')?.textContent,
+        pill: document.querySelector('#site-detail-panel .sn-pill')?.textContent,
+        delBtns: document.querySelectorAll('#site-detail-panel .sn-item .sn-link').length,
+      }));
+      eq(t.active, 'shared'); ok(t.warn, '경고 문구 없음'); eq(t.text, '공유 테스트'); eq(t.pill, '유호정');
+      eq(t.delBtns, 1, '관리자는 남의 메모를 삭제만 할 수 있다(수정 불가)');
+      await page.fill('#site-detail-panel .sn-textarea', '새 공유'); await page.click('#site-detail-panel .sn-btn-primary'); await page.waitForTimeout(500);
+      eq(await page.locator('#site-detail-panel .sn-item').count(), 2, '등록 후 2건');
+      eq(await page.locator('#site-detail-panel .sn-item.is-mine .sn-link').count(), 2, '내 메모는 수정/삭제');
+      eq((await page.textContent('#site-detail-panel .sn-tab[data-tab="shared"] .sn-tab-count')).trim(), '2');
+      await page.click('#site-detail-panel .sn-tab[data-tab="personal"]');
+      ok(await page.isVisible('#site-note-textarea'), '개인 메모 탭 복귀');
+    });
+    await test('공유 메모(PC): 현장 메모 탭에 개인/공유 탭과 내 메모|공유 메모 목록 전환이 있다', async () => {
+      await page.click('.pc-nav-btn[data-pc-tab="notes"]'); await page.waitForTimeout(500);
+      eq(await page.locator('#pc-notes-page .sn-tab').count(), 2, '탭 2개');
+      await page.click('#pc-notes-page .sn-scope-btn:has-text("공유 메모")'); await page.waitForTimeout(200);
+      ok((await page.locator('#pc-notes-page .pc-np-saved-item').count()) >= 1, '공유 목록 항목');
+      await page.click('#pc-notes-page .pc-np-saved-item'); await page.waitForTimeout(500);
+      eq(await page.evaluate(() => document.querySelector('#pc-notes-page .sn-tab.is-active')?.dataset.tab), 'shared');
+      ok((await page.locator('#pc-notes-page .sn-item').count()) >= 1, '선택 현장 공유 메모 표시');
+    });
     eq(errors.length, 0, errors.join(' | '));
     await page.close();
   }
