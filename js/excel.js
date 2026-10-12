@@ -1,9 +1,11 @@
 // excel.js — STEP 10. 엑셀 파싱 → 공식 식별번호 추출 → validation.
 // CLAUDE.md 흐름: parsing → 식별번호 추출 → validation → geocoding(STEP 11) → RPC(STEP 12, 단일 트랜잭션).
 // 이 파일은 파싱/검증까지만 담당한다. DB 반영(geocoding/RPC 호출)은 이번 STEP 범위가 아니다.
-// SheetJS(xlsx)는 index.html에서 로드된 전역 XLSX를 사용한다.
+// SheetJS(xlsx)는 필요할 때 js/xlsx_loader.js의 ensureXlsx()가 불러오는 전역 XLSX를 사용한다.
 
 // 두 양식을 자동 판별하기 위한 필수 컬럼 목록 (헤더에 전부 존재해야 해당 양식으로 판정).
+import { ensureXlsx } from './xlsx_loader.js';
+
 const FORM1_REQUIRED = ['본사명', '사업장명', '산재관리번호', '사업개시번호', '공사금액', '공사기간'];
 const FORM2_REQUIRED = ['사업장명', '사업현장명', '산재관리번호', '사업개시번호', '공사금액', '공사시작일', '공사종료일'];
 
@@ -202,6 +204,7 @@ function validateRow(row, rowIndex) {
 // File 객체를 읽어 파싱 → 매핑 → validation까지 수행하고 state에 결과를 채운다.
 // DB 조회/반영은 하지 않는다 (RLS/네트워크 요청 없음, 순수 클라이언트 파싱).
 export async function parseExcelFile(file, state) {
+  const XLSX = await ensureXlsx();
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: 'array', cellDates: true });
   const sheet = wb.Sheets[wb.SheetNames[0]];

@@ -1,6 +1,7 @@
 // ui.js — STEP 6A. 사업장 목록/상세/검색/정렬 렌더링 및 선택 상태 연동.
 // XSS 방지: DB 값(site_name/company_name/address 등)은 innerHTML 문자열 조립에 쓰지 않고
 // 전부 textContent 또는 createElement 기반 DOM 생성으로만 넣는다.
+import { ensureXlsx } from './xlsx_loader.js';
 import { state } from './state.js';
 import { panToSite, renderMarkers, clearMarkers, fitMapToSites, setForcePinsVisible, centerSiteInVisibleArea, highlightSelectedMarker, clearMarkerHighlight, refreshFavoriteMarker, initRouteMap, relayoutRouteMap, renderRouteMarkers, panToRouteSite, searchPlacesKeyword, showAddressSearchPin, clearAddressSearchPin, assignDongToSites, renderHqMarkerOnRouteMap, renderRouteSelectionOnMainMap, clearRouteSelectionOnMainMap, destroyRouteMap, centerRouteMapOnLocation, refreshRouteMap, resetRouteMapView } from './map.js';
 import { getFilteredSortedSites, getDongOptions, loadActiveSites } from './sites.js';
@@ -1304,13 +1305,15 @@ async function bulkAddFavorites(ids) {
 // 일반 사용자의 1회 내보내기 상한(건). 관리자는 제한이 없지만 모든 내보내기는 작업 이력에 기록된다.
 const EXPORT_MAX_ROWS_USER = 100;
 
-function exportSelectedSitesToExcel(sites) {
+async function exportSelectedSitesToExcel(sites) {
   if (!sites.length) return;
   if (!isAdmin() && sites.length > EXPORT_MAX_ROWS_USER) {
     alert(`한 번에 최대 ${EXPORT_MAX_ROWS_USER}건까지 내보낼 수 있습니다. (선택 ${sites.length}건) 선택을 줄여 다시 시도해 주세요.`);
     return;
   }
-  if (typeof window.XLSX === 'undefined' || !window.XLSX.utils) {
+  try {
+    await ensureXlsx(); // 엑셀 라이브러리는 이때 처음 불러온다.
+  } catch (e) {
     alert('엑셀 내보내기 기능을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
     return;
   }
