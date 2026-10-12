@@ -80,7 +80,7 @@
     position: fixed;
     inset: 0;
     z-index: -2;
-    background-image: url('../assets/images/desktop-auth-bg.jpg');
+    background-image: url('../assets/images/desktop-auth-bg.webp');
     background-repeat: no-repeat;
     background-size: cover;
     background-position: center center;
@@ -931,7 +931,7 @@
     position: absolute;
     inset: 0;
     z-index: 0;
-    background: url('../assets/images/desktop-auth-bg.jpg') center center / cover no-repeat;
+    background: url('../assets/images/desktop-auth-bg.webp') center center / cover no-repeat;
   }
 
   #mobile-splash.mobile-splash-hide {
@@ -4795,7 +4795,7 @@
     font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Pretendard, "Noto Sans KR", "Segoe UI", sans-serif;
   }
   #view-signup-done > h1, #view-signup-done > p, #mobile-signupdone-body, #mobile-signupdone-header { display: none !important; }
-  #view-signup-done .pc-auth-bg { display: block; position: fixed; inset: 0; z-index: -2; background: url('../assets/images/desktop-auth-bg.jpg') center center / cover no-repeat; }
+  #view-signup-done .pc-auth-bg { display: block; position: fixed; inset: 0; z-index: -2; background: url('../assets/images/desktop-auth-bg.webp') center center / cover no-repeat; }
   #view-signup-done .pc-auth-topbar { display: flex; }
   #app #pc-signupdone-card {
     display: block; position: relative; z-index: 2; box-sizing: border-box; width: 520px; max-width: calc(100vw - 48px);
