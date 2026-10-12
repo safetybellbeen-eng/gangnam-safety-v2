@@ -400,6 +400,10 @@ function buildLegend() {
     legend.appendChild(item);
   });
   legend.appendChild(el('span', 'pc-sv-legend-sep'));
+  const lg = el('span', 'pc-sv-legend-item');
+  lg.appendChild(el('i', 'pc-sv-swatch is-long'));
+  lg.appendChild(document.createTextNode('연한 띠 = 장기(30일 이상)'));
+  legend.appendChild(lg);
   const done = el('span', 'pc-sv-legend-item');
   done.appendChild(el('i', 'pc-sv-swatch is-kind-sup is-faded'));
   done.appendChild(document.createTextNode('흐림 = 완료'));
@@ -487,11 +491,12 @@ function buildMonthView(host) {
   host.appendChild(grid);
 }
 
-function layoutWeek(days, skipLong) {
+// only: 'short'(30일 미만만) / 'long'(장기만) / 생략(전부)
+function layoutWeek(days, only) {
   const ws = days[0];
   const we = days[6];
   const segs = svRows()
-    .filter(sv => svOverlapsRange(sv, ws, we) && !(skipLong && svIsLong(sv)))
+    .filter(sv => svOverlapsRange(sv, ws, we) && (only === 'short' ? !svIsLong(sv) : only === 'long' ? svIsLong(sv) : true))
     .map(sv => {
       const s = sv.start_date < ws ? ws : sv.start_date;
       const t = sv.end_date > we ? we : sv.end_date;
@@ -529,12 +534,28 @@ function buildWeekRow(days, anchorMonth, today) {
     row.appendChild(cell);
   });
 
-  const segs = layoutWeek(days, true);
+  // 단기 일정은 진한 막대(최대 MAX_BAR_LANES줄), 장기(30일 이상) 일정은 그 아래에 연한 슬림 띠로 모두 표시한다.
+  const segs = layoutWeek(days, 'short');
+  const longSegs = layoutWeek(days, 'long');
   const layer = el('div', 'pc-sv-week-events');
   segs.forEach(sg => {
     if (sg.lane >= MAX_BAR_LANES) return;
     layer.appendChild(buildBar(sg, days));
   });
+  const maxShortLane = segs.reduce((m, sg) => Math.max(m, sg.lane), -1);
+  const shortRows = maxShortLane < 0 ? 0 : (maxShortLane >= MAX_BAR_LANES ? MAX_BAR_LANES + 1 : maxShortLane + 1);
+  const longRows = longSegs.reduce((m, sg) => Math.max(m, sg.lane + 1), 0);
+  longSegs.forEach(sg => {
+    const bar = buildBar(sg, days, true);
+    bar.style.gridRow = String(shortRows + sg.lane + 1);
+    layer.appendChild(bar);
+  });
+  if (longRows > 0) {
+    layer.style.gridTemplateRows = `${shortRows ? `repeat(${shortRows}, 27px) ` : ''}repeat(${longRows}, 20px)`;
+    layer.style.rowGap = '3px';
+    const need = 38 + shortRows * 30 + longRows * 23 + 10;
+    row.style.minHeight = `${Math.max(124, need)}px`;
+  }
   // 칸이 모자라 가려진 일정은 날짜별로 "감독 N / 점검 N" 으로 알려준다.
   for (let col = 0; col < 7; col++) {
     const hiddenSegs = segs.filter(sg => sg.lane >= MAX_BAR_LANES && sg.c0 <= col && sg.c1 >= col);
@@ -639,17 +660,29 @@ function attachSvTip(node, sv) {
   node.addEventListener('click', closeSvTip);
 }
 
-function buildBar(sg, days) {
+function buildBar(sg, days, slim) {
   const { sv } = sg;
   const kind = svKind(sv);
   const status = computeSupervisionStatus(sv.start_date, sv.end_date);
-  const bar = el('button', `pc-sv-bar is-kind-${kind}` + (status === 'done' ? ' is-done' : '')
+  const bar = el('button', `pc-sv-bar is-kind-${kind}` + (slim ? ' is-slim' : '') + (status === 'done' ? ' is-done' : '')
     + (sg.contL ? ' cont-left' : '') + (sg.contR ? ' cont-right' : '')
     + (SV.selected && svOverlapsDate(sv, SV.selected) ? ' is-active' : ''));
   bar.type = 'button';
   bar.style.gridColumn = `${sg.c0 + 1} / ${sg.c1 + 2}`;
   bar.style.gridRow = String(sg.lane + 1);
   bar.setAttribute('aria-label', `${SV_KIND_LABEL[kind]} ${sv.title} (${fmtMD(sv.start_date)} ~ ${fmtMD(sv.end_date)}) ${STATUS_LABEL[status]}${sv.manager_name ? ' 담당 ' + sv.manager_name : ''}`);
+  if (slim) {
+    // 장기 일정: 종류 글자표 대신 왼쪽 색 띠 + "· 장기" 로 구분한다(공간 절약).
+    bar.appendChild(el('span', 'pc-sv-bar-title', sv.title));
+    bar.appendChild(el('span', 'pc-sv-bar-long', '· 장기'));
+    attachSvTip(bar, sv);
+    bar.addEventListener('click', (e) => {
+      e.stopPropagation();
+      SV.selected = sv.start_date < days[0] ? days[0] : sv.start_date;
+      rerenderSv();
+    });
+    return bar;
+  }
   bar.appendChild(el('span', 'pc-sv-bar-tag', SV_KIND_LABEL[kind]));
   const multi = sv.start_date !== sv.end_date;
   bar.appendChild(el('span', 'pc-sv-bar-title', sv.title));
