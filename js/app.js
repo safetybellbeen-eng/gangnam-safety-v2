@@ -1,6 +1,7 @@
 // app.js — STEP 3B. 인증 흐름 최소 테스트 UI 연결.
 // 지도/사업장 등 실제 기능은 이후 STEP에서 추가한다 (CLAUDE.md 12절: 대규모 UI 금지).
 import { CONFIG } from './config.js';
+import { perfMark, perfNextFrame } from './perf.js';
 import { maybeStartTutorial, startTutorial } from './pc_tutorial.js';
 import { maybeStartMobileTutorial, startMobileTutorial } from './mobile_tutorial.js';
 import { bindPcAddressSearch } from './pc_address_search.js';
@@ -61,6 +62,7 @@ function startLockCountdown(el, lockedUntilIso, prefix, onExpire) {
 // STEP15-B. 모바일 하단 탭 전환. 기존 DOM/데이터 조회는 재사용하고 표시 여부(CSS)만 바꾼다.
 // 지도 인스턴스/marker/cluster는 여기서 절대 재생성하지 않는다.
 function activateMobileTab(tab) {
+  perfNextFrame('모바일 탭: ' + tab);
   const previousTab = state.mobileActiveTab;
   state.mobileActiveTab = tab;
 
@@ -302,9 +304,11 @@ function routeByProfile() {
       // 병렬로 시작한다(예전에는 지도가 다 만들어진 뒤에야 조회를 시작해 그만큼 첫 화면이 늦었다).
       preloadKakaoSdk();
       const earlyDataPromise = Promise.all([loadActiveSites(), loadFavorites(), loadNotes()]);
+      earlyDataPromise.then(() => perfMark('사업장·즐겨찾기·메모 받기 끝'), () => {});
       earlyDataPromise.catch(() => {}); // 실패 처리는 아래 체인에서 한다(미처리 거부 경고만 막음).
       resolvePreferredMapStartCenter()
         .then((startCenter) => initMap('map-container', startCenter))
+        .then((map) => { perfMark('지도 생성 끝(카카오 SDK 포함)'); return map; })
         // STEP16.28: 지도 초기화 직후 "커맨드센터"(강남지청) 고정 마커를 1회 요청한다. 내부에서
         // 주소를 지오코딩해 좌표를 얻는 비동기 작업이라 여기서 await하지 않고(체인을 지연시키지
         // 않음) 결과가 오면 지도 위에 직접 표시된다.
@@ -314,6 +318,7 @@ function routeByProfile() {
         // 이미 로드된 경계 데이터를 재사용(캐시된 Promise)해 즉시 판정할 수 있게 하기 위함이다.
         .then(() => Promise.all([earlyDataPromise, renderGangnamBoundaries()]))
         .then(async ([[sites]]) => {
+          perfMark('지도·경계선·데이터 모두 준비');
           state.sites = sites;
           // STEP16.20: gnmap_v2_sites.dong이 전부 NULL이라(§map.js 상단 설명), 좌표 기준으로
           // 강남구 14개 법정동에 배정한다. 이 값으로 기존 "관할" 체크박스 필터(renderDongOptions/
@@ -328,6 +333,7 @@ function routeByProfile() {
           renderDongOptions(); // state.sites 기준으로 동 select 옵션을 채운 뒤 이벤트 바인딩
           bindSearchAndSort('site-list');
           renderSiteList('site-list'); // 내부에서 marker도 함께 렌더한다 (getFilteredSortedSites 기준, 즐겨찾기 별표 포함)
+          perfMark('목록·마커 그리기 끝');
           activateMobileTab(state.mobileActiveTab || 'map'); // STEP15-B. 모바일 하단 탭 초기 표시 상태 적용(PC에서는 CSS로 무효화됨)
           // STEP16.6(모바일 앱 설정 "현재 위치 자동 표시"): 켜져 있으면 기존 수동 버튼과 동일한
           // requestCurrentLocation()을 지도 준비 직후 1회 자동 호출한다(새 위치 로직 없음).
@@ -609,6 +615,7 @@ function enterPcFavMapView() {
 }
 
 function activatePcTab(tab, opts = {}) {
+  perfNextFrame('PC 탭: ' + tab);
   if (window.matchMedia('(max-width: 768px)').matches) return;
   if (pcFavMapView && !(tab === 'map' && opts.keepFavMap)) exitPcFavMapView();
   const appEl = document.getElementById('app');
@@ -1412,12 +1419,14 @@ let splashHidden = false;
 function hideSplash() {
   if (splashHidden) return;
   splashHidden = true;
+  perfMark('시작 화면(스플래시) 닫힘');
   const splash = document.getElementById('mobile-splash');
   if (splash) splash.classList.add('mobile-splash-hide');
 }
 
 async function bootstrap() {
   const splashStartedAt = Date.now();
+  perfMark('앱 시작(bootstrap)');
   preloadKakaoSdk(); // 인증/프로필 확인과 병렬로 지도 SDK를 미리 받는다.
   setTimeout(hideSplash, SPLASH_MAX_MS);
   try {
@@ -1434,7 +1443,9 @@ async function bootstrap() {
       clearAutoLoginMark();
       loginNotice = `자동 로그인 기간(${AUTO_LOGIN_MAX_DAYS}일)이 지나 다시 로그인이 필요합니다.`;
     }
+    perfMark('세션 확인 끝');
     await loadCurrentProfile();
+    perfMark('프로필 확인 끝');
     routeByProfile();
     if (loginNotice) showLoginNotice(loginNotice);
   } finally {
