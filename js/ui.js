@@ -7,6 +7,7 @@ import { panToSite, renderMarkers, clearMarkers, fitMapToSites, setForcePinsVisi
 import { getFilteredSortedSites, getDongOptions, loadActiveSites } from './sites.js';
 import { isFavorite, toggleFavorite, loadFavorites, addFavorite } from './favorites.js';
 import { getNote, saveNote, deleteNote, loadNotes } from './notes.js';
+import { getSharedNotes, sharedCount, buildSharedNotesBox, buildMemoTabs, buildAuthorPill } from './shared_notes.js';
 import { loadUsers, setUserStatus, setUserRole, resetUserPassword, deleteRejectedProfile, logSitesExport } from './admin.js';
 import { parseExcelFile } from './excel.js';
 import { runGeocodingForParsedRows, runKeywordCandidateSearch, runKakaoLotRecovery, buildLotQueries, runJusoNormalize, buildJusoQuery, runKakaoJusoRecovery, runRoadApproximateRecovery, extractApproximateStructure, reverseGeocode, geocodeKeyword } from './geocoding.js';
@@ -243,7 +244,11 @@ async function handleFavoriteToggle(siteId, triggerBtn) {
 // STEP16.5-C: id/이벤트/저장·삭제 로직(saveNote/deleteNote)은 그대로 두고, 시각적 구획을 위한
 // 클래스만 추가한다(css/mobile.css @media(max-width:768px) 안에서만 스타일링 — PC는 layout.css의
 // 기존 #site-note-textarea 규칙만 그대로 적용되어 화면이 바뀌지 않는다).
-function renderNoteSection(panel, siteId) {
+function renderNoteSection(outerPanel, siteId) {
+  // STEP19: 개인 메모 | 공유 메모 탭. 기존 개인 메모 UI는 personalPane 안에 그대로 그린다.
+  const personalPane = document.createElement('div');
+  personalPane.className = 'sn-pane sn-pane-personal';
+  const panel = personalPane;
   const title = document.createElement('h3');
   title.className = 'site-detail-section-title';
   title.textContent = '개인 메모';
@@ -337,6 +342,26 @@ function renderNoteSection(panel, siteId) {
   noteActions.appendChild(saveBtn);
   noteActions.appendChild(deleteBtn);
   panel.appendChild(noteActions);
+
+  const sharedPane = document.createElement('div');
+  sharedPane.className = 'sn-pane sn-pane-shared';
+  let tabs = null;
+  sharedPane.appendChild(buildSharedNotesBox(siteId, (sid) => { if (tabs) tabs.setCount('shared', sharedCount(sid)); refreshSharedBadge(sid); }));
+  tabs = buildMemoTabs([
+    { key: 'personal', label: '개인 메모', el: personalPane },
+    { key: 'shared', label: '공유 메모', count: sharedCount(siteId), el: sharedPane },
+  ]);
+  tabs.classList.add('sn-detail-tabs');
+  outerPanel.appendChild(tabs);
+}
+
+// 현장 표의 "👥N" 배지를 현재 공유 메모 건수로 맞춘다.
+function refreshSharedBadge(siteId) {
+  document.querySelectorAll(`.pc-table-shared[data-site-id="${CSS.escape(String(siteId))}"]`).forEach(b => {
+    const n = sharedCount(siteId);
+    b.textContent = `👥${n}`;
+    b.hidden = n === 0;
+  });
 }
 
 // 사용자 요청: 지도/현장/경로 탭의 현장상세정보에서 "메모" 버튼을 누르면, 더 이상 이 팝업
@@ -344,7 +369,7 @@ function renderNoteSection(panel, siteId) {
 // X로 닫으며, 작은 "메모 작성/수정" 버튼을 누르면 더보기 > 현장 메모 관리(전체화면, 해당
 // 현장 자동 선택+잠금)로 넘어가 실제 작성/수정/삭제를 하도록 한다(openSiteNotesWritePanel
 // 재사용 — 새 작성/수정 로직 없음). 데이터 조회는 기존 getNote()만 그대로 쓴다.
-function openNoteModal(siteId) {
+function openNoteModal(siteId, startTab) {
   closeNoteModal(); // 혹시 이미 열려있던 모달이 있으면 먼저 정리(중복 방지)
 
   const overlay = document.createElement('div');
@@ -369,10 +394,12 @@ function openNoteModal(siteId) {
   header.appendChild(closeBtn);
   content.appendChild(header);
 
+  const personalPane = document.createElement('div');
+  personalPane.className = 'sn-pane';
   const title = document.createElement('h3');
   title.className = 'site-detail-section-title site-note-modal-title';
   title.textContent = '개인 메모';
-  content.appendChild(title);
+  personalPane.appendChild(title);
 
   const existing = getNote(siteId);
   const body = document.createElement('div');
@@ -383,7 +410,7 @@ function openNoteModal(siteId) {
     body.classList.add('is-empty');
     body.textContent = '작성된 메모가 없습니다.';
   }
-  content.appendChild(body);
+  personalPane.appendChild(body);
 
   const writeBtn = document.createElement('button');
   writeBtn.type = 'button';
@@ -397,7 +424,18 @@ function openNoteModal(siteId) {
     if (moreTabBtn) moreTabBtn.click();
     openSiteNotesWritePanel(siteId, { locked: true });
   });
-  content.appendChild(writeBtn);
+  personalPane.appendChild(writeBtn);
+
+  const sharedPane = document.createElement('div');
+  sharedPane.className = 'sn-pane';
+  let modalTabs = null;
+  sharedPane.appendChild(buildSharedNotesBox(siteId, (sid) => { if (modalTabs) modalTabs.setCount('shared', sharedCount(sid)); }));
+  modalTabs = buildMemoTabs([
+    { key: 'personal', label: '개인 메모', el: personalPane },
+    { key: 'shared', label: '공유 메모', count: sharedCount(siteId), el: sharedPane },
+  ]);
+  if (startTab) modalTabs.select(startTab);
+  content.appendChild(modalTabs);
 
   overlay.appendChild(content);
   document.body.appendChild(overlay);
@@ -435,6 +473,17 @@ function closeNoteModal() {
 
 // state.siteNotes(Map) + state.sites를 조인해 표시용 배열로 만든다. 참조하는 site가
 // 목록에 없으면(이론상 FK RESTRICT라 발생하지 않지만) 조용히 제외한다.
+function getSharedNotesJoined() {
+  const rows = [];
+  state.sharedNotes.forEach((list, siteId) => {
+    const site = state.sites.find(s => s.id === siteId);
+    if (!site || !list.length) return;
+    const last = list[list.length - 1];
+    rows.push({ shared: true, count: list.length, content: last.content, author_name: last.author_name, created_at: last.created_at, updated_at: last.created_at, site });
+  });
+  return rows;
+}
+
 function getSiteNotesJoined() {
   const rows = [];
   state.siteNotes.forEach((note, siteId) => {
@@ -464,7 +513,8 @@ export function renderSiteNotesPanel(containerId) {
     const panel = document.getElementById(containerId);
     if (panel) panel.style.display = 'none';
   });
-  const allNotes = getSiteNotesJoined();
+  const sharedScope = state.siteNotesScope === 'shared';
+  const allNotes = sharedScope ? getSharedNotesJoined() : getSiteNotesJoined();
   const titleCountEl = document.createElement('span');
   titleCountEl.className = 'sv-mobile-title-count';
   titleCountEl.textContent = `전체 ${allNotes.length}건`;
@@ -484,6 +534,19 @@ export function renderSiteNotesPanel(containerId) {
   subtitleEl.style.padding = '0 16px 12px';
   subtitleEl.textContent = '현장에서 작성한 메모를 한곳에서 관리합니다.';
   container.appendChild(subtitleEl);
+
+  // STEP19: 내 메모(개인) | 공유 메모 구분
+  const scopeRow = document.createElement('div');
+  scopeRow.className = 'sn-scope-row';
+  [['mine', '내 메모', state.siteNotes.size], ['shared', '공유 메모', state.sharedNotes.size]].forEach(([val, label, cnt]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sn-scope-btn' + (state.siteNotesScope === val ? ' is-active' : '');
+    b.textContent = `${label} ${cnt}`;
+    b.addEventListener('click', () => { state.siteNotesScope = val; renderSiteNotesPanel(containerId); });
+    scopeRow.appendChild(b);
+  });
+  container.appendChild(scopeRow);
 
   const searchWrap = document.createElement('div');
   searchWrap.className = 'site-notes-search-wrap';
@@ -538,6 +601,7 @@ export function renderSiteNotesPanel(containerId) {
     });
     filterRow.appendChild(chip);
   });
+  filterRow.style.display = sharedScope ? 'none' : '';
   container.appendChild(filterRow);
 
   const listWrap = document.createElement('div');
@@ -572,7 +636,14 @@ export function renderSiteNotesPanel(containerId) {
       emptyIcon.style.width = '32px';
       emptyIcon.style.height = '32px';
       empty.appendChild(emptyIcon);
-      if (allNotes.length === 0) {
+      if (allNotes.length === 0 && sharedScope) {
+        const line1 = document.createElement('p');
+        line1.textContent = '공유 메모가 없습니다.';
+        empty.appendChild(line1);
+        const line2 = document.createElement('p');
+        line2.textContent = '현장 상세의 메모 > 공유 메모 탭에서 남길 수 있습니다.';
+        empty.appendChild(line2);
+      } else if (allNotes.length === 0) {
         // 메모 자체가 하나도 없는 경우 — "검색 결과 없음"과 구분되는 안내 + 바로 작성 CTA.
         const line1 = document.createElement('p');
         line1.textContent = '작성된 현장 메모가 없습니다.';
@@ -631,7 +702,7 @@ function buildSiteNoteCard(n) {
   const card = document.createElement('button');
   card.type = 'button';
   card.className = 'sv-mobile-card site-notes-card';
-  card.addEventListener('click', () => openSiteNotesWritePanel(n.site.id, { locked: true }));
+  card.addEventListener('click', () => { if (n.shared) openNoteModal(n.site.id, 'shared'); else openSiteNotesWritePanel(n.site.id, { locked: true }); });
 
   const top = document.createElement('div');
   top.className = 'sv-mobile-card-top';
@@ -662,6 +733,12 @@ function buildSiteNoteCard(n) {
 
   const metaRow = document.createElement('div');
   metaRow.className = 'sv-mobile-card-meta-row';
+  if (n.shared) {
+    metaRow.appendChild(buildAuthorPill(n.author_name));
+    const cnt = document.createElement('span');
+    cnt.textContent = `👥${n.count}`;
+    metaRow.appendChild(cnt);
+  }
   const dateEl = document.createElement('span');
   dateEl.textContent = formatUploadDateTime(n.updated_at);
   metaRow.appendChild(dateEl);
@@ -1397,7 +1474,7 @@ export function renderPcSiteTable() {
     const amountTd=document.createElement('td'); amountTd.textContent=formatAmountKRW(site.amount); tr.appendChild(amountTd);
     const periodTd=document.createElement('td'); const periodText=formatPeriodKR(site.period_start, site.period_end); const periodParts=String(periodText).split(' ~ '); if(periodParts.length===2){ periodTd.appendChild(document.createTextNode(periodParts[0]+' ~')); periodTd.appendChild(document.createElement('br')); periodTd.appendChild(document.createTextNode(periodParts[1])); } else { periodTd.textContent=periodText; } periodTd.title=periodText; tr.appendChild(periodTd);
     const qualityTd=document.createElement('td'); const [ql, qc]=pcLocationQuality(site); const qspan=document.createElement('span'); qspan.className=`pc-table-quality ${qc}`; const dot=document.createElement('i'); qspan.appendChild(dot); qspan.append(document.createTextNode(ql)); qualityTd.appendChild(qspan); tr.appendChild(qualityTd);
-    const noteTd=document.createElement('td'); noteTd.style.textAlign='center'; const noteBtn=document.createElement('button'); noteBtn.type='button'; noteBtn.className='pc-table-note'; noteBtn.textContent=getNote(site.id)?'▣':'▤'; noteBtn.title=getNote(site.id)?'메모 있음':'메모 작성'; noteBtn.addEventListener('click', e=>{e.stopPropagation(); selectSite(site.id);}); noteTd.appendChild(noteBtn); tr.appendChild(noteTd);
+    const noteTd=document.createElement('td'); noteTd.style.textAlign='center'; const noteBtn=document.createElement('button'); noteBtn.type='button'; noteBtn.className='pc-table-note'; noteBtn.textContent=getNote(site.id)?'▣':'▤'; noteBtn.title=getNote(site.id)?'메모 있음':'메모 작성'; noteBtn.addEventListener('click', e=>{e.stopPropagation(); selectSite(site.id);}); noteTd.appendChild(noteBtn); const sharedBadge=document.createElement('button'); sharedBadge.type='button'; sharedBadge.className='pc-table-shared'; sharedBadge.dataset.siteId=String(site.id); sharedBadge.title='공유 메모 보기'; sharedBadge.textContent=`👥${sharedCount(site.id)}`; sharedBadge.hidden=sharedCount(site.id)===0; sharedBadge.addEventListener('click', e=>{e.stopPropagation(); state.memoTab='shared'; selectSite(site.id);}); noteTd.appendChild(sharedBadge); tr.appendChild(noteTd);
     tr.addEventListener('click', ()=>selectSite(site.id)); body.appendChild(tr);
   });
 

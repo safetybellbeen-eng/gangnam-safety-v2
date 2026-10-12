@@ -396,6 +396,7 @@ function resetClientStateAfterSignOut() {
   state.favoriteSiteIds = new Set();
   state.favoriteInFlight = new Set();
   state.siteNotes = new Map();
+  state.sharedNotes = new Map();
   state.noteInFlight = new Set();
   state.currentLocation = null;
   state.currentLocationAddress = null;

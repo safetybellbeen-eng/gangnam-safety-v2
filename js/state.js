@@ -20,6 +20,10 @@ export const state = {
   siteAccidentReportFilter: 'all', // 사용자 요청: "산재표" 필터(gnmap_v2_sites.accident_report_count 기준). 'all' | 'yes' | 'no'.
   favoriteSiteIds: new Set(), // 현재 로그인 사용자가 즐겨찾기한 site id 집합
   favoriteInFlight: new Set(), // 토글 요청이 진행 중인 site id (rapid click 중복 방지)
+  sharedNotes: new Map(), // siteId -> gnmap_v2_shared_notes 행 배열(오래된 순). 공유 메모(승인된 모든 사용자에게 보임).
+  sharedNotesError: false,
+  memoTab: 'personal',    // 'personal' | 'shared' — 마지막으로 본 메모 탭
+  siteNotesScope: 'mine', // 현장 메모 목록: 'mine' | 'shared'
   siteNotes: new Map(),   // siteId -> gnmap_v2_site_notes 행 (id/site_id/content/created_at/updated_at). 없으면 키가 없음.
   noteInFlight: new Set(), // 저장/삭제 요청이 진행 중인 site id (동시 요청 중복 방지)
   // F2(STEP16.35): 각 목록 조회가 "0건"인지 "조회 자체가 실패"했는지 화면에서 구분할 수 있도록

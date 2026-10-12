@@ -9,6 +9,7 @@ import { state } from './state.js';
 import { loadSupervisions, createSupervision, updateSupervision, deleteSupervision } from './supervision.js';
 import { saveNote, deleteNote, getNote } from './notes.js';
 import { isAdmin } from './auth.js';
+import { buildSharedNotesBox, buildMemoTabs, buildAuthorPill, sharedCount } from './shared_notes.js';
 import { loadUsers } from './admin.js';
 import { computeSupervisionStatus, todayDateString, showToast } from './ui.js';
 
@@ -1228,6 +1229,7 @@ function paintNotesPage() {
 }
 
 function buildNoteFormCard() {
+  NP.paintShared = null; NP.selectTab = null;
   const card = el('div', 'pc-np-card');
 
   // ---- 현장 선택(검색형 콤보박스)
@@ -1358,6 +1360,7 @@ function buildNoteFormCard() {
   });
 
   function refreshButtons() {
+    if (NP.paintShared) NP.paintShared();
     const hasSite = !!NP.siteId;
     const hasContent = textarea.value.trim().length > 0;
     saveBtn.disabled = !(hasSite && hasContent);
@@ -1557,6 +1560,34 @@ function buildNoteFormCard() {
     syncCounter();
   }
   refreshButtons();
+
+  // STEP19: 개인 메모 | 공유 메모 탭 — 기존 개인 메모 입력부(메모/안내/버튼)는 그대로 개인 탭으로 옮긴다.
+  const personalPane = el('div', 'sn-pane');
+  personalPane.appendChild(memoField);
+  personalPane.appendChild(guide);
+  personalPane.appendChild(actions);
+  const sharedPane = el('div', 'sn-pane');
+  const memoTabs = buildMemoTabs([
+    { key: 'personal', label: '개인 메모', el: personalPane },
+    { key: 'shared', label: '공유 메모', count: NP.siteId ? sharedCount(NP.siteId) : 0, el: sharedPane },
+  ]);
+  memoTabs.classList.add('sn-np-tabs');
+  card.appendChild(memoTabs);
+  let sharedPaintedFor = undefined;
+  function paintShared() {
+    if (sharedPaintedFor === NP.siteId) return;
+    sharedPaintedFor = NP.siteId;
+    sharedPane.innerHTML = '';
+    memoTabs.setCount('shared', NP.siteId ? sharedCount(NP.siteId) : 0);
+    if (!NP.siteId) { sharedPane.appendChild(el('p', 'sn-empty', '현장을 선택하면 공유 메모를 볼 수 있습니다.')); return; }
+    sharedPane.appendChild(buildSharedNotesBox(NP.siteId, (sid) => {
+      memoTabs.setCount('shared', sharedCount(sid));
+      if (NP.refreshSaved) NP.refreshSaved();
+    }));
+  }
+  NP.paintShared = paintShared;
+  NP.selectTab = memoTabs.select;
+  paintShared();
   return card;
 }
 
@@ -1566,12 +1597,47 @@ function buildSavedNotesCard() {
   head.appendChild(el('strong', '', '저장된 메모'));
   const badge = el('span', 'pc-sv-count-badge', '0건');
   head.appendChild(badge);
+  const scopeBox = el('span', 'sn-scope-row sn-scope-inline');
+  head.appendChild(scopeBox);
   card.appendChild(head);
   const body = el('div', 'pc-np-saved-list');
   card.appendChild(body);
 
+  function paintScope() {
+    scopeBox.innerHTML = '';
+    [['mine', '내 메모', state.siteNotes.size], ['shared', '공유 메모', state.sharedNotes.size]].forEach(([val, label, cnt]) => {
+      const b = el('button', 'sn-scope-btn' + (state.siteNotesScope === val ? ' is-active' : ''), `${label} ${cnt}`);
+      b.type = 'button';
+      b.addEventListener('click', () => { state.siteNotesScope = val; paint(); });
+      scopeBox.appendChild(b);
+    });
+  }
+  function paintShared() {
+    const sitesById = new Map((state.sites || []).map(x => [x.id, x]));
+    const rows = [];
+    state.sharedNotes.forEach((list, siteId) => { const site = sitesById.get(siteId); if (site && list.length) rows.push({ site, list, last: list[list.length - 1] }); });
+    rows.sort((a, b) => String(b.last.created_at).localeCompare(String(a.last.created_at)));
+    badge.textContent = `${rows.length}건`;
+    if (rows.length === 0) { body.appendChild(el('p', 'pc-np-saved-empty', '공유 메모가 없습니다.')); return; }
+    rows.forEach(({ site, list, last }) => {
+      const item = el('button', 'pc-np-saved-item' + (site.id === NP.siteId ? ' is-active' : ''));
+      item.type = 'button';
+      const top = el('div', 'pc-np-saved-top');
+      top.appendChild(el('strong', '', siteLabel(site)));
+      top.appendChild(el('span', '', `👥${list.length} · ${fmtTimestampDate(last.created_at)}`));
+      item.appendChild(top);
+      const line = el('p', 'sn-saved-line');
+      line.appendChild(buildAuthorPill(last.author_name));
+      line.appendChild(document.createTextNode(' ' + String(last.content || '').replace(/\s+/g, ' ').trim().slice(0, 60)));
+      item.appendChild(line);
+      item.addEventListener('click', () => { if (NP.choose) NP.choose(site); if (NP.selectTab) NP.selectTab('shared'); });
+      body.appendChild(item);
+    });
+  }
   function paint() {
     body.innerHTML = '';
+    paintScope();
+    if (state.siteNotesScope === 'shared') { paintShared(); return; }
     const sitesById = new Map((state.sites || []).map(x => [x.id, x]));
     const notes = Array.from((state.siteNotes && state.siteNotes.values && state.siteNotes.values()) || [])
       .filter(n => sitesById.has(n.site_id))

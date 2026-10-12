@@ -4,10 +4,17 @@
 // 다른 user_id를 조작할 수 있는 여지를 코드 레벨에서도 만들지 않는다.
 import { sb } from './api.js';
 import { state } from './state.js';
+import { loadSharedNotes } from './shared_notes.js';
 
 // 현재 로그인 사용자의 메모를 1회 조회해 state.siteNotes(Map)에 채운다.
 // 실패해도 예외를 던지지 않는다 — sites/map 등 다른 기능을 막지 않기 위함.
 export async function loadNotes() {
+  // 공유 메모(STEP19)도 함께 불러온다 — 개인 메모 조회와 병렬이며, 실패해도 개인 메모에 영향이 없다.
+  const sharedP = loadSharedNotes().catch(e => { console.error('공유 메모 조회 실패:', e); });
+  try { await loadPersonalNotes(); } finally { await sharedP; }
+}
+
+async function loadPersonalNotes() {
   // F2(STEP16.35): 조회 실패를 "메모 0건"과 구분할 수 있도록 표시만 한다.
   state.notesLoadError = false;
 
