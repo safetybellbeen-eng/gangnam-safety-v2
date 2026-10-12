@@ -21,6 +21,7 @@
 <!-- 성능: 외부 서버 연결을 미리 열고, 앱 모듈을 한꺼번에 병렬로 내려받는다(import 체인을 따라 하나씩 받던 지연 제거). -->
 <link rel="preconnect" href="https://dapi.kakao.com" crossorigin>
 <link rel="preconnect" href="https://kuphyemtyamglvyjpvwh.supabase.co" crossorigin>
+<link rel="preload" as="script" href="vendor/supabase.min.js">
 <link rel="modulepreload" href="js/app.js">
 <link rel="modulepreload" href="js/config.js">
 <link rel="modulepreload" href="js/state.js">

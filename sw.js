@@ -10,7 +10,7 @@
 // 다른 origin/다른 앱의 캐시는 건드리지 않는다(Cache Storage 자체가 origin별로 격리되어 있고,
 // 여기서도 이름 prefix로 한 번 더 스스로 범위를 제한한다).
 const CACHE_PREFIX = 'gnmap-v2-shell-';
-const CACHE_VERSION = 'v73'; // STEP16.22 배포(index.html/js/ui.js/css/mobile.css 변경) 후에도
+const CACHE_VERSION = 'v74'; // STEP16.22 배포(index.html/js/ui.js/css/mobile.css 변경) 후에도
 // "필터가 작동 안 한다" 재발 — STEP16.22를 올리면서 이 값을 v7 그대로 두고 깜빡해, app shell
 // (index.html/css/mobile.css)이 여전히 STEP16.21 버전으로 캐시된 채 최신 js/ui.js와 섞여 로드된
 // 것이 원인으로 추정된다. 앞으로는 index.html/css/*.css 중 하나라도 바뀌는 배포마다 반드시 이
@@ -27,12 +27,50 @@ const APP_SHELL_URLS = [
   './index.html',
   './manifest.json',
   './css/base.css',
-  './css/layout.css',
   './css/components.css',
+  './css/desktop.css',
+  './css/layout.css',
   './css/map.css',
   './css/mobile.css',
+  './js/admin.js',
+  './js/api.js',
+  './js/app.js',
+  './js/auth.js',
+  './js/config.js',
+  './js/excel.js',
+  './js/favorites.js',
+  './js/geocoding.js',
+  './js/import.js',
+  './js/location.js',
+  './js/map.js',
+  './js/mobile_tutorial.js',
+  './js/nav_chooser.js',
+  './js/notes.js',
+  './js/pc_address_search.js',
+  './js/pc_admin.js',
+  './js/pc_pages.js',
+  './js/pc_tutorial.js',
+  './js/pc_upload.js',
+  './js/perf.js',
+  './js/session_guard.js',
+  './js/sites.js',
+  './js/state.js',
+  './js/supervision.js',
+  './js/ui.js',
+  './js/xlsx_loader.js',
+  './vendor/supabase.min.js',
+  './assets/data/gangnam-boundary.geojson',
+  './assets/data/gangnam-dong-boundary.geojson',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
+  './assets/icons/apple-touch-icon.png',
+  './assets/icons/mobile-qr.png',
+  './assets/icons/moel-ci-full.png',
+  './assets/icons/moel-ci-cutout.png',
+  './assets/icons/moel-ci.png',
+  './assets/images/login-hero.webp',
+  './assets/images/splash.webp',
+  './assets/images/desktop-auth-bg.webp',
 ];
 
 self.addEventListener('install', (event) => {
@@ -92,17 +130,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 그 외 같은 origin의 정적 asset(css/js/manifest/icon 등)은 stale-while-revalidate.
-  // 캐시가 있으면 즉시 그걸 응답하면서 동시에 네트워크로 최신본을 받아 캐시를 갱신해 두고,
-  // 캐시가 없으면 네트워크 응답을 그대로 쓰면서 캐시에 저장한다.
-  // 수정(2026-10): JS/CSS는 서로 import로 엮여 있어(app.js ↔ ui.js ↔ pc_pages.js) 일부만 옛 캐시를
-  // 쓰면 "export 없음"으로 모듈 로딩이 깨지거나 새 화면이 빈 화면이 된다. 그래서 network-first로
-  // 항상 최신본을 받고, 오프라인일 때만 캐시를 쓴다. 이미지/manifest 등만 stale-while-revalidate.
-  if (/\.(js|css|html)$/.test(url.pathname)) {
+  // 속도(2026-10): 예전에는 JS/CSS를 매 요청마다 서버에 먼저 물어봐(network-first) 파일 160여 개가 줄을
+  // 서서 재방문도 느렸다. 이제 같은 origin 정적 파일은 "버전 고정 캐시 우선"으로 처리한다.
+  //  - install 때 모든 JS/CSS/이미지를 새 버전 캐시에 한 번에 받아 두고(위 APP_SHELL_URLS),
+  //    CACHE_VERSION이 바뀌면 옛 캐시는 통째로 지워진다 → 옛 파일과 새 파일이 섞이지 않는다.
+  //  - 배포 때마다 sw.js의 CACHE_VERSION과 js/build_check.js의 B를 반드시 같이 올린다(기존 규칙 그대로).
+  //  - index.html / build_check.js / sw.js / manifest.json 은 항상 network-first(가볍고, 새 버전 감지용).
+  if (/\/(build_check\.js|sw\.js|manifest\.json|index\.html)$/.test(url.pathname)) {
     event.respondWith(networkFirst(request));
     return;
   }
-  event.respondWith(staleWhileRevalidate(request));
+  event.respondWith(cacheFirst(request));
 });
 
 async function networkFirst(request) {
@@ -122,30 +160,12 @@ async function networkFirst(request) {
   }
 }
 
-async function staleWhileRevalidate(request) {
+async function cacheFirst(request) {
   const cache = await caches.open(CACHE_NAME);
-  const cached = await cache.match(request);
-
-  const networkFetch = fetch(request)
-    .then((response) => {
-      // basic 타입(같은 origin, 정상 응답)만 캐시한다 — opaque/에러 응답은 저장하지 않는다.
-      if (response && response.ok && response.type === 'basic') {
-        cache.put(request, response.clone());
-      }
-      return response;
-    })
-    .catch(() => null);
-
-  if (cached) {
-    // 오래된 캐시를 먼저 즉시 반환하고, 네트워크 갱신은 백그라운드에서 계속 진행한다
-    // (응답을 기다리지 않음 — 실패해도 이미 cached를 반환했으므로 무시).
-    networkFetch;
-    return cached;
-  }
-
-  const networkResponse = await networkFetch;
-  if (networkResponse) return networkResponse;
-
-  // 캐시도 없고 네트워크도 실패한 경우(오프라인 상태에서 한 번도 못 받아본 asset)만 실패시킨다.
-  throw new Error('네트워크와 캐시 모두 사용할 수 없습니다: ' + request.url);
+  const cached = await cache.match(request, { ignoreSearch: true });
+  if (cached) return cached;
+  // 캐시에 없는 파일(예: 처음 쓰는 xlsx 라이브러리)은 네트워크로 받아 이 버전 캐시에 저장한다.
+  const response = await fetch(request);
+  if (response && response.ok && response.type === 'basic') cache.put(request, response.clone());
+  return response;
 }
