@@ -37,6 +37,11 @@ try {
   {
     const { page, errors } = await openLoggedIn(browser, { width: 1400, height: 900 });
     await test('PC: 로그인 후 승인 화면 진입, JS 오류/CSP 위반 없음', async () => { eq(errors.length, 0, errors.join(' | ')); });
+    await test('속도: 엑셀 라이브러리는 시작 때 받지 않고, 필요할 때(ensureXlsx) 불러온다', async () => {
+      eq(await page.evaluate(() => typeof window.XLSX), 'undefined', '시작부터 XLSX가 로드됨');
+      const ok2 = await page.evaluate(async () => { const m = await import('/js/xlsx_loader.js'); const x = await m.ensureXlsx(); return !!(x && x.utils && x.writeFile); });
+      ok(ok2, 'ensureXlsx 로드 실패');
+    });
     await page.click('.pc-nav-btn[data-pc-tab="map"]'); await page.waitForTimeout(500);
     await test('PC: 행정동 "기본" 상태에서는 목록이 비어 있다', async () => {
       eq(await page.evaluate(() => window.__st.dongDefault), true); eq(await items(page), 0);
