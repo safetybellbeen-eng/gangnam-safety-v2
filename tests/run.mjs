@@ -194,21 +194,27 @@ try {
     });
     await test('감독일정 달력: 담당자 이니셜, 장기 일정 띠, 감독/점검 건수', async () => {
       const r = await page.evaluate(() => ({
-        av: document.querySelectorAll('.pc-sv-bar .pc-sv-av, .pc-sv-longchip .pc-sv-av').length,
-        panelNames: [...document.querySelectorAll('.pc-sv-drow .pc-sv-av')].map((x) => x.textContent),
-        longChips: document.querySelectorAll('.pc-sv-longchip').length,
+        av: document.querySelectorAll('.pc-sv-bar .pc-sv-mp, .pc-sv-bar .pc-sv-av').length,
+        panelNames: [...document.querySelectorAll('.pc-sv-drow .pc-sv-mp')].map((x) => x.textContent),
+        oldParts: ['.pc-sv-stat', '.pc-sv-longchip', '.pc-sv-today-bar', '.pc-sv-filter', '.pc-sv-mgrchip'].map((q) => document.querySelectorAll(q).length),
+        mavColors: new Set([...document.querySelectorAll('.pc-sv-mav')].map((b) => getComputedStyle(b).backgroundColor)).size,
+        mavCount: document.querySelectorAll('.pc-sv-mav').length,
+        pillColors: new Set([...document.querySelectorAll('.pc-sv-drow .pc-sv-mp')].map((x) => getComputedStyle(x).color)).size,
         longInGrid: [...document.querySelectorAll('.pc-sv-bar.is-slim .pc-sv-bar-title')].some((x) => x.textContent === '장기점검'),
         slimLabel: document.querySelector('.pc-sv-bar.is-slim .pc-sv-bar-long')?.textContent || '',
         slimNotSolid: [...document.querySelectorAll('.pc-sv-bar:not(.is-slim) .pc-sv-bar-title')].every((x) => x.textContent !== '장기점검'),
-        stat: document.querySelector('.pc-sv-stat-total .pc-sv-stat-sub')?.textContent || '',
+        stat: document.querySelector('.pc-sv-statline')?.textContent || '',
       }));
       eq(r.av, 0, '달력 막대/띠에 담당자 이름이 표시됨');
       ok(r.panelNames.includes('영호') && r.panelNames.includes('세진'), '선택 날짜 패널 담당자 이름 누락 ' + r.panelNames);
-      eq(r.longChips, 1, '장기 일정 띠');
+      eq(r.oldParts.join(','), '0,0,0,0,0', '정리로 없앤 요소가 남아 있음(통계카드/장기띠/오늘바/드롭다운/칩)');
+      eq(r.mavCount, 3, '담당자 색 원 개수');
+      eq(r.mavColors, 3, '담당자마다 색이 달라야 함');
+      ok(r.pillColors >= 2, '패널 이름표 색 구분');
       eq(r.longInGrid, true, '장기 일정이 달력 칸에 연한 띠로 표시되어야 함');
       ok(/장기/.test(r.slimLabel), '장기 띠 표시 글자 ' + r.slimLabel);
       ok(r.slimNotSolid, '장기 일정이 진한 막대로 그려짐');
-      ok(/감독 1 · 점검 2/.test(r.stat), '건수 표시 ' + r.stat);
+      ok(/진행/.test(r.stat) && /예정/.test(r.stat) && /완료/.test(r.stat), '상태 건수 글자 ' + r.stat);
     });
     await test('감독일정 달력: 막대에 마우스를 올리면 미리보기가 뜨고 벗어나면 사라진다', async () => {
       await page.hover('.pc-sv-bar.is-kind-sup'); await page.waitForTimeout(150);
@@ -228,10 +234,16 @@ try {
       eq(r.other, false, '다른 날짜 일정 카드가 남아 있음');
       ok(r.exp.includes('집중감독') && r.exp.includes('현장점검') && !r.exp.includes('장기점검'), '만료 예정 목록 ' + r.exp); // 오늘 끝나는 일정도 포함, 40일 뒤 끝나는 장기 일정은 제외
     });
-    await test('감독일정 달력: 담당자 칩으로 필터된다', async () => {
-      await page.click('.pc-sv-mgrchip:has-text("최영호")'); await page.waitForTimeout(200);
-      const t = await page.evaluate(() => [...document.querySelectorAll('.pc-sv-bar .pc-sv-bar-title')].map((x) => x.textContent));
-      ok(new Set(t).size === 1 && t[0] === '집중감독', '필터 결과 ' + t); // 주를 넘어가는 일정은 막대가 두 개로 나뉘므로 제목 종류로 비교한다.
+    await test('감독일정 달력: 담당자 색 원을 누르면 그 담당자 일정만 진하게, 나머지는 흐리게 보이고 다시 누르면 풀린다', async () => {
+      await page.click('.pc-sv-mav[title="강남지청 최영호"]'); await page.waitForTimeout(200);
+      const t = await page.evaluate(() => ({
+        solid: [...document.querySelectorAll('.pc-sv-bar:not(.is-dim) .pc-sv-bar-title')].map((x) => x.textContent),
+        dim: document.querySelectorAll('.pc-sv-bar.is-dim').length,
+      }));
+      ok(new Set(t.solid).size === 1 && t.solid[0] === '집중감독', '진한 막대 ' + t.solid); // 주를 넘어가는 일정은 막대가 두 개로 나뉘므로 제목 종류로 비교한다.
+      ok(t.dim > 0, '흐린 막대가 없음');
+      await page.click('.pc-sv-mav[title="강남지청 최영호"]'); await page.waitForTimeout(200);
+      eq(await page.locator('.pc-sv-bar.is-dim').count(), 0, '다시 누르면 전체로 돌아와야 함');
     });
     eq(errors.length, 0, errors.join(' | '));
     await page.close();
