@@ -130,3 +130,5 @@ create table gnmap_v2_supervisions (
   constraint gnmap_v2_supervisions_date_check
     check (end_date >= start_date)
 );
+
+-- STEP19: 공유 현장 메모 gnmap_v2_shared_notes (테이블/트리거/RLS 전체는 migrations/20261012_step19_shared_site_notes.sql)

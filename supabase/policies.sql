@@ -185,3 +185,5 @@ create policy gnmap_v2_supervisions_update_admin
 create policy gnmap_v2_supervisions_delete_admin
   on gnmap_v2_supervisions for delete
   using (is_gnmap_v2_admin());
+
+-- STEP19: gnmap_v2_shared_notes RLS — 조회: 승인 사용자 전체 / 쓰기: 본인 / 삭제: 본인 또는 관리자 (migrations/20261012_step19_shared_site_notes.sql 참조)
