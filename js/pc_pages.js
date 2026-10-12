@@ -129,6 +129,10 @@ const SV = {
   manager: 'all',           // 'all' | 'mine' | 담당 감독관 이름
 };
 
+// 달력 막대용: 담당자를 한 명 골랐을 때는 다른 사람 일정도 그대로 그리고 흐리게만 표시한다.
+function svCalRows() { return (SV.manager === 'all' || SV.manager === 'mine') ? svRows() : SV.rows; }
+function svDimmed(sv) { return SV.manager !== 'all' && SV.manager !== 'mine' && (sv.manager_name || '') !== SV.manager; }
+
 // 담당 감독관 필터가 적용된 일정 목록
 function svRows() {
   if (SV.manager === 'all') return SV.rows;
@@ -149,16 +153,42 @@ const SV_EXPIRE_DAYS = 5; // 우측 '만료 예정' 기준(종료까지 남은 �
 function svIsLong(sv) { return (parseYMD(sv.end_date) - parseYMD(sv.start_date)) / 86400000 >= SV_LONG_DAYS; }
 
 // 담당 감독관 이니셜/색(이름 순서대로 고정 배정)
-const SV_MGR_COLORS = ['#6a3fb5', '#0b7a6b', '#a35a14', '#4b5563', '#a3338c', '#2a7a2a', '#8a6d00', '#1c6fa8'];
+// 감독(빨강)/점검(파랑)과 헷갈리지 않도록 빨강·파랑 계열은 뺀 담당자 전용 색.
+const SV_MGR_COLORS = ['#7b61c9', '#2f9e6f', '#e8890c', '#0e8fa8', '#a3338c', '#6b7a1f', '#8a5a3c', '#4b5563'];
 function svMgrNames() {
   return Array.from(new Set(SV.rows.map(sv => (sv.manager_name || '').trim()).filter(Boolean))).sort();
 }
 // 담당자 표시: "강남지청 유호정" → 이름 "유호정", 아바타에는 성을 뺀 "호정"을 쓴다.
 function svMgrShort(name) { const t = (name || '').trim().split(/\s+/); return t[t.length - 1] || ''; }
 function svMgrInitial(name) { const c = Array.from(svMgrShort(name)); return (c.length >= 3 ? c.slice(1) : c).join(''); }
-function svMgrColor(name) {
-  const i = svMgrNames().indexOf((name || '').trim());
-  return SV_MGR_COLORS[(i < 0 ? 0 : i) % SV_MGR_COLORS.length];
+// 담당자 색: 이름에서 계산한 값으로 먼저 정하고, 겹치면 다음 빈 색으로 넘긴다(이름 순서대로 처리).
+// 그래서 담당자가 추가/삭제돼도 대부분의 사람은 색이 그대로 유지된다.
+function svMgrColorMap() {
+  const names = svMgrNames();
+  const key = names.join('|');
+  if (svMgrColorMap.cache && svMgrColorMap.cache.key === key) return svMgrColorMap.cache.map;
+  const hash = (t) => { let h = 0; for (const ch of t) h = (h * 31 + ch.codePointAt(0)) >>> 0; return h; };
+  const n = SV_MGR_COLORS.length;
+  const used = new Set();
+  const map = {};
+  names.slice().sort((a, b) => hash(svMgrShort(a)) - hash(svMgrShort(b)) || a.localeCompare(b)).forEach(nm => {
+    let i = hash(svMgrShort(nm)) % n;
+    for (let k = 0; k < n && used.has(i); k++) i = (i + 1) % n;
+    used.add(i);
+    map[nm] = SV_MGR_COLORS[i];
+  });
+  svMgrColorMap.cache = { key, map };
+  return map;
+}
+function svMgrColor(name) { return svMgrColorMap()[(name || '').trim()] || '#4b5563'; }
+// 담당자 이름표(색 점 + 이름). 오른쪽 패널 목록에 쓴다.
+function buildMgrPill(name) {
+  const p = el('span', 'pc-sv-mp');
+  p.style.setProperty('--mc', svMgrColor(name));
+  p.appendChild(el('i'));
+  p.appendChild(document.createTextNode(svMgrInitial(name)));
+  p.title = (name || '').trim();
+  return p;
 }
 function buildAvatar(name) {
   const a = el('span', 'pc-sv-av', svMgrInitial(name));
@@ -265,19 +295,6 @@ function paintSupervisionPage() {
   titleWrap.appendChild(el('p', 'pc-sv-subtitle', '예정된 감독 일정을 확인하고 관리합니다.'));
   titleBar.appendChild(titleWrap);
   const rightBox = el('div', 'pc-sv-titlebar-right');
-  const names = Array.from(new Set(SV.rows.map(sv => (sv.manager_name || '').trim()).filter(Boolean))).sort();
-  const filterWrap = el('label', 'pc-sv-filter');
-  filterWrap.appendChild(el('span', '', '담당 감독관'));
-  const filterSel = el('select', 'pc-sv-filter-select');
-  [['all', '전체 일정'], ['mine', '내 일정'], ...names.map(n => [n, n])].forEach(([v, label]) => {
-    const o = el('option', '', label);
-    o.value = v;
-    if (SV.manager === v) o.selected = true;
-    filterSel.appendChild(o);
-  });
-  filterSel.addEventListener('change', () => { SV.manager = filterSel.value; rerenderSv(); });
-  filterWrap.appendChild(filterSel);
-  rightBox.appendChild(filterWrap);
   titleBar.appendChild(rightBox);
   if (admin) {
     const addBtn = el('button', 'pc-sv-add-btn');
@@ -305,37 +322,6 @@ function paintSupervisionPage() {
   const monthRows = svRows().filter(sv => svOverlapsRange(sv, mStart, mEnd));
   const rowsOf = (st) => st === 'total' ? monthRows : monthRows.filter(sv => computeSupervisionStatus(sv.start_date, sv.end_date) === st);
 
-  const topLine = el('div', 'pc-sv-topline');
-  const stats = el('div', 'pc-sv-stats');
-  [
-    ['total', 'calendar', '전체 일정'],
-    ['scheduled', 'clock', '예정'],
-    ['ongoing', 'play', '진행'],
-    ['done', 'check', '완료'],
-  ].forEach(([key, ic, label]) => {
-    const list = rowsOf(key);
-    const count = list.length;
-    const supN = list.filter(sv => svKind(sv) === 'sup').length;
-    const card = el('div', `pc-sv-stat pc-sv-stat-${key}`);
-    const iconBox = el('span', 'pc-sv-stat-icon');
-    iconBox.appendChild(icon(ic, key === 'total' ? 26 : 30));
-    card.appendChild(iconBox);
-    const text = el('div', 'pc-sv-stat-text');
-    text.appendChild(el('span', 'pc-sv-stat-label', label));
-    const num = el('strong', 'pc-sv-stat-num');
-    num.appendChild(document.createTextNode(String(count)));
-    num.appendChild(el('small', '', '건'));
-    text.appendChild(num);
-    const sub = el('span', 'pc-sv-stat-sub');
-    sub.appendChild(el('b', 'is-sup', `감독 ${supN}`));
-    sub.appendChild(document.createTextNode(' · '));
-    sub.appendChild(el('b', 'is-ins', `점검 ${count - supN}`));
-    text.appendChild(sub);
-    card.appendChild(text);
-    stats.appendChild(card);
-  });
-  topLine.appendChild(stats);
-
   const toolbar = el('div', 'pc-sv-toolbar');
   const nav = el('div', 'pc-sv-nav');
   const todayBtn = el('button', 'pc-sv-today-btn', '오늘');
@@ -361,6 +347,35 @@ function paintSupervisionPage() {
   nav.appendChild(next);
   toolbar.appendChild(nav);
 
+  const rightTools = el('div', 'pc-sv-toolbar-right');
+  // 이번 기간 상태별 건수(글자 한 줄)
+  const statline = el('div', 'pc-sv-statline');
+  [['ongoing', '진행'], ['scheduled', '예정'], ['done', '완료']].forEach(([key, label], i) => {
+    if (i) statline.appendChild(el('span', 'pc-sv-statline-sep', '·'));
+    statline.appendChild(el('span', '', label));
+    statline.appendChild(el('b', '', String(rowsOf(key).length)));
+  });
+  rightTools.appendChild(statline);
+  // 담당자 색 원: 누르면 그 담당자 일정만 진하게, 다시 누르면 전체
+  const mgrNames = svMgrNames();
+  if (mgrNames.length) {
+    const mavs = el('div', 'pc-sv-mavs');
+    mavs.setAttribute('role', 'group');
+    mavs.setAttribute('aria-label', '담당자 선택');
+    mgrNames.forEach(n => {
+      const on = SV.manager === n;
+      const b = el('button', 'pc-sv-mav' + (on ? ' is-on' : (SV.manager !== 'all' && SV.manager !== 'mine' ? ' is-off' : '')), svMgrInitial(n));
+      b.type = 'button';
+      b.title = n;
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      b.setAttribute('aria-label', `담당자 ${n}`);
+      b.style.setProperty('--mc', svMgrColor(n));
+      b.addEventListener('click', () => { SV.manager = SV.manager === n ? 'all' : n; rerenderSv(); });
+      mavs.appendChild(b);
+    });
+    rightTools.appendChild(mavs);
+  }
+
   const seg = el('div', 'pc-sv-seg');
   [['month', '월'], ['week', '주'], ['day', '일'], ['list', '목록']].forEach(([key, label]) => {
     const b = el('button', 'pc-sv-seg-btn' + (SV.view === key ? ' active' : ''), label);
@@ -372,11 +387,9 @@ function paintSupervisionPage() {
     });
     seg.appendChild(b);
   });
-  toolbar.appendChild(seg);
-  topLine.appendChild(toolbar);
-  root.appendChild(topLine);
-  const subRow = buildSvSubRow();
-  if (subRow) root.appendChild(subRow);
+  rightTools.appendChild(seg);
+  toolbar.appendChild(rightTools);
+  root.appendChild(toolbar);
 
   // ---- 본문: 좌측(달력/주/일/목록) + 우측(선택 날짜 일정 / 다른 날짜 일정)
   const body = el('div', 'pc-sv-body');
@@ -419,61 +432,6 @@ function buildLegend() {
   return legend;
 }
 
-// 달력 위 한 줄: 담당자 필터 + 장기 일정 띠(월 보기에서만)
-function buildSvSubRow() {
-  const row = el('div', 'pc-sv-subrow');
-  const names = svMgrNames();
-  if (names.length) {
-    const box = el('div', 'pc-sv-mgrbox');
-    box.appendChild(el('b', 'pc-sv-subrow-label', '담당자'));
-    const me = ((state.profile && state.profile.name) || '').trim();
-    names.forEach(n => {
-      const on = SV.manager === 'all' || SV.manager === n || (SV.manager === 'mine' && me && n.includes(me));
-      const chip = el('button', 'pc-sv-mgrchip' + (on ? ' is-on' : ''));
-      chip.type = 'button';
-      chip.setAttribute('aria-pressed', on ? 'true' : 'false');
-      chip.style.setProperty('--mc', svMgrColor(n));
-      chip.appendChild(document.createTextNode(svMgrShort(n)));
-      chip.addEventListener('click', () => { SV.manager = SV.manager === n ? 'all' : n; rerenderSv(); });
-      box.appendChild(chip);
-    });
-    row.appendChild(box);
-  }
-  if (SV.view === 'month') {
-    const [ms, me2] = monthRange(SV.anchor);
-    const longs = sortEvents(svRows().filter(sv => svIsLong(sv) && svOverlapsRange(sv, ms, me2)));
-    if (longs.length) {
-      const box = el('div', 'pc-sv-longbox');
-      box.appendChild(el('b', 'pc-sv-subrow-label', '장기 일정'));
-      const today = todayDateString();
-      longs.forEach(sv => {
-        const total = Math.max(1, (parseYMD(sv.end_date) - parseYMD(sv.start_date)) / 86400000);
-        const pct = Math.round(Math.min(1, Math.max(0, (parseYMD(today) - parseYMD(sv.start_date)) / 86400000 / total)) * 100);
-        const chip = el('button', `pc-sv-longchip is-kind-${svKind(sv)}`);
-        chip.type = 'button';
-        chip.appendChild(el('span', 'pc-sv-bar-tag', SV_KIND_LABEL[svKind(sv)]));
-        chip.appendChild(el('span', 'pc-sv-longchip-title', sv.title));
-        const pg = el('span', 'pc-sv-longchip-pg');
-        const fill = el('i');
-        fill.style.width = `${pct}%`;
-        pg.appendChild(fill);
-        chip.appendChild(pg);
-        chip.appendChild(el('small', '', `${fmtMD(sv.start_date)} ~ ${fmtMD(sv.end_date)} · ${pct}%`));
-        chip.addEventListener('click', () => {
-          const lo = sv.start_date > ms ? sv.start_date : ms;
-          const hi = sv.end_date < me2 ? sv.end_date : me2;
-          SV.selected = today < lo ? lo : today > hi ? hi : today;
-          rerenderSv();
-        });
-        attachSvTip(chip, sv);
-        box.appendChild(chip);
-      });
-      row.appendChild(box);
-    }
-  }
-  return row.childNodes.length ? row : null;
-}
-
 // ---- 월 보기
 function buildMonthView(host) {
   host.classList.add('is-month');
@@ -495,7 +453,7 @@ function buildMonthView(host) {
 function layoutWeek(days, only) {
   const ws = days[0];
   const we = days[6];
-  const segs = svRows()
+  const segs = svCalRows()
     .filter(sv => svOverlapsRange(sv, ws, we) && (only === 'short' ? !svIsLong(sv) : only === 'long' ? svIsLong(sv) : true))
     .map(sv => {
       const s = sv.start_date < ws ? ws : sv.start_date;
@@ -664,7 +622,7 @@ function buildBar(sg, days, slim) {
   const { sv } = sg;
   const kind = svKind(sv);
   const status = computeSupervisionStatus(sv.start_date, sv.end_date);
-  const bar = el('button', `pc-sv-bar is-kind-${kind}` + (slim ? ' is-slim' : '') + (status === 'done' ? ' is-done' : '')
+  const bar = el('button', `pc-sv-bar is-kind-${kind}` + (slim ? ' is-slim' : '') + (svDimmed(sv) ? ' is-dim' : '') + (status === 'done' ? ' is-done' : '')
     + (sg.contL ? ' cont-left' : '') + (sg.contR ? ' cont-right' : '')
     + (SV.selected && svOverlapsDate(sv, SV.selected) ? ' is-active' : ''));
   bar.type = 'button';
@@ -829,7 +787,7 @@ function buildDayGroups(rows) {
       r.appendChild(el('span', 'pc-sv-drow-title', sv.title));
       const range = sv.start_date === sv.end_date ? fmtMD(sv.start_date) : `${fmtMD(sv.start_date)}~${fmtMD(sv.end_date)}`;
       r.appendChild(el('span', 'pc-sv-drow-range', svIsLong(sv) ? `${range} · 장기` : range));
-      if ((sv.manager_name || '').trim()) r.appendChild(buildAvatar(sv.manager_name));
+      if ((sv.manager_name || '').trim()) r.appendChild(buildMgrPill(sv.manager_name));
       r.appendChild(el('span', `pc-sv-dst pc-status-${st}`, STATUS_LABEL[st]));
       r.addEventListener('click', () => openSvDetailModal(sv));
       g.appendChild(r);
@@ -842,20 +800,6 @@ function buildDayGroups(rows) {
 function buildSidePanel() {
   const side = el('div', 'pc-sv-side');
   const admin = isAdmin();
-
-  // 오늘 요약
-  const todayStr = todayDateString();
-  const todayCount = svRows().filter(sv => svOverlapsDate(sv, todayStr)).length;
-  const ongoingCount = svRows().filter(sv => computeSupervisionStatus(sv.start_date, sv.end_date) === 'ongoing').length;
-  const todayBar = el('button', 'pc-sv-today-bar');
-  todayBar.type = 'button';
-  todayBar.appendChild(icon('calendar', 20));
-  todayBar.appendChild(el('span', 'pc-sv-today-text', `오늘 ${todayCount}건`));
-  todayBar.appendChild(el('i', 'pc-sv-today-sep'));
-  todayBar.appendChild(el('span', 'pc-sv-today-text is-ongoing', `진행 중 ${ongoingCount}건`));
-  todayBar.appendChild(el('span', 'pc-sv-today-go', '오늘로 이동'));
-  todayBar.addEventListener('click', () => { SV.anchor = todayStr; SV.selected = todayStr; rerenderSv(); });
-  side.appendChild(todayBar);
 
   const sel = el('div', 'pc-sv-side-card is-selected-card');
   const selHead = el('div', 'pc-sv-side-head');
@@ -911,6 +855,7 @@ function buildSidePanel() {
       r.appendChild(el('span', `pc-sv-ktag is-${kind}`, SV_KIND_LABEL[kind]));
       r.appendChild(el('span', 'pc-sv-drow-title', sv.title));
       r.appendChild(el('span', 'pc-sv-drow-range', `~${fmtMD(sv.end_date)}`));
+      if ((sv.manager_name || '').trim()) r.appendChild(buildMgrPill(sv.manager_name));
       r.appendChild(el('span', 'pc-sv-expbadge' + (left <= 1 ? ' is-urgent' : ''), left === 0 ? '오늘 종료' : `D-${left}`));
       r.addEventListener('click', () => openSvDetailModal(sv));
       other.appendChild(r);
